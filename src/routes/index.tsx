@@ -6,11 +6,16 @@ import {
   Gamepad2,
   HouseWifi,
   Laptop,
+  Loader2,
   Moon,
+  Radar,
   Radio,
+  RotateCcw,
   Search,
+  Settings2,
   Sun,
   Tv,
+  Upload,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -21,8 +26,21 @@ import {
   type Device,
   type DeviceType,
 } from "@/lib/devices";
+import {
+  clearStoredData,
+  fetchFromAgent,
+  formatScanTime,
+  loadScanMeta,
+  loadStoredDevices,
+  saveDevices,
+  saveScanMeta,
+  type ScanMeta,
+  type ScannerStatus,
+} from "@/lib/scanner";
 import { BandwidthChart } from "@/components/network/BandwidthChart";
 import { DeviceDetailPanel } from "@/components/network/DeviceDetailPanel";
+import { ImportDevicesModal } from "@/components/network/ImportDevicesModal";
+import { ScannerSetupModal } from "@/components/network/ScannerSetupModal";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
