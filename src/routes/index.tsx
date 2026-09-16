@@ -93,21 +93,33 @@ function Dashboard() {
   const [importOpen, setImportOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [packageOpen, setPackageOpen] = useState(false);
+  const [runtime, setRuntime] = useState<Runtime>("web");
+  const [dbPath, setDbPath] = useState("Almacenamiento del navegador (localStorage)");
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
 
-  // Restaura la última lista guardada en este navegador.
+  // Restaura la última lista guardada (archivo local en escritorio, localStorage en web).
   useEffect(() => {
-    const stored = loadStoredDevices();
-    if (stored && stored.length > 0) setItems(stored);
-    setMeta(loadScanMeta());
-    setHydrated(true);
+    let cancelled = false;
+    void (async () => {
+      const stored = await loadDevicesAnywhere();
+      if (cancelled) return;
+      if (stored && stored.length > 0) setItems(stored);
+      setMeta(loadScanMeta());
+      setRuntime(getRuntime());
+      setDbPath(await getDbPath());
+      setHydrated(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    if (hydrated) saveDevices(items);
+    if (hydrated) void saveDevicesAnywhere(items);
   }, [items, hydrated]);
 
   const applyScan = (devices: Device[], source: NonNullable<ScanMeta["source"]>) => {
@@ -115,7 +127,7 @@ function Dashboard() {
     const next: ScanMeta = { lastScanAt: new Date().toISOString(), source };
     setMeta(next);
     saveScanMeta(next);
-    saveDevices(devices);
+    void saveDevicesAnywhere(devices);
   };
 
   const scan = async () => {
@@ -123,6 +135,15 @@ function Dashboard() {
     setStatus("checking");
     setNotice(null);
     try {
+      // 1) En escritorio (Tauri/Electron): escaneo ARP nativo del sistema.
+      const native = await nativeScan();
+      if (native && native.length > 0) {
+        setStatus("connected");
+        applyScan(native, "native");
+        setNotice(`Escaneo nativo completado: ${native.length} dispositivos detectados.`);
+        return;
+      }
+      // 2) Fallback: agente local en http://localhost:8765/scan.
       const devices = await fetchFromAgent();
       setStatus("connected");
       applyScan(devices, "agent");
@@ -130,7 +151,7 @@ function Dashboard() {
     } catch {
       setStatus("disconnected");
       setNotice(
-        "No se ha podido contactar con el agente local en http://localhost:8765/scan. Configúralo o importa los datos manualmente.",
+        "No se ha podido escanear la red. Inicia el agente local (http://localhost:8765/scan), usa la app portable o importa los datos manualmente.",
       );
     } finally {
       setScanning(false);
@@ -141,6 +162,7 @@ function Dashboard() {
     clearStoredData();
     setItems(seedDevices);
     setMeta({ lastScanAt: null, source: null });
+    void saveDevicesAnywhere(seedDevices);
     setNotice("Datos guardados borrados. Se muestra de nuevo la red de ejemplo.");
   };
 
