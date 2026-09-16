@@ -51,6 +51,11 @@ export const runtimeLabels: Record<Runtime, string> = {
 /* Persistencia en archivo local (devices-db.json)                     */
 /* ------------------------------------------------------------------ */
 
+/** Import dinámico opcional: los paquetes de Tauri solo existen en la app portable. */
+async function optionalImport(spec: string): Promise<any> {
+  return import(/* @vite-ignore */ spec);
+}
+
 export async function readDevicesFile(): Promise<Device[] | null> {
   const runtime = getRuntime();
   try {
@@ -59,7 +64,7 @@ export async function readDevicesFile(): Promise<Device[] | null> {
       return raw ? (JSON.parse(raw) as Device[]) : null;
     }
     if (runtime === "tauri") {
-      const fs = await import(/* @vite-ignore */ "@tauri-apps/plugin-fs");
+      const fs = await optionalImport("@tauri-apps/plugin-fs");
       const exists = await fs.exists(DB_FILE, { baseDir: fs.BaseDirectory.AppData });
       if (!exists) return null;
       const raw = await fs.readTextFile(DB_FILE, { baseDir: fs.BaseDirectory.AppData });
@@ -80,7 +85,7 @@ export async function writeDevicesFile(devices: Device[]): Promise<boolean> {
       return true;
     }
     if (runtime === "tauri") {
-      const fs = await import(/* @vite-ignore */ "@tauri-apps/plugin-fs");
+      const fs = await optionalImport("@tauri-apps/plugin-fs");
       await fs.writeTextFile(DB_FILE, json, { baseDir: fs.BaseDirectory.AppData });
       return true;
     }
@@ -101,7 +106,7 @@ export async function nativeScan(): Promise<Device[] | null> {
       return parseHostsJson(await window.nethub.scanNetwork());
     }
     if (runtime === "tauri") {
-      const shell = await import(/* @vite-ignore */ "@tauri-apps/plugin-shell");
+      const shell = await optionalImport("@tauri-apps/plugin-shell");
       const output = await shell.Command.create("arp", ["-a"]).execute();
       const devices = parseArpOutput(output.stdout);
       return devices.length > 0 ? devices : null;
@@ -118,7 +123,7 @@ export async function getDbPath(): Promise<string> {
   try {
     if (runtime === "electron" && window.nethub?.dbPath) return await window.nethub.dbPath();
     if (runtime === "tauri") {
-      const path = await import(/* @vite-ignore */ "@tauri-apps/api/path");
+      const path = await optionalImport("@tauri-apps/api/path");
       return `${await path.appDataDir()}${DB_FILE}`;
     }
   } catch {
