@@ -16,6 +16,9 @@ export interface Device {
   upstream: number;
   tags: string[];
   notes?: string;
+  /** Controles locales (simulados, listos para enviar al router/API) */
+  blocked?: boolean;
+  prioritized?: boolean;
 }
 
 export const deviceTypeLabels: Record<DeviceType, string> = {
