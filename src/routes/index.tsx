@@ -248,6 +248,50 @@ function Dashboard() {
       </header>
 
       <main className="mx-auto max-w-6xl px-5 py-8">
+        <section className="mb-6 flex flex-wrap items-center gap-x-5 gap-y-3 rounded-2xl border border-border bg-card px-5 py-4 text-xs">
+          <span className="text-muted-foreground">
+            Último escaneo:{" "}
+            <span className="font-mono text-foreground">
+              {formatScanTime(meta.lastScanAt)}
+            </span>
+            {meta.source && (
+              <span className="text-muted-foreground"> · origen: {sourceLabels[meta.source]}</span>
+            )}
+          </span>
+          <span className="min-w-0 max-w-full truncate text-muted-foreground" title={dbPath}>
+            Datos en <span className="font-mono text-foreground">{dbPath}</span>
+          </span>
+          <div className="ml-auto flex flex-wrap gap-2">
+            <button
+              onClick={() => setPackageOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-brand px-3 py-1.5 font-medium text-brand transition-colors hover:bg-brand/10"
+            >
+              <Package className="size-3.5" />
+              Empaquetar App Portable
+            </button>
+            <button
+              onClick={() => downloadDevicesJson(items)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <Download className="size-3.5" />
+              Exportar devices-db.json
+            </button>
+            <button
+              onClick={resetDemo}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <RotateCcw className="size-3.5" />
+              Restablecer
+            </button>
+          </div>
+        </section>
+
+        {notice && (
+          <p className="mb-6 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+            {notice}
+          </p>
+        )}
+
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Stat
             icon={<Wifi className="size-4" />}
