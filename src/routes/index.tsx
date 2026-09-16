@@ -86,10 +86,63 @@ function Dashboard() {
   const [onlyOnline, setOnlyOnline] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dark, setDark] = useState(true);
+  const [status, setStatus] = useState<ScannerStatus>("unknown");
+  const [scanning, setScanning] = useState(false);
+  const [meta, setMeta] = useState<ScanMeta>({ lastScanAt: null, source: null });
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
+
+  // Restaura la última lista guardada en este navegador.
+  useEffect(() => {
+    const stored = loadStoredDevices();
+    if (stored && stored.length > 0) setItems(stored);
+    setMeta(loadScanMeta());
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (hydrated) saveDevices(items);
+  }, [items, hydrated]);
+
+  const applyScan = (devices: Device[], source: NonNullable<ScanMeta["source"]>) => {
+    setItems(devices);
+    const next: ScanMeta = { lastScanAt: new Date().toISOString(), source };
+    setMeta(next);
+    saveScanMeta(next);
+    saveDevices(devices);
+  };
+
+  const scan = async () => {
+    setScanning(true);
+    setStatus("checking");
+    setNotice(null);
+    try {
+      const devices = await fetchFromAgent();
+      setStatus("connected");
+      applyScan(devices, "agent");
+      setNotice(`Escaneo completado: ${devices.length} dispositivos detectados.`);
+    } catch {
+      setStatus("disconnected");
+      setNotice(
+        "No se ha podido contactar con el agente local en http://localhost:8765/scan. Configúralo o importa los datos manualmente.",
+      );
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const resetDemo = () => {
+    clearStoredData();
+    setItems(seedDevices);
+    setMeta({ lastScanAt: null, source: null });
+    setNotice("Datos guardados borrados. Se muestra de nuevo la red de ejemplo.");
+  };
 
   const online = items.filter((d) => d.status === "online");
   const totalDown = online.reduce((sum, d) => sum + d.downstream, 0);
