@@ -110,7 +110,8 @@ export function parseHostsJson(input: unknown): Device[] {
     if (!ip || !mac) continue;
     const online = raw.online ?? (raw.status ? raw.status !== "offline" : true);
     const extra: Partial<Device> = { status: online ? "online" : "offline" };
-    if (raw.name ?? raw.hostname) extra.name = raw.name ?? raw.hostname;
+    const rawName = raw.name ?? raw.hostname;
+    if (rawName) extra.name = rawName;
     if (raw.vendor) extra.vendor = raw.vendor;
     if (raw.type) extra.type = raw.type as DeviceType;
     const device = makeDevice(ip, mac, extra);
