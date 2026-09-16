@@ -445,7 +445,67 @@ function Dashboard() {
         onClose={() => setSelectedId(null)}
         onUpdate={update}
       />
+      <ScannerSetupModal open={setupOpen} onClose={() => setSetupOpen(false)} />
+      <ImportDevicesModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImport={(devices, source) => {
+          applyScan(devices, source);
+          setNotice(`Importados ${devices.length} dispositivos y guardados localmente.`);
+        }}
+      />
+      <PackageAppModal
+        open={packageOpen}
+        onClose={() => setPackageOpen(false)}
+        dbPath={dbPath}
+        runtimeLabel={runtimeLabels[runtime]}
+      />
     </div>
+  );
+}
+
+const sourceLabels: Record<NonNullable<ScanMeta["source"]>, string> = {
+  agent: "agente local",
+  native: "escaneo nativo",
+  arp: "arp -a importado",
+  json: "archivo JSON",
+  demo: "datos de ejemplo",
+};
+
+function StatusPill({ status }: { status: ScannerStatus }) {
+  const map: Record<ScannerStatus, { label: string; className: string; dot: string }> = {
+    unknown: {
+      label: "Escáner sin comprobar",
+      className: "bg-muted text-muted-foreground",
+      dot: "bg-muted-foreground",
+    },
+    checking: {
+      label: "Comprobando…",
+      className: "bg-warning/15 text-warning",
+      dot: "bg-warning animate-pulse",
+    },
+    connected: {
+      label: "Conectado",
+      className: "bg-success/15 text-success",
+      dot: "bg-success",
+    },
+    disconnected: {
+      label: "Desconectado",
+      className: "bg-destructive/15 text-destructive",
+      dot: "bg-destructive",
+    },
+  };
+  const s = map[status];
+  return (
+    <span
+      className={cn(
+        "hidden items-center gap-2 rounded-full px-3 py-1 text-xs font-medium md:inline-flex",
+        s.className,
+      )}
+    >
+      <span className={cn("size-1.5 rounded-full", s.dot)} />
+      {s.label}
+    </span>
   );
 }
 
