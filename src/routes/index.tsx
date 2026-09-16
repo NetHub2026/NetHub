@@ -31,15 +31,23 @@ import {
   fetchFromAgent,
   formatScanTime,
   loadScanMeta,
-  loadStoredDevices,
-  saveDevices,
   saveScanMeta,
   type ScanMeta,
   type ScannerStatus,
 } from "@/lib/scanner";
+import {
+  downloadDevicesJson,
+  getDbPath,
+  getRuntime,
+  nativeScan,
+  runtimeLabels,
+  type Runtime,
+} from "@/lib/desktop";
+import { loadDevicesAnywhere, saveDevicesAnywhere } from "@/lib/persistence";
 import { BandwidthChart } from "@/components/network/BandwidthChart";
 import { DeviceDetailPanel } from "@/components/network/DeviceDetailPanel";
 import { ImportDevicesModal } from "@/components/network/ImportDevicesModal";
+import { PackageAppModal } from "@/components/network/PackageAppModal";
 import { ScannerSetupModal } from "@/components/network/ScannerSetupModal";
 import { cn } from "@/lib/utils";
 
