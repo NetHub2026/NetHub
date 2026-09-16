@@ -1,12 +1,9 @@
-# Roadmap NetHub
+# NetHub — Hoja de ruta
 
 ## Hecho
-- [x] Panel de red: métricas, gráfico de ancho de banda, listado con filtros, detalle con etiquetas/control, modo oscuro.
-- [x] Escáner: botón "Escanear red" contra agente local, importación de `arp -a` / JSON, persistencia en localStorage, estado de conexión y última hora de escaneo.
+- Panel de red: métricas, gráfico de ancho de banda, listado con filtros/búsqueda, panel de detalle con etiquetas y controles, modo oscuro.
+- Escáner de red: agente local (http://localhost:8765/scan), importación de `arp -a` y JSON, estado Conectado/Desconectado, última hora de escaneo, modal de configuración (Python y PowerShell).
+- App portable: detección de entorno (web/Tauri/Electron), persistencia dual (devices-db.json en escritorio, localStorage en web), escaneo ARP nativo con fallback, exportación manual del JSON y modal "Empaquetar App Portable" con comandos Tauri y Electron Builder.
 
-## En curso
-- [ ] Modo escritorio portable (Windows)
-  - [ ] Persistencia dual: `devices-db.json` en el directorio de la app (desktop) + localStorage (web), con exportación/importación.
-  - [ ] Capa de abstracción del escáner nativo (ARP/ping vía sistema en desktop, fallback en preview).
-  - [ ] Modal "Empaquetar App Portable" con comandos Tauri/Electron y rutas del .exe y del fichero de datos.
-  - [ ] Mantener interfaz actual (panel, métricas, filtros, modo oscuro).
+## Pendiente
+- Ninguna tarea abierta.
