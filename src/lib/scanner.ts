@@ -109,12 +109,11 @@ export function parseHostsJson(input: unknown): Device[] {
     const mac = raw.mac ?? raw.hw;
     if (!ip || !mac) continue;
     const online = raw.online ?? (raw.status ? raw.status !== "offline" : true);
-    const device = makeDevice(ip, mac, {
-      name: raw.name ?? raw.hostname,
-      vendor: raw.vendor,
-      type: (raw.type as DeviceType) || undefined,
-      status: online ? "online" : "offline",
-    });
+    const extra: Partial<Device> = { status: online ? "online" : "offline" };
+    if (raw.name ?? raw.hostname) extra.name = raw.name ?? raw.hostname;
+    if (raw.vendor) extra.vendor = raw.vendor;
+    if (raw.type) extra.type = raw.type as DeviceType;
+    const device = makeDevice(ip, mac, extra);
     found.set(device.id, device);
   }
   return [...found.values()].sort((a, b) => a.ip.localeCompare(b.ip, undefined, { numeric: true }));
@@ -122,7 +121,10 @@ export function parseHostsJson(input: unknown): Device[] {
 
 /** Consulta al agente local. Lanza error si no responde. */
 export async function fetchFromAgent(signal?: AbortSignal): Promise<Device[]> {
-  const res = await fetch(AGENT_URL, { signal, headers: { Accept: "application/json" } });
+  const res = await fetch(AGENT_URL, {
+    ...(signal ? { signal } : {}),
+    headers: { Accept: "application/json" },
+  });
   if (!res.ok) throw new Error(`El agente respondió ${res.status}`);
   return parseHostsJson(await res.json());
 }
