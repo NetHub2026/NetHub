@@ -3,11 +3,13 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   ArrowDownUp,
+  Download,
   Gamepad2,
   HouseWifi,
   Laptop,
   Loader2,
   Moon,
+  Package,
   Radar,
   Radio,
   RotateCcw,
