@@ -179,10 +179,34 @@ function Dashboard() {
               Red doméstica · 192.168.1.0/24
             </p>
           </div>
-          <span className="hidden items-center gap-2 rounded-full bg-success/15 px-3 py-1 text-xs font-medium text-success sm:inline-flex">
-            <span className="size-1.5 animate-pulse rounded-full bg-success" />
-            Router en línea
-          </span>
+          <StatusPill status={status} />
+          <button
+            onClick={scan}
+            disabled={scanning}
+            className="inline-flex items-center gap-2 rounded-md bg-brand px-3.5 py-2 text-sm font-medium text-brand-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+          >
+            {scanning ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Radar className="size-4" />
+            )}
+            {scanning ? "Escaneando…" : "Escanear red"}
+          </button>
+          <button
+            onClick={() => setImportOpen(true)}
+            className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Upload className="size-4" />
+            <span className="hidden sm:inline">Importar</span>
+          </button>
+          <button
+            onClick={() => setSetupOpen(true)}
+            className="rounded-md border border-border p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            aria-label="Configurar escáner Windows"
+            title="Configurar escáner Windows"
+          >
+            <Settings2 className="size-4" />
+          </button>
           <button
             onClick={() => setDark((v) => !v)}
             className="rounded-md border border-border p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
