@@ -3,14 +3,21 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   ArrowDownUp,
+  Download,
   Gamepad2,
   HouseWifi,
   Laptop,
+  Loader2,
   Moon,
+  Package,
+  Radar,
   Radio,
+  RotateCcw,
   Search,
+  Settings2,
   Sun,
   Tv,
+  Upload,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -21,8 +28,29 @@ import {
   type Device,
   type DeviceType,
 } from "@/lib/devices";
+import {
+  clearStoredData,
+  fetchFromAgent,
+  formatScanTime,
+  loadScanMeta,
+  saveScanMeta,
+  type ScanMeta,
+  type ScannerStatus,
+} from "@/lib/scanner";
+import {
+  downloadDevicesJson,
+  getDbPath,
+  getRuntime,
+  nativeScan,
+  runtimeLabels,
+  type Runtime,
+} from "@/lib/desktop";
+import { loadDevicesAnywhere, saveDevicesAnywhere } from "@/lib/persistence";
 import { BandwidthChart } from "@/components/network/BandwidthChart";
 import { DeviceDetailPanel } from "@/components/network/DeviceDetailPanel";
+import { ImportDevicesModal } from "@/components/network/ImportDevicesModal";
+import { PackageAppModal } from "@/components/network/PackageAppModal";
+import { ScannerSetupModal } from "@/components/network/ScannerSetupModal";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
@@ -68,10 +96,85 @@ function Dashboard() {
   const [onlyOnline, setOnlyOnline] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dark, setDark] = useState(true);
+  const [status, setStatus] = useState<ScannerStatus>("unknown");
+  const [scanning, setScanning] = useState(false);
+  const [meta, setMeta] = useState<ScanMeta>({ lastScanAt: null, source: null });
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+  const [packageOpen, setPackageOpen] = useState(false);
+  const [runtime, setRuntime] = useState<Runtime>("web");
+  const [dbPath, setDbPath] = useState("Almacenamiento del navegador (localStorage)");
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
+
+  // Restaura la última lista guardada (archivo local en escritorio, localStorage en web).
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const stored = await loadDevicesAnywhere();
+      if (cancelled) return;
+      if (stored && stored.length > 0) setItems(stored);
+      setMeta(loadScanMeta());
+      setRuntime(getRuntime());
+      setDbPath(await getDbPath());
+      setHydrated(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (hydrated) void saveDevicesAnywhere(items);
+  }, [items, hydrated]);
+
+  const applyScan = (devices: Device[], source: NonNullable<ScanMeta["source"]>) => {
+    setItems(devices);
+    const next: ScanMeta = { lastScanAt: new Date().toISOString(), source };
+    setMeta(next);
+    saveScanMeta(next);
+    void saveDevicesAnywhere(devices);
+  };
+
+  const scan = async () => {
+    setScanning(true);
+    setStatus("checking");
+    setNotice(null);
+    try {
+      // 1) En escritorio (Tauri/Electron): escaneo ARP nativo del sistema.
+      const native = await nativeScan();
+      if (native && native.length > 0) {
+        setStatus("connected");
+        applyScan(native, "native");
+        setNotice(`Escaneo nativo completado: ${native.length} dispositivos detectados.`);
+        return;
+      }
+      // 2) Fallback: agente local en http://localhost:8765/scan.
+      const devices = await fetchFromAgent();
+      setStatus("connected");
+      applyScan(devices, "agent");
+      setNotice(`Escaneo completado: ${devices.length} dispositivos detectados.`);
+    } catch {
+      setStatus("disconnected");
+      setNotice(
+        "No se ha podido escanear la red. Inicia el agente local (http://localhost:8765/scan), usa la app portable o importa los datos manualmente.",
+      );
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const resetDemo = () => {
+    clearStoredData();
+    setItems(seedDevices);
+    setMeta({ lastScanAt: null, source: null });
+    void saveDevicesAnywhere(seedDevices);
+    setNotice("Datos guardados borrados. Se muestra de nuevo la red de ejemplo.");
+  };
 
   const online = items.filter((d) => d.status === "online");
   const totalDown = online.reduce((sum, d) => sum + d.downstream, 0);
@@ -105,13 +208,37 @@ function Dashboard() {
           <div className="flex-1">
             <h1 className="text-lg font-semibold leading-none">NetHub</h1>
             <p className="mt-1 text-xs text-muted-foreground">
-              Red doméstica · 192.168.1.0/24
+              Red doméstica · {runtimeLabels[runtime]}
             </p>
           </div>
-          <span className="hidden items-center gap-2 rounded-full bg-success/15 px-3 py-1 text-xs font-medium text-success sm:inline-flex">
-            <span className="size-1.5 animate-pulse rounded-full bg-success" />
-            Router en línea
-          </span>
+          <StatusPill status={status} />
+          <button
+            onClick={scan}
+            disabled={scanning}
+            className="inline-flex items-center gap-2 rounded-md bg-brand px-3.5 py-2 text-sm font-medium text-brand-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+          >
+            {scanning ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Radar className="size-4" />
+            )}
+            {scanning ? "Escaneando…" : "Escanear red"}
+          </button>
+          <button
+            onClick={() => setImportOpen(true)}
+            className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Upload className="size-4" />
+            <span className="hidden sm:inline">Importar</span>
+          </button>
+          <button
+            onClick={() => setSetupOpen(true)}
+            className="rounded-md border border-border p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            aria-label="Configurar escáner Windows"
+            title="Configurar escáner Windows"
+          >
+            <Settings2 className="size-4" />
+          </button>
           <button
             onClick={() => setDark((v) => !v)}
             className="rounded-md border border-border p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -123,6 +250,50 @@ function Dashboard() {
       </header>
 
       <main className="mx-auto max-w-6xl px-5 py-8">
+        <section className="mb-6 flex flex-wrap items-center gap-x-5 gap-y-3 rounded-2xl border border-border bg-card px-5 py-4 text-xs">
+          <span className="text-muted-foreground">
+            Último escaneo:{" "}
+            <span className="font-mono text-foreground">
+              {formatScanTime(meta.lastScanAt)}
+            </span>
+            {meta.source && (
+              <span className="text-muted-foreground"> · origen: {sourceLabels[meta.source]}</span>
+            )}
+          </span>
+          <span className="min-w-0 max-w-full truncate text-muted-foreground" title={dbPath}>
+            Datos en <span className="font-mono text-foreground">{dbPath}</span>
+          </span>
+          <div className="ml-auto flex flex-wrap gap-2">
+            <button
+              onClick={() => setPackageOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-brand px-3 py-1.5 font-medium text-brand transition-colors hover:bg-brand/10"
+            >
+              <Package className="size-3.5" />
+              Empaquetar App Portable
+            </button>
+            <button
+              onClick={() => downloadDevicesJson(items)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <Download className="size-3.5" />
+              Exportar devices-db.json
+            </button>
+            <button
+              onClick={resetDemo}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <RotateCcw className="size-3.5" />
+              Restablecer
+            </button>
+          </div>
+        </section>
+
+        {notice && (
+          <p className="mb-6 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+            {notice}
+          </p>
+        )}
+
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Stat
             icon={<Wifi className="size-4" />}
@@ -276,7 +447,67 @@ function Dashboard() {
         onClose={() => setSelectedId(null)}
         onUpdate={update}
       />
+      <ScannerSetupModal open={setupOpen} onClose={() => setSetupOpen(false)} />
+      <ImportDevicesModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImport={(devices, source) => {
+          applyScan(devices, source);
+          setNotice(`Importados ${devices.length} dispositivos y guardados localmente.`);
+        }}
+      />
+      <PackageAppModal
+        open={packageOpen}
+        onClose={() => setPackageOpen(false)}
+        dbPath={dbPath}
+        runtimeLabel={runtimeLabels[runtime]}
+      />
     </div>
+  );
+}
+
+const sourceLabels: Record<NonNullable<ScanMeta["source"]>, string> = {
+  agent: "agente local",
+  native: "escaneo nativo",
+  arp: "arp -a importado",
+  json: "archivo JSON",
+  demo: "datos de ejemplo",
+};
+
+function StatusPill({ status }: { status: ScannerStatus }) {
+  const map: Record<ScannerStatus, { label: string; className: string; dot: string }> = {
+    unknown: {
+      label: "Escáner sin comprobar",
+      className: "bg-muted text-muted-foreground",
+      dot: "bg-muted-foreground",
+    },
+    checking: {
+      label: "Comprobando…",
+      className: "bg-warning/15 text-warning",
+      dot: "bg-warning animate-pulse",
+    },
+    connected: {
+      label: "Conectado",
+      className: "bg-success/15 text-success",
+      dot: "bg-success",
+    },
+    disconnected: {
+      label: "Desconectado",
+      className: "bg-destructive/15 text-destructive",
+      dot: "bg-destructive",
+    },
+  };
+  const s = map[status];
+  return (
+    <span
+      className={cn(
+        "hidden items-center gap-2 rounded-full px-3 py-1 text-xs font-medium md:inline-flex",
+        s.className,
+      )}
+    >
+      <span className={cn("size-1.5 rounded-full", s.dot)} />
+      {s.label}
+    </span>
   );
 }
 
