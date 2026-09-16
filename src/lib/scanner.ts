@@ -8,7 +8,7 @@ export type ScannerStatus = "unknown" | "connected" | "disconnected" | "checking
 
 export interface ScanMeta {
   lastScanAt: string | null;
-  source: "agent" | "arp" | "json" | "demo" | null;
+  source: "agent" | "native" | "arp" | "json" | "demo" | null;
 }
 
 /** Fila cruda que puede devolver el agente o un JSON importado. */
