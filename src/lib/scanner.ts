@@ -700,8 +700,12 @@ while ($listener.IsListening) {
   $payload = $null
 
   switch ($route) {
-    '/scan' { $payload = @{ devices = (Get-ArpDevices) } }
+    '/scan' { $payload = @{ devices = (Add-VendorInfo (Get-ArpDevices)) } }
     '/ping' { $payload = (Invoke-PingHost $ctx.Request.QueryString['ip']) }
+    '/vendor' {
+      $mac = $ctx.Request.QueryString['mac']
+      $payload = @{ mac = $mac; vendor = (Get-VendorForMac $mac) }
+    }
     '/wol'  { $payload = @{ ok = (Send-WolPacket $ctx.Request.QueryString['mac']) } }
     default { $payload = @{ error = 'not found' }; $res.StatusCode = 404 }
   }
