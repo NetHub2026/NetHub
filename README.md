@@ -1,14 +1,16 @@
-# Welcome to your Lovable project
+# Home Network Hub
+
+Crear una aplicación web moderna tipo dashboard para monitorizar y gestionar dispositivos de una red doméstica (PCs, consolas, Smart TVs, Home Assistant e IoT). Debe incluir una vista general de la red (dispositivos activos/inactivos, consumo de ancho de banda simulado o preparado para API/integración), listado y filtrado por tipo de dispositivo con detalles (nombre, IP, MAC, estado, fabricante, última conexión), modal o panel de detalle por dispositivo con opciones de control o etiquetado, y un diseño limpio y moderno con modo oscuro.
 
 This project was built with [Lovable](https://lovable.dev).
 
 ## Build with Lovable
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
+Continue developing this project in the [Lovable editor](https://lovable.dev/projects/b8fc483b-526d-4c70-a9a5-d10ff69950a5).
 
 - **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
+- **Stay in sync**: every change made in Lovable is committed straight to this repository.
+- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
 
 ## Development
 
@@ -20,10 +22,3 @@ cd <repository-name>
 npm i
 npm run dev
 ```
-
-## Built with
-
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
