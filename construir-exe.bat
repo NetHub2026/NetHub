@@ -3,10 +3,36 @@ setlocal
 title NetHub - Construir ejecutable portable
 cd /d "%~dp0"
 
+REM === Comprobacion de permisos de Administrador ===
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+    echo No tienes permisos de Administrador.
+    echo Intentando elevar automaticamente...
+    powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+    if not errorlevel 1 (
+        rem Se relanzo como Administrador; esta ventana ya no es necesaria
+        exit /b 0
+    )
+    echo.
+    echo ============================================
+    echo   ATENCION: se necesitan permisos de
+    echo   Administrador para extraer las herramientas
+    echo   de compilacion (enlaces simbolicos).
+    echo.
+    echo   Cierra esta ventana, haz clic derecho sobre
+    echo   construir-exe.bat y elige
+    echo   "Ejecutar como administrador".
+    echo ============================================
+    echo.
+    pause
+    exit /b 1
+)
+
 echo ============================================
 echo   NetHub - Generando NetHub.exe portable
 echo ============================================
 echo.
+
 
 echo [1/3] Instalando dependencias...
 call npm install
