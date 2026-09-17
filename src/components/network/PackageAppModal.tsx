@@ -200,7 +200,7 @@ export function PackageAppModal({
   dbPath,
   runtimeLabel,
 }: PackageAppModalProps) {
-  const [tab, setTab] = useState<Tab>("tauri");
+  const [tab, setTab] = useState<Tab>("bat");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   useEffect(() => {
@@ -221,18 +221,32 @@ export function PackageAppModal({
     }
   };
 
-  const blocks: Array<{ key: string; title: string; code: string }> =
-    tab === "tauri"
-      ? [
-          { key: "t-cmd", title: "Comandos (PowerShell)", code: tauriCommands },
-          { key: "t-conf", title: "src-tauri/tauri.conf.json", code: tauriConfig },
-        ]
-      : [
-          { key: "e-cmd", title: "Comandos (PowerShell)", code: electronCommands },
-          { key: "e-main", title: "electron/main.cjs", code: electronMain },
-          { key: "e-pre", title: "electron/preload.cjs", code: electronPreload },
-          { key: "e-pkg", title: "package.json + vite.config.ts", code: electronPackageJson },
-        ];
+  const blockSets: Record<Tab, Array<{ key: string; title: string; code: string }>> = {
+    bat: [
+      { key: "b-build", title: "build-portable.bat", code: buildBat },
+      { key: "b-update", title: "update-portable.bat", code: updateBat },
+      { key: "b-main", title: "electron/main.cjs (datos junto al .exe)", code: electronMain },
+      { key: "b-pre", title: "electron/preload.cjs", code: electronPreload },
+      { key: "b-pkg", title: "package.json + vite.config.ts", code: electronPackageJson },
+    ],
+    tauri: [
+      { key: "t-cmd", title: "Comandos (PowerShell)", code: tauriCommands },
+      { key: "t-conf", title: "src-tauri/tauri.conf.json", code: tauriConfig },
+    ],
+    electron: [
+      { key: "e-cmd", title: "Comandos (PowerShell)", code: electronCommands },
+      { key: "e-main", title: "electron/main.cjs", code: electronMain },
+      { key: "e-pre", title: "electron/preload.cjs", code: electronPreload },
+      { key: "e-pkg", title: "package.json + vite.config.ts", code: electronPackageJson },
+    ],
+  };
+  const blocks = blockSets[tab];
+
+  const tabLabels: Record<Tab, string> = {
+    bat: "Un solo clic (.bat)",
+    tauri: "Tauri (.exe ~6 MB)",
+    electron: "Electron Builder",
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-8">
