@@ -513,6 +513,35 @@ function Get-ArpDevices {
   return @($rows | Where-Object { $_ -ne $null })
 }
 
+function Invoke-PingHost($ip) {
+  if (-not ($ip -match '^\\d{1,3}(\\.\\d{1,3}){3}$')) { return @{ ok = $false; rtt = $null } }
+  try {
+    $reply = (New-Object System.Net.NetworkInformation.Ping).Send($ip, 1000)
+    if ($reply.Status -eq 'Success') { return @{ ok = $true; rtt = [int]$reply.RoundtripTime } }
+  } catch {}
+  return @{ ok = $false; rtt = $null }
+}
+
+function Send-WolPacket($mac) {
+  $clean = ($mac -replace '[^0-9a-fA-F]', '')
+  if ($clean.Length -ne 12) { return $false }
+  try {
+    $macBytes = New-Object byte[] 6
+    for ($i = 0; $i -lt 6; $i++) { $macBytes[$i] = [Convert]::ToByte($clean.Substring($i * 2, 2), 16) }
+    $packet = New-Object System.Collections.Generic.List[byte]
+    for ($i = 0; $i -lt 6; $i++) { $packet.Add([byte]0xFF) }
+    for ($i = 0; $i -lt 16; $i++) { $packet.AddRange($macBytes) }
+    $bytes = $packet.ToArray()
+    $udp = New-Object System.Net.Sockets.UdpClient
+    $udp.EnableBroadcast = $true
+    $udp.Connect([System.Net.IPAddress]::Broadcast, 9)
+    [void]$udp.Send($bytes, $bytes.Length)
+    $udp.Close()
+    return $true
+  } catch {}
+  return $false
+}
+
 while ($listener.IsListening) {
   $ctx = $listener.GetContext()
   $res = $ctx.Response
@@ -526,13 +555,18 @@ while ($listener.IsListening) {
     continue
   }
 
-  if ($ctx.Request.Url.AbsolutePath.TrimEnd('/') -ne "/scan") {
-    $res.StatusCode = 404
-    $res.Close()
-    continue
+  $route = $ctx.Request.Url.AbsolutePath.TrimEnd('/')
+  if ($route -eq '') { $route = '/' }
+  $payload = $null
+
+  switch ($route) {
+    '/scan' { $payload = @{ devices = (Get-ArpDevices) } }
+    '/ping' { $payload = (Invoke-PingHost $ctx.Request.QueryString['ip']) }
+    '/wol'  { $payload = @{ ok = (Send-WolPacket $ctx.Request.QueryString['mac']) } }
+    default { $payload = @{ error = 'not found' }; $res.StatusCode = 404 }
   }
 
-  $json = @{ devices = (Get-ArpDevices) } | ConvertTo-Json -Depth 4
+  $json = $payload | ConvertTo-Json -Depth 4
   $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
   $res.ContentType = "application/json"
   $res.ContentLength64 = $bytes.Length
