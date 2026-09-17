@@ -295,7 +295,7 @@ export function formatScanTime(iso: string | null): string {
 
 export const pythonAgentScript = `# nethub_agent.py — agente de escaneo ARP + ping + Wake-on-LAN para Windows
 # Requisitos: Python 3.9+ (no necesita dependencias externas)
-# Endpoints:  /scan   /ping?ip=192.168.1.20   /wol?mac=AA:BB:CC:DD:EE:FF
+# Endpoints:  /scan   /ping?ip=192.168.1.20   /wol?mac=AA:BB:CC:DD:EE:FF   /vendor?mac=AA:BB:CC:DD:EE:FF
 import json, os, re, socket, subprocess, time, urllib.request, uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
@@ -510,17 +510,73 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print("NetHub agent escuchando en http://localhost:8765 (/scan, /ping, /wol)")
+    print("NetHub agent escuchando en http://localhost:8765 (/scan, /ping, /wol, /vendor)")
     HTTPServer(("127.0.0.1", 8765), Handler).serve_forever()
 `;
 
 export const powershellAgentScript = `# nethub-agent.ps1 — agente de escaneo ARP + ping + Wake-on-LAN (PowerShell 5+)
 # Uso:  powershell -ExecutionPolicy Bypass -File .\\nethub-agent.ps1
-# Endpoints:  /scan   /ping?ip=192.168.1.20   /wol?mac=AA:BB:CC:DD:EE:FF
+# Endpoints:  /scan   /ping?ip=192.168.1.20   /wol?mac=AA:BB:CC:DD:EE:FF   /vendor?mac=AA:BB:CC:DD:EE:FF
 $listener = [System.Net.HttpListener]::new()
 $listener.Prefixes.Add("http://localhost:8765/")
 $listener.Start()
-Write-Host "NetHub agent escuchando en http://localhost:8765 (/scan, /ping, /wol)"
+Write-Host "NetHub agent escuchando en http://localhost:8765 (/scan, /ping, /wol, /vendor)"
+
+# --- Resolución de fabricantes (OUI) por Internet, dentro del propio agente ---
+$VendorCacheFile = Join-Path $PSScriptRoot 'vendor-cache.json'
+$VendorCache = @{}
+if (Test-Path $VendorCacheFile) {
+  try {
+    (Get-Content $VendorCacheFile -Raw | ConvertFrom-Json).PSObject.Properties |
+      ForEach-Object { $VendorCache[$_.Name] = $_.Value }
+  } catch {}
+}
+
+function Save-VendorCache {
+  try { ($VendorCache | ConvertTo-Json -Depth 3) | Set-Content -Path $VendorCacheFile -Encoding UTF8 } catch {}
+}
+
+function Test-PrivateMac($mac) {
+  $clean = ($mac -replace '[^0-9a-fA-F]', '')
+  if ($clean.Length -lt 2) { return $false }
+  return (([Convert]::ToInt32($clean.Substring(0, 2), 16) -band 2) -eq 2)
+}
+
+function Get-VendorForMac($mac) {
+  $clean = ($mac -replace '[^0-9a-fA-F]', '').ToUpper()
+  if ($clean.Length -lt 6) { return '' }
+  $key = $clean.Substring(0, 6)
+  if ($VendorCache.ContainsKey($key)) { return $VendorCache[$key] }
+  if (Test-PrivateMac $mac) { $VendorCache[$key] = ''; Save-VendorCache; return '' }
+
+  $vendor = ''
+  foreach ($url in @("https://api.macvendors.com/$clean", "https://api.maclookup.app/v2/macs/$clean")) {
+    try {
+      $resp = Invoke-RestMethod -Uri $url -TimeoutSec 4 -UseBasicParsing
+      if ($resp -is [string]) { $vendor = $resp.Trim() }
+      elseif ($resp.company) { $vendor = [string]$resp.company }
+      elseif ($resp.vendor) { $vendor = [string]$resp.vendor }
+      if ($vendor -and $vendor -notmatch '(?i)not found') { break }
+      $vendor = ''
+    } catch { $vendor = '' }
+    Start-Sleep -Milliseconds 600   # pausa entre peticiones para evitar bloqueos
+  }
+
+  $VendorCache[$key] = $vendor
+  Save-VendorCache
+  return $vendor
+}
+
+function Add-VendorInfo($rows) {
+  foreach ($row in $rows) {
+    if (-not $row -or $row.vendor) { continue }
+    $vendor = Get-VendorForMac $row.mac
+    if ($vendor) { $row.vendor = $vendor }
+    elseif (Test-PrivateMac $row.mac) { $row.vendor = 'MAC privada (Móvil/Portátil)' }
+    Start-Sleep -Milliseconds 150
+  }
+  return $rows
+}
 
 function Get-NetBiosNameMap {
   $names = @{}
