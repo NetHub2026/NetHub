@@ -7,12 +7,17 @@ const path = require("node:path");
 const fs = require("node:fs");
 const os = require("node:os");
 const http = require("node:http");
+const https = require("node:https");
 const dgram = require("node:dgram");
-const { execFile } = require("node:child_process");
+const { execFile, spawn } = require("node:child_process");
 
 const DB_FILE = "devices-db.json";
 const AGENT_PORT = 8765;
 const isWindows = process.platform === "win32";
+const GITHUB_REPO = "oyogor1985/connected-clan";
+const UPDATE_ASSET = "NetHub.exe";
+const USER_AGENT = "NetHub-Updater";
+
 
 /** Carpeta del ejecutable portable (o del proyecto en desarrollo). */
 function baseDir() {
@@ -199,6 +204,160 @@ async function readTraffic() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Actualización automática desde GitHub Releases                      */
+/* ------------------------------------------------------------------ */
+
+function currentVersion() {
+  try {
+    return app.getVersion();
+  } catch {
+    return "0.0.0";
+  }
+}
+
+/** Petición HTTPS con seguimiento de redirecciones; devuelve el texto. */
+function httpsText(url) {
+  return new Promise((resolve, reject) => {
+    const request = https.get(
+      url,
+      { headers: { "User-Agent": USER_AGENT, Accept: "application/vnd.github+json" } },
+      (res) => {
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          res.resume();
+          httpsText(res.headers.location).then(resolve, reject);
+          return;
+        }
+        if (res.statusCode !== 200) {
+          res.resume();
+          reject(new Error(`GitHub respondió ${res.statusCode}`));
+          return;
+        }
+        let body = "";
+        res.setEncoding("utf8");
+        res.on("data", (chunk) => (body += chunk));
+        res.on("end", () => resolve(body));
+      },
+    );
+    request.on("error", reject);
+    request.setTimeout(15000, () => request.destroy(new Error("Tiempo de espera agotado")));
+  });
+}
+
+function normalizeVersion(value) {
+  return String(value || "").trim().replace(/^v/i, "");
+}
+
+/** Compara versiones semánticas: >0 si a es mayor que b. */
+function compareVersions(a, b) {
+  const pa = normalizeVersion(a).split(/[.\-+]/).map((n) => Number(n) || 0);
+  const pb = normalizeVersion(b).split(/[.\-+]/).map((n) => Number(n) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] || 0) - (pb[i] || 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+async function checkUpdate() {
+  const version = currentVersion();
+  try {
+    const raw = await httpsText(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
+    const release = JSON.parse(raw);
+    const latest = normalizeVersion(release.tag_name || release.name);
+    const asset = (release.assets || []).find(
+      (a) => String(a.name || "").toLowerCase() === UPDATE_ASSET.toLowerCase(),
+    );
+    return {
+      ok: true,
+      currentVersion: version,
+      latestVersion: latest || version,
+      available: Boolean(latest) && compareVersions(latest, version) > 0 && Boolean(asset),
+      notes: release.body || "",
+      downloadUrl: asset?.browser_download_url || null,
+      size: asset?.size || 0,
+      publishedAt: release.published_at || null,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      currentVersion: version,
+      latestVersion: version,
+      available: false,
+      notes: "",
+      downloadUrl: null,
+      size: 0,
+      error: String(error?.message || error),
+    };
+  }
+}
+
+/** Descarga el asset informando del progreso al renderer. */
+function downloadFile(url, target, total, onProgress) {
+  return new Promise((resolve, reject) => {
+    const request = https.get(url, { headers: { "User-Agent": USER_AGENT } }, (res) => {
+      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume();
+        downloadFile(res.headers.location, target, total, onProgress).then(resolve, reject);
+        return;
+      }
+      if (res.statusCode !== 200) {
+        res.resume();
+        reject(new Error(`Descarga fallida (${res.statusCode})`));
+        return;
+      }
+      const size = Number(res.headers["content-length"]) || total || 0;
+      let received = 0;
+      const file = fs.createWriteStream(target);
+      res.on("data", (chunk) => {
+        received += chunk.length;
+        onProgress(received, size);
+      });
+      res.pipe(file);
+      file.on("finish", () => file.close(() => resolve(true)));
+      file.on("error", reject);
+      res.on("error", reject);
+    });
+    request.on("error", reject);
+    request.setTimeout(60000, () => request.destroy(new Error("Tiempo de espera agotado")));
+  });
+}
+
+async function downloadAndInstall(sender) {
+  const info = await checkUpdate();
+  if (!info.available || !info.downloadUrl) {
+    return { ok: false, error: info.error || "No hay ninguna actualización disponible." };
+  }
+
+  const temp = path.join(os.tmpdir(), "NetHub-update.exe");
+  try {
+    if (fs.existsSync(temp)) fs.unlinkSync(temp);
+    await downloadFile(info.downloadUrl, temp, info.size, (received, size) => {
+      const percent = size > 0 ? Math.min(100, Math.round((received / size) * 100)) : 0;
+      try {
+        sender?.send("nethub:update-progress", { received, total: size, percent });
+      } catch {
+        /* ventana cerrada */
+      }
+    });
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
+
+  const targetExe = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
+  const script = path.join(os.tmpdir(), "nethub-update.bat");
+  const content = `@echo off\r\ntimeout /t 1 /nobreak >nul\r\nmove /y "${temp}" "${targetExe}" >nul\r\nstart "" "${targetExe}"\r\n`;
+  try {
+    fs.writeFileSync(script, content, "utf8");
+    spawn("cmd.exe", ["/c", script], { detached: true, windowsHide: true, stdio: "ignore" }).unref();
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
+
+  setTimeout(() => app.quit(), 400);
+  return { ok: true, version: info.latestVersion, restarting: true };
+}
+
+/* ------------------------------------------------------------------ */
 /* IPC                                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -209,6 +368,9 @@ ipcMain.handle("nethub:path", () => dbPath());
 ipcMain.handle("nethub:ping", (_e, ip) => pingIp(ip));
 ipcMain.handle("nethub:wol", (_e, mac) => sendWol(mac));
 ipcMain.handle("nethub:traffic", () => readTraffic());
+ipcMain.handle("nethub:check-update", () => checkUpdate());
+ipcMain.handle("nethub:download-and-install", (event) => downloadAndInstall(event.sender));
+
 
 /* ------------------------------------------------------------------ */
 /* Servidor HTTP de respaldo (compatibilidad con el agente local)      */

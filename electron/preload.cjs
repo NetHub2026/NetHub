@@ -10,4 +10,14 @@ contextBridge.exposeInMainWorld("nethub", {
   ping: (ip) => ipcRenderer.invoke("nethub:ping", ip),
   wol: (mac) => ipcRenderer.invoke("nethub:wol", mac),
   traffic: () => ipcRenderer.invoke("nethub:traffic"),
+  checkUpdate: () => ipcRenderer.invoke("nethub:check-update"),
+  installUpdate: (onProgress) => {
+    const listener = (_event, payload) => {
+      if (typeof onProgress === "function") onProgress(payload);
+    };
+    ipcRenderer.on("nethub:update-progress", listener);
+    return ipcRenderer.invoke("nethub:download-and-install").finally(() => {
+      ipcRenderer.removeListener("nethub:update-progress", listener);
+    });
+  },
 });
