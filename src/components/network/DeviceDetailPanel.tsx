@@ -286,7 +286,7 @@ export function DeviceDetailPanel({
             )}
           </label>
           <label className="block">
-            <span className="text-xs text-muted-foreground">Red / router</span>
+            <span className="text-xs text-muted-foreground">Red / subred</span>
             <span className="mt-1 flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 focus-within:border-brand">
               <Router className="size-4 shrink-0 text-brand" />
               <select
@@ -303,7 +303,7 @@ export function DeviceDetailPanel({
                 <option value="" className="bg-popover text-popover-foreground">
                   Sin clasificar
                 </option>
-                {networks.map((net) => (
+                {networkOptions.map((net) => (
                   <option
                     key={net.id}
                     value={net.id}
