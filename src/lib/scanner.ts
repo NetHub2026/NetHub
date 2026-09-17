@@ -1,5 +1,5 @@
 import { type Device, type DeviceType } from "./devices";
-import { lookupOui, normalizeMac, suggestedName, vendorFromMac } from "./oui";
+import { lookupOui, normalizeMac, suggestedName } from "./oui";
 
 export { vendorFromMac, suggestedName, isRandomizedMac } from "./oui";
 
