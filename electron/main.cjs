@@ -253,14 +253,96 @@ function startAgentServer() {
 /* Ventana                                                             */
 /* ------------------------------------------------------------------ */
 
-function resolveIndexHtml() {
-  const candidates = [
-    path.join(__dirname, "..", "dist", "client", "index.html"),
-    path.join(__dirname, "..", "dist", "index.html"),
-    path.join(process.resourcesPath || "", "app", "dist", "client", "index.html"),
-  ];
-  return candidates.find((file) => file && fs.existsSync(file)) || null;
+/** Raíces posibles de la app compilada, en orden de preferencia. */
+function staticRoots() {
+  const roots = [];
+  for (const base of [path.join(__dirname, ".."), process.resourcesPath || "", path.join(process.resourcesPath || "", "app")]) {
+    if (!base) continue;
+    roots.push(
+      path.join(base, "dist", "client"),
+      path.join(base, "dist"),
+      path.join(base, ".output", "public"),
+    );
+  }
+  return roots;
 }
+
+function resolveStaticRoot() {
+  return staticRoots().find((dir) => fs.existsSync(path.join(dir, "index.html"))) || null;
+}
+
+const MIME = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".ico": "image/x-icon",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".txt": "text/plain; charset=utf-8",
+  ".map": "application/json; charset=utf-8",
+};
+
+/**
+ * Servidor de estáticos interno en un puerto efímero de localhost:
+ * la app portable funciona sin vite, sin red y sin nada instalado.
+ */
+function startStaticServer(root) {
+  return new Promise((resolve) => {
+    const server = http.createServer((req, res) => {
+      let pathname = "/";
+      try {
+        pathname = decodeURIComponent(new URL(req.url, "http://localhost").pathname);
+      } catch {
+        pathname = "/";
+      }
+      const safe = path.normalize(pathname).replace(/^(\.\.[/\\])+/, "");
+      let file = path.join(root, safe);
+      if (!file.startsWith(root)) file = path.join(root, "index.html");
+      if (fs.existsSync(file) && fs.statSync(file).isDirectory()) {
+        file = path.join(file, "index.html");
+      }
+      if (!fs.existsSync(file)) file = path.join(root, "index.html"); // SPA fallback
+      try {
+        res.writeHead(200, {
+          "Content-Type": MIME[path.extname(file).toLowerCase()] || "application/octet-stream",
+        });
+        res.end(fs.readFileSync(file));
+      } catch {
+        res.writeHead(500);
+        res.end("Error interno");
+      }
+    });
+    server.listen(0, "127.0.0.1", () => {
+      const { port } = server.address();
+      resolve(`http://127.0.0.1:${port}/`);
+    });
+    server.on("error", () => resolve(null));
+  });
+}
+
+/** Pantalla amigable si faltan los archivos compilados. */
+function fallbackPage() {
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8">
+<title>NetHub</title><style>
+body{margin:0;height:100vh;display:grid;place-items:center;background:#0b1120;color:#e2e8f0;
+font-family:system-ui,-apple-system,Segoe UI,sans-serif;text-align:center;padding:2rem}
+h1{font-size:1.4rem;margin:0 0 .5rem}p{color:#94a3b8;max-width:34rem;line-height:1.6}
+code{background:#1e293b;padding:.15rem .4rem;border-radius:.35rem}
+button{margin-top:1.5rem;padding:.6rem 1.2rem;border:0;border-radius:.6rem;background:#2563eb;color:#fff;font-size:.95rem;cursor:pointer}
+</style></head><body><div><h1>No se han encontrado los archivos de NetHub</h1>
+<p>Falta la carpeta compilada de la aplicación. Ejecuta <code>construir-exe.bat</code>
+(o <code>npm run build</code>) en la carpeta del proyecto y vuelve a abrir NetHub.</p>
+<button onclick="location.reload()">Reintentar</button></div></body></html>`;
+  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+}
+
 
 function createWindow() {
   const win = new BrowserWindow({
