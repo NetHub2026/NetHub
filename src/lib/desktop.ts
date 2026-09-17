@@ -21,6 +21,8 @@ interface ElectronBridge {
   ping?: (ip: string) => Promise<{ ok: boolean; rtt: number | null }>;
   wol?: (mac: string) => Promise<boolean>;
   traffic?: () => Promise<TrafficSample>;
+  checkUpdate?: () => Promise<UpdateInfo>;
+  installUpdate?: (onProgress: (p: UpdateProgress) => void) => Promise<InstallResult>;
 }
 
 /** Muestra instantánea de tráfico de red en Mbps. */
@@ -29,6 +31,109 @@ export interface TrafficSample {
   txMbps: number;
   totalMbps: number;
 }
+
+/** Versión de NetHub que se muestra en la interfaz (coincide con package.json). */
+export const APP_VERSION = "1.0.0";
+
+const GITHUB_REPO = "oyogor1985/connected-clan";
+
+export interface UpdateInfo {
+  ok: boolean;
+  currentVersion: string;
+  latestVersion: string;
+  available: boolean;
+  notes: string;
+  downloadUrl: string | null;
+  size: number;
+  publishedAt?: string | null;
+  error?: string;
+}
+
+export interface UpdateProgress {
+  received: number;
+  total: number;
+  percent: number;
+}
+
+export interface InstallResult {
+  ok: boolean;
+  version?: string;
+  restarting?: boolean;
+  error?: string;
+}
+
+function normalizeVersion(value: unknown): string {
+  return String(value ?? "").trim().replace(/^v/i, "");
+}
+
+function compareVersions(a: string, b: string): number {
+  const pa = normalizeVersion(a).split(/[.\-+]/).map((n) => Number(n) || 0);
+  const pb = normalizeVersion(b).split(/[.\-+]/).map((n) => Number(n) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] || 0) - (pb[i] || 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+/**
+ * Comprueba si hay una versión más reciente publicada en GitHub.
+ * En la app de escritorio lo hace el proceso principal; en el navegador
+ * se consulta la API pública solo para informar (sin poder instalar).
+ */
+export async function checkUpdate(): Promise<UpdateInfo> {
+  if (typeof window !== "undefined" && window.nethub?.checkUpdate) {
+    return window.nethub.checkUpdate();
+  }
+  const base: UpdateInfo = {
+    ok: false,
+    currentVersion: APP_VERSION,
+    latestVersion: APP_VERSION,
+    available: false,
+    notes: "",
+    downloadUrl: null,
+    size: 0,
+  };
+  try {
+    const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
+    if (!response.ok) return { ...base, error: `GitHub respondió ${response.status}` };
+    const release = (await response.json()) as {
+      tag_name?: string;
+      name?: string;
+      body?: string;
+      published_at?: string;
+      assets?: Array<{ name?: string; browser_download_url?: string; size?: number }>;
+    };
+    const latest = normalizeVersion(release.tag_name || release.name);
+    const asset = (release.assets || []).find((a) => a.name?.toLowerCase() === "nethub.exe");
+    return {
+      ok: true,
+      currentVersion: APP_VERSION,
+      latestVersion: latest || APP_VERSION,
+      available: Boolean(latest) && compareVersions(latest, APP_VERSION) > 0,
+      notes: release.body || "",
+      downloadUrl: asset?.browser_download_url || null,
+      size: asset?.size || 0,
+      publishedAt: release.published_at || null,
+    };
+  } catch (error) {
+    return { ...base, error: String(error) };
+  }
+}
+
+/** Descarga e instala la nueva versión (solo en la app de escritorio). */
+export async function installUpdate(
+  onProgress: (progress: UpdateProgress) => void,
+): Promise<InstallResult> {
+  if (typeof window !== "undefined" && window.nethub?.installUpdate) {
+    return window.nethub.installUpdate(onProgress);
+  }
+  return {
+    ok: false,
+    error: "La actualización automática solo está disponible en la app de escritorio de NetHub.",
+  };
+}
+
 
 declare global {
   interface Window {
