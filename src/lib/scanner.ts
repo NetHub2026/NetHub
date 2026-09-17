@@ -351,11 +351,55 @@ def scan():
     return hosts
 
 
+def ping(ip):
+    """Ping ICMP real: 1 paquete, 1 segundo de espera."""
+    if not re.fullmatch(r"\\d{1,3}(?:\\.\\d{1,3}){3}", ip or ""):
+        return {"ok": False, "rtt": None}
+    out = subprocess.run(
+        ["ping", "-n", "1", "-w", "1000", ip],
+        capture_output=True, text=True, shell=True,
+    ).stdout
+    found = TIME_RE.search(out)
+    if found:
+        return {"ok": True, "rtt": float(found.group(1).replace(",", "."))}
+    if "TTL=" in out.upper():
+        return {"ok": True, "rtt": 0.0}
+    return {"ok": False, "rtt": None}
+
+
+def wol(mac):
+    """Envía el Magic Packet de Wake-on-LAN por UDP al puerto 9 en difusión."""
+    clean = re.sub(r"[^0-9a-fA-F]", "", mac or "")
+    if len(clean) != 12:
+        return False
+    packet = b"\\xff" * 6 + bytes.fromhex(clean) * 16
+    sent = False
+    for target in ("255.255.255.255", "192.168.255.255"):
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            sock.sendto(packet, (target, 9))
+            sock.close()
+            sent = True
+        except Exception:
+            pass
+    return sent
+
+
 class Handler(BaseHTTPRequestHandler):
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "*")
+
+    def _json(self, payload, code=200):
+        body = json.dumps(payload).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self._cors()
+        self.end_headers()
+        self.wfile.write(body)
 
     def do_OPTIONS(self):
         self.send_response(204)
@@ -363,25 +407,26 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        if self.path.rstrip("/") != "/scan":
-            self.send_response(404)
-            self._cors()
-            self.end_headers()
-            return
-        body = json.dumps({"devices": scan()}).encode()
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self._cors()
-        self.end_headers()
-        self.wfile.write(body)
+        parsed = urlparse(self.path)
+        route = parsed.path.rstrip("/") or "/"
+        query = parse_qs(parsed.query)
+
+        if route == "/scan":
+            self._json({"devices": scan()})
+        elif route == "/ping":
+            self._json(ping((query.get("ip") or [""])[0]))
+        elif route == "/wol":
+            ok = wol((query.get("mac") or [""])[0])
+            self._json({"ok": ok}, 200 if ok else 400)
+        else:
+            self._json({"error": "not found"}, 404)
 
     def log_message(self, *args):
         pass
 
 
 if __name__ == "__main__":
-    print("NetHub agent escuchando en http://localhost:8765/scan")
+    print("NetHub agent escuchando en http://localhost:8765 (/scan, /ping, /wol)")
     HTTPServer(("127.0.0.1", 8765), Handler).serve_forever()
 `;
 
