@@ -80,6 +80,15 @@ export function DeviceDetailPanel({
 
   if (!device) return null;
 
+  /** Subredes disponibles, incluyendo la del propio dispositivo. */
+  const own = device.networkId ?? detectNetworkId(device.ip);
+  const networkOptions: NetworkDef[] = networks.some((n) => n.id === own)
+    ? networks
+    : own
+      ? [...networks, { id: own, name: `${own}.x`, hint: `subred ${own}.0/24` }]
+      : networks;
+
+
   const addTag = () => {
     const tag = tagDraft.trim();
     if (!tag || device.tags.includes(tag)) return;
