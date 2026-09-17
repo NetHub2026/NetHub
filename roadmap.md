@@ -11,6 +11,11 @@
 - Mejoras actuales: selector con contraste correcto, OUI ampliada con resolución externa/fallback por hostname y etiquetas rápidas.
 - Scripts del agente actualizados para incluir el propio PC local con nombre, IP, MAC, tipo PC y etiquetas.
 - Escaneo optimizado: PowerShell evita DNS bloqueante por IP y la consulta externa de fabricantes queda en segundo plano.
+- Ping en tiempo real en la ficha (RTT, alcanzabilidad e histórico) con endpoint `/ping` en los agentes y ping nativo en escritorio.
+- Test de velocidad con velocímetro (latencia, jitter, descarga, subida) e historial de pruebas.
+- Wake-on-LAN desde la ficha con Magic Packet vía agente (`/wol`) o nativo.
+- Segmentación por redes: pestañas con contadores, detección por subred y asignación manual en la ficha.
+- Copia de seguridad: exportar inventario en JSON o CSV y restaurar fusionando o reemplazando.
 
 ## Pendiente
 - Ninguna tarea abierta.
