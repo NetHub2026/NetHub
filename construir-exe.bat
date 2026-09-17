@@ -34,12 +34,12 @@ echo ============================================
 echo.
 
 
-echo [1/3] Instalando dependencias...
+echo [1/4] Instalando dependencias...
 call npm install
 if errorlevel 1 goto error
 
 echo.
-echo [2/3] Compilando la aplicacion...
+echo [2/4] Compilando la aplicacion...
 call npm run build
 if errorlevel 1 goto error
 
