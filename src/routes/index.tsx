@@ -462,6 +462,19 @@ function Dashboard() {
           <BandwidthChart data={bandwidthSeries} />
         </section>
 
+        <SpeedTestPanel />
+
+        <section className="mt-8">
+          <h2 className="text-base font-semibold">Redes y routers</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Cada equipo se clasifica por su subred; puedes cambiar su red en la ficha de
+            detalle.
+          </p>
+          <div className="mt-3">
+            <NetworkTabs value={network} counts={networkCounts} onChange={setNetwork} />
+          </div>
+        </section>
+
         <section className="mt-8">
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="mr-auto text-base font-semibold">
