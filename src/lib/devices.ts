@@ -1,3 +1,6 @@
+import type { VendorBrand } from "./oui";
+import type { ServiceHit } from "./services";
+
 export type DeviceType = "pc" | "console" | "tv" | "home-assistant" | "iot";
 
 export type DeviceStatus = "online" | "offline";
