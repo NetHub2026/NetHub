@@ -4,6 +4,7 @@ import {
   Activity,
   ArrowDownUp,
   Download,
+  FileSpreadsheet,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
