@@ -7,19 +7,14 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sparkles,
-  Gamepad2,
-  HouseWifi,
-  Laptop,
   Loader2,
   Moon,
   Package,
   Radar,
-  Radio,
   RotateCcw,
   Search,
   Settings2,
   Sun,
-  Tv,
   Upload,
   Wifi,
   WifiOff,
@@ -57,6 +52,7 @@ import { ImportDevicesModal } from "@/components/network/ImportDevicesModal";
 import { PackageAppModal } from "@/components/network/PackageAppModal";
 import { ScannerSetupModal } from "@/components/network/ScannerSetupModal";
 import { VendorIcon } from "@/components/network/VendorIcon";
+import { DeviceTypeIcon } from "@/components/network/DeviceTypeIcon";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
@@ -78,14 +74,6 @@ export const Route = createFileRoute("/")({
   }),
   component: Dashboard,
 });
-
-const typeIcons: Record<DeviceType, React.ReactNode> = {
-  pc: <Laptop className="size-4" />,
-  console: <Gamepad2 className="size-4" />,
-  tv: <Tv className="size-4" />,
-  "home-assistant": <HouseWifi className="size-4" />,
-  iot: <Radio className="size-4" />,
-};
 
 const filters: Array<{ value: DeviceType | "all"; label: string }> = [
   { value: "all", label: "Todos" },
@@ -216,6 +204,17 @@ function Dashboard() {
 
   const update = (device: Device) =>
     setItems((prev) => prev.map((d) => (d.id === device.id ? device : d)));
+
+  /** Olvida el dispositivo: desaparece de la lista y del almacenamiento local. */
+  const remove = (device: Device) => {
+    const next = items.filter((d) => d.id !== device.id);
+    setItems(next);
+    void saveDevicesAnywhere(next);
+    setSelectedId(null);
+    setNotice(
+      `«${device.name}» eliminado de la lista. Si vuelve a aparecer en un escaneo se marcará como nuevo.`,
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -428,7 +427,7 @@ function Dashboard() {
                     : "border-border text-muted-foreground hover:bg-accent hover:text-foreground",
                 )}
               >
-                {f.value !== "all" && typeIcons[f.value]}
+                {f.value !== "all" && <DeviceTypeIcon type={f.value} />}
                 {f.label}
               </button>
             ))}
@@ -449,7 +448,7 @@ function Dashboard() {
                       : "bg-muted text-muted-foreground",
                   )}
                 >
-                  {typeIcons[d.type]}
+                  <DeviceTypeIcon type={d.type} />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
@@ -511,6 +510,7 @@ function Dashboard() {
         device={selected}
         onClose={() => setSelectedId(null)}
         onUpdate={update}
+        onDelete={remove}
       />
       <ScannerSetupModal open={setupOpen} onClose={() => setSetupOpen(false)} />
       <ImportDevicesModal
