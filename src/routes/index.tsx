@@ -140,17 +140,13 @@ function Dashboard() {
 
   /** Fusiona el escaneo con la lista conocida y devuelve cuántos son nuevos. */
   const applyScan = (devices: Device[], source: NonNullable<ScanMeta["source"]>) => {
-    let fresh = 0;
-    setItems((prev) => {
-      const merged = mergeScan(prev, devices);
-      fresh = newDevices(merged).length;
-      void saveDevicesAnywhere(merged);
-      return merged;
-    });
+    const merged = mergeScan(items, devices);
+    setItems(merged);
+    void saveDevicesAnywhere(merged);
     const next: ScanMeta = { lastScanAt: new Date().toISOString(), source };
     setMeta(next);
     saveScanMeta(next);
-    return fresh;
+    return newDevices(merged).length;
   };
 
   const trustAll = () =>
