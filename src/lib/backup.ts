@@ -142,7 +142,7 @@ export function parseBackupCsv(text: string): Device[] {
       manualEdit: true,
     };
     const brand = at("brand");
-    if (brand) device.brand = brand as Device["brand"];
+    if (brand) device.brand = brand as NonNullable<Device["brand"]>;
     const networkId = at("networkid");
     if (networkId) device.networkId = networkId;
     const notes = at("notes");
