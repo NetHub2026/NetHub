@@ -17,7 +17,13 @@ import { deviceTypeLabels, type Device, type DeviceType } from "@/lib/devices";
 import { DeviceTypeIcon } from "./DeviceTypeIcon";
 import { PingCard } from "./PingCard";
 import { detectNetworkId, networks } from "@/lib/networks";
-import { isRandomizedMac, suggestedName } from "@/lib/oui";
+import {
+  PRIVATE_MAC_LABEL,
+  isRandomizedMac,
+  resolveVendor,
+  suggestedName,
+} from "@/lib/oui";
+import { Globe } from "lucide-react";
 import { detectServices, likelyServices, type ServiceHit } from "@/lib/services";
 import { VendorIcon } from "./VendorIcon";
 import { cn } from "@/lib/utils";
@@ -52,12 +58,15 @@ export function DeviceDetailPanel({
   const [probing, setProbing] = useState(false);
   const [probeNote, setProbeNote] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [vendorLookup, setVendorLookup] = useState(false);
+  const [vendorNote, setVendorNote] = useState<string | null>(null);
 
   useEffect(() => {
     setTagDraft("");
     setFeedback(null);
     setProbeNote(null);
     setConfirmDelete(false);
+    setVendorNote(null);
   }, [device?.id]);
 
   useEffect(() => {
@@ -103,9 +112,29 @@ export function DeviceDetailPanel({
       : likelyServices(device.ip, device.type);
   const suggested = !device.services || device.services.length === 0;
 
+  const privateMac = isRandomizedMac(device.mac);
+
+  const findVendorOnline = async () => {
+    setVendorLookup(true);
+    setVendorNote(null);
+    const resolved = await resolveVendor(device.mac, device.name);
+    setVendorLookup(false);
+    if (resolved.vendor && resolved.vendor !== device.vendor) {
+      onUpdate({ ...device, vendor: resolved.vendor, brand: resolved.brand });
+      setVendorNote(`Fabricante actualizado: ${resolved.vendor}.`);
+      return;
+    }
+    setVendorNote(
+      privateMac
+        ? "La dirección es privada, no hay fabricante que consultar."
+        : "No se ha encontrado más información. Con el agente en marcha la búsqueda es más fiable.",
+    );
+  };
+
+
   const rows: Array<[string, string]> = [
     ["Dirección IP", device.ip],
-    ["Dirección MAC", device.mac + (isRandomizedMac(device.mac) ? " (aleatoria)" : "")],
+    ["Dirección MAC", device.mac + (privateMac ? " · privada" : "")],
     ["Última conexión", device.lastSeen],
     ["Descarga actual", `${device.downstream.toFixed(1)} Mbps`],
     ["Subida actual", `${device.upstream.toFixed(1)} Mbps`],
@@ -228,6 +257,30 @@ export function DeviceDetailPanel({
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none"
               />
             </span>
+            <button
+              type="button"
+              onClick={findVendorOnline}
+              disabled={vendorLookup}
+              className="mt-2 inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:border-brand hover:text-brand disabled:opacity-60"
+            >
+              {vendorLookup ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Globe className="size-3.5" />
+              )}
+              Buscar fabricante en Internet
+            </button>
+            {privateMac && (
+              <span className="mt-2 block text-[11px] text-muted-foreground">
+                {PRIVATE_MAC_LABEL}: este equipo oculta su dirección real, así que el
+                fabricante no puede deducirse.
+              </span>
+            )}
+            {vendorNote && (
+              <span className="mt-1 block text-[11px] text-muted-foreground">
+                {vendorNote}
+              </span>
+            )}
           </label>
           <label className="block">
             <span className="text-xs text-muted-foreground">Red / router</span>

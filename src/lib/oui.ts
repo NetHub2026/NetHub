@@ -717,13 +717,38 @@ export function lookupByHostname(hostname?: string | null): OuiEntry | null {
   return HOSTNAME_RULES.find((rule) => rule.pattern.test(text))?.entry ?? null;
 }
 
+/** Etiqueta usada cuando la MAC es aleatoria/privada y no identifica al fabricante. */
+export const PRIVATE_MAC_LABEL = "MAC privada (Móvil/Portátil)";
+const PRIVATE_MAC_ENTRY: OuiEntry = { vendor: PRIVATE_MAC_LABEL, brand: "unknown" };
+
 export function lookupOui(mac: string, hostname?: string | null): OuiEntry {
   const normalized = normalizeMac(mac);
   const local = OUI[prefix(normalized)];
   if (local) return local;
   const cached = readCache()[cacheKey(normalized)];
   if (cached) return cached;
-  return lookupByHostname(hostname) ?? UNKNOWN_VENDOR;
+  const byHost = lookupByHostname(hostname);
+  if (byHost) return byHost;
+  if (isRandomizedMac(normalized)) return PRIVATE_MAC_ENTRY;
+  return UNKNOWN_VENDOR;
+}
+
+/** Consulta al agente local (sin CORS ni bloqueos del navegador). */
+async function resolveViaAgent(mac: string): Promise<string> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(
+      `http://localhost:8765/vendor?mac=${encodeURIComponent(mac)}`,
+      { signal: controller.signal, cache: "no-store" },
+    );
+    clearTimeout(timer);
+    if (!res.ok) return "";
+    const body = (await res.json()) as { vendor?: string };
+    return body.vendor?.trim() ?? "";
+  } catch {
+    return "";
+  }
 }
 
 export async function resolveVendor(mac: string, hostname?: string | null): Promise<OuiEntry> {
@@ -731,6 +756,17 @@ export async function resolveVendor(mac: string, hostname?: string | null): Prom
   if (local.brand !== "unknown") return local;
 
   const normalized = normalizeMac(mac);
+
+  // Una MAC aleatoria no pertenece a ningún fabricante: no se consulta Internet.
+  if (!OUI[prefix(normalized)] && isRandomizedMac(normalized)) {
+    return lookupByHostname(hostname) ?? PRIVATE_MAC_ENTRY;
+  }
+
+  const fromAgent = await resolveViaAgent(normalized);
+  if (fromAgent && !/not found|unknown/i.test(fromAgent)) {
+    return cacheOui(normalized, fromAgent, brandFromVendorName(fromAgent));
+  }
+
   const urls = [
     `https://api.macvendors.com/${encodeURIComponent(normalized)}`,
     `https://api.maclookup.app/v2/macs/${encodeURIComponent(normalized)}`,

@@ -295,8 +295,8 @@ export function formatScanTime(iso: string | null): string {
 
 export const pythonAgentScript = `# nethub_agent.py — agente de escaneo ARP + ping + Wake-on-LAN para Windows
 # Requisitos: Python 3.9+ (no necesita dependencias externas)
-# Endpoints:  /scan   /ping?ip=192.168.1.20   /wol?mac=AA:BB:CC:DD:EE:FF
-import json, re, socket, subprocess, uuid
+# Endpoints:  /scan   /ping?ip=192.168.1.20   /wol?mac=AA:BB:CC:DD:EE:FF   /vendor?mac=AA:BB:CC:DD:EE:FF
+import json, os, re, socket, subprocess, time, urllib.request, uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -348,7 +348,7 @@ def scan():
     local = local_device()
     hosts = [h for h in hosts if h.get("mac") != local["mac"]]
     hosts.append(local)
-    return hosts
+    return annotate_vendors(hosts)
 
 
 def ping(ip):
@@ -386,6 +386,87 @@ def wol(mac):
     return sent
 
 
+# ---------------------------------------------------------------------------
+# Resolución de fabricantes (OUI) por Internet, en el propio agente.
+# Se consulta de forma secuencial y con pausa entre peticiones, y se guarda
+# el resultado en vendor-cache.json junto al script.
+# ---------------------------------------------------------------------------
+CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor-cache.json")
+try:
+    with open(CACHE_FILE, "r", encoding="utf-8") as fh:
+        VENDOR_CACHE = json.load(fh)
+except Exception:
+    VENDOR_CACHE = {}
+
+
+def _save_cache():
+    try:
+        with open(CACHE_FILE, "w", encoding="utf-8") as fh:
+            json.dump(VENDOR_CACHE, fh, indent=2)
+    except Exception:
+        pass
+
+
+def is_private_mac(mac):
+    """MAC aleatoria/privada: segundo bit del primer octeto activo."""
+    clean = re.sub(r"[^0-9a-fA-F]", "", mac or "")
+    if len(clean) < 2:
+        return False
+    return int(clean[:2], 16) & 0x02 == 0x02
+
+
+def lookup_vendor(mac):
+    clean = re.sub(r"[^0-9a-fA-F]", "", mac or "").upper()
+    if len(clean) < 6:
+        return ""
+    key = clean[:6]
+    if key in VENDOR_CACHE:
+        return VENDOR_CACHE[key]
+    if is_private_mac(mac):
+        VENDOR_CACHE[key] = ""
+        _save_cache()
+        return ""
+
+    vendor = ""
+    for url in (
+        "https://api.macvendors.com/" + clean,
+        "https://api.maclookup.app/v2/macs/" + clean,
+    ):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "NetHub-Agent"})
+            with urllib.request.urlopen(req, timeout=4) as res:
+                body = res.read().decode("utf-8", "ignore").strip()
+            if body.startswith("{"):
+                data = json.loads(body)
+                vendor = (data.get("company") or data.get("vendor") or "").strip()
+            else:
+                vendor = body
+            if vendor and "not found" not in vendor.lower():
+                break
+            vendor = ""
+        except Exception:
+            vendor = ""
+        time.sleep(0.6)  # pausa para no ser bloqueado por límite de peticiones
+
+    VENDOR_CACHE[key] = vendor
+    _save_cache()
+    return vendor
+
+
+def annotate_vendors(hosts):
+    for host in hosts:
+        if host.get("vendor"):
+            continue
+        vendor = lookup_vendor(host.get("mac", ""))
+        if vendor:
+            host["vendor"] = vendor
+        elif is_private_mac(host.get("mac", "")):
+            host["vendor"] = "MAC privada (Móvil/Portátil)"
+        time.sleep(0.2)
+    return hosts
+
+
+
 class Handler(BaseHTTPRequestHandler):
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -415,6 +496,9 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"devices": scan()})
         elif route == "/ping":
             self._json(ping((query.get("ip") or [""])[0]))
+        elif route == "/vendor":
+            mac = (query.get("mac") or [""])[0]
+            self._json({"mac": mac, "vendor": lookup_vendor(mac)})
         elif route == "/wol":
             ok = wol((query.get("mac") or [""])[0])
             self._json({"ok": ok}, 200 if ok else 400)
@@ -426,17 +510,73 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print("NetHub agent escuchando en http://localhost:8765 (/scan, /ping, /wol)")
+    print("NetHub agent escuchando en http://localhost:8765 (/scan, /ping, /wol, /vendor)")
     HTTPServer(("127.0.0.1", 8765), Handler).serve_forever()
 `;
 
 export const powershellAgentScript = `# nethub-agent.ps1 — agente de escaneo ARP + ping + Wake-on-LAN (PowerShell 5+)
 # Uso:  powershell -ExecutionPolicy Bypass -File .\\nethub-agent.ps1
-# Endpoints:  /scan   /ping?ip=192.168.1.20   /wol?mac=AA:BB:CC:DD:EE:FF
+# Endpoints:  /scan   /ping?ip=192.168.1.20   /wol?mac=AA:BB:CC:DD:EE:FF   /vendor?mac=AA:BB:CC:DD:EE:FF
 $listener = [System.Net.HttpListener]::new()
 $listener.Prefixes.Add("http://localhost:8765/")
 $listener.Start()
-Write-Host "NetHub agent escuchando en http://localhost:8765 (/scan, /ping, /wol)"
+Write-Host "NetHub agent escuchando en http://localhost:8765 (/scan, /ping, /wol, /vendor)"
+
+# --- Resolución de fabricantes (OUI) por Internet, dentro del propio agente ---
+$VendorCacheFile = Join-Path $PSScriptRoot 'vendor-cache.json'
+$VendorCache = @{}
+if (Test-Path $VendorCacheFile) {
+  try {
+    (Get-Content $VendorCacheFile -Raw | ConvertFrom-Json).PSObject.Properties |
+      ForEach-Object { $VendorCache[$_.Name] = $_.Value }
+  } catch {}
+}
+
+function Save-VendorCache {
+  try { ($VendorCache | ConvertTo-Json -Depth 3) | Set-Content -Path $VendorCacheFile -Encoding UTF8 } catch {}
+}
+
+function Test-PrivateMac($mac) {
+  $clean = ($mac -replace '[^0-9a-fA-F]', '')
+  if ($clean.Length -lt 2) { return $false }
+  return (([Convert]::ToInt32($clean.Substring(0, 2), 16) -band 2) -eq 2)
+}
+
+function Get-VendorForMac($mac) {
+  $clean = ($mac -replace '[^0-9a-fA-F]', '').ToUpper()
+  if ($clean.Length -lt 6) { return '' }
+  $key = $clean.Substring(0, 6)
+  if ($VendorCache.ContainsKey($key)) { return $VendorCache[$key] }
+  if (Test-PrivateMac $mac) { $VendorCache[$key] = ''; Save-VendorCache; return '' }
+
+  $vendor = ''
+  foreach ($url in @("https://api.macvendors.com/$clean", "https://api.maclookup.app/v2/macs/$clean")) {
+    try {
+      $resp = Invoke-RestMethod -Uri $url -TimeoutSec 4 -UseBasicParsing
+      if ($resp -is [string]) { $vendor = $resp.Trim() }
+      elseif ($resp.company) { $vendor = [string]$resp.company }
+      elseif ($resp.vendor) { $vendor = [string]$resp.vendor }
+      if ($vendor -and $vendor -notmatch '(?i)not found') { break }
+      $vendor = ''
+    } catch { $vendor = '' }
+    Start-Sleep -Milliseconds 600   # pausa entre peticiones para evitar bloqueos
+  }
+
+  $VendorCache[$key] = $vendor
+  Save-VendorCache
+  return $vendor
+}
+
+function Add-VendorInfo($rows) {
+  foreach ($row in $rows) {
+    if (-not $row -or $row.vendor) { continue }
+    $vendor = Get-VendorForMac $row.mac
+    if ($vendor) { $row.vendor = $vendor }
+    elseif (Test-PrivateMac $row.mac) { $row.vendor = 'MAC privada (Móvil/Portátil)' }
+    Start-Sleep -Milliseconds 150
+  }
+  return $rows
+}
 
 function Get-NetBiosNameMap {
   $names = @{}
@@ -560,8 +700,12 @@ while ($listener.IsListening) {
   $payload = $null
 
   switch ($route) {
-    '/scan' { $payload = @{ devices = (Get-ArpDevices) } }
+    '/scan' { $payload = @{ devices = (Add-VendorInfo (Get-ArpDevices)) } }
     '/ping' { $payload = (Invoke-PingHost $ctx.Request.QueryString['ip']) }
+    '/vendor' {
+      $mac = $ctx.Request.QueryString['mac']
+      $payload = @{ mac = $mac; vendor = (Get-VendorForMac $mac) }
+    }
     '/wol'  { $payload = @{ ok = (Send-WolPacket $ctx.Request.QueryString['mac']) } }
     default { $payload = @{ error = 'not found' }; $res.StatusCode = 404 }
   }
