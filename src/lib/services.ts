@@ -104,10 +104,10 @@ export function likelyServices(ip: string, type: string): ServiceHit[] {
       : type === "iot"
         ? [80, 443]
         : type === "tv"
-          ? [8080]
+          ? [8080, 80]
           : type === "pc"
             ? [22, 445]
-            : [];
+            : [80, 443];
   return commonServices
     .filter((d) => ports.includes(d.port))
     .map((def) => ({
