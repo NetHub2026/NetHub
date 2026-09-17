@@ -31,6 +31,12 @@ export type VendorBrand =
   | "realtek"
   | "sercomm"
   | "sagemcom"
+  | "arcadyan"
+  | "technicolor"
+  | "mitrastar"
+  | "askey"
+  | "zyxel"
+  | "comtrend"
   | "tuya"
   | "hp"
   | "dell"
@@ -606,8 +612,16 @@ addEntries(OUI, "TP-Link", "tp-link", ["00:14:78", "00:19:e0", "00:1d:0f", "00:2
 addEntries(OUI, "Ubiquiti", "ubiquiti", ["00:15:6d", "04:18:d6", "18:e8:29", "24:a4:3c", "44:d9:e7", "68:72:51", "70:a7:41", "74:83:c2", "78:8a:20", "78:45:58", "80:2a:a8", "9c:05:d6", "a8:5e:45", "b4:fb:e4", "dc:9f:db", "e0:63:da", "f0:9f:c2", "f4:92:bf", "fc:ec:da"]);
 addEntries(OUI, "Netgear", "netgear", ["00:09:5b", "00:0f:b5", "00:14:6c", "00:18:4d", "00:1b:2f", "00:1e:2a", "00:22:3f", "00:24:b2", "00:26:f2", "04:a1:51", "08:02:8e", "10:0d:7f", "20:4e:7f", "28:80:23", "2c:30:33", "30:46:9a", "34:98:b5", "44:94:fc", "4c:60:de", "50:6a:03", "54:b8:0a", "5c:26:0a", "6c:b0:ce", "74:44:01", "80:37:73", "84:1b:5e", "94:18:82", "9c:3d:cf", "a0:04:60", "a0:21:b7", "a0:40:a0", "b0:39:56", "c0:3f:0e", "c4:04:15", "cc:40:d0", "d0:75:be", "e0:46:ee", "e4:f4:c6", "ec:08:6b"]);
 addEntries(OUI, "AVM (FRITZ!Box)", "avm", ["00:04:0e", "00:15:0c", "00:1a:4f", "00:1c:4a", "00:1f:3f", "00:24:fe", "08:96:d7", "24:65:11", "34:31:c4", "3c:a6:2f", "44:4e:6d", "5c:49:79", "74:31:70", "7c:ff:4d", "9c:c7:a6", "bc:05:43", "c8:0e:14", "dc:15:c8", "e0:28:6d"]);
-addEntries(OUI, "Sercomm", "sercomm", ["00:13:c8", "00:15:56", "00:19:15", "00:1d:20", "00:1f:33", "00:22:3f", "00:24:ba", "00:26:5a", "04:20:9a", "0c:4c:39", "10:62:eb", "14:91:82", "18:83:bf", "20:2b:c1", "28:be:9b", "30:91:8f", "34:6b:46", "38:6b:1c", "40:65:a3", "48:31:b7", "50:57:9c", "58:23:8c", "60:31:97", "64:66:24", "6c:63:9c", "70:54:d2", "78:8c:54", "80:2a:a8", "84:1b:5e", "8c:19:2d", "94:4a:0c", "9c:97:26", "a0:02:dc", "ac:84:c6", "b0:39:56", "bc:4d:fb", "c0:56:27", "c4:27:95", "cc:32:e5", "d4:6a:91", "dc:08:0f", "e0:91:f5", "e8:37:7a", "f0:72:8c", "f8:8e:85"]);
-addEntries(OUI, "Sagemcom", "sagemcom", ["00:1a:2b", "00:1d:19", "00:22:07", "00:24:17", "00:26:91", "0c:30:21", "10:7b:44", "18:1e:78", "1c:95:5d", "2c:30:33", "34:27:92", "3c:81:d8", "44:ce:7d", "4c:17:44", "50:7e:5d", "5c:35:3b", "60:31:97", "68:7f:74", "70:4f:57", "78:8c:54", "80:3f:5d", "84:1b:5e", "8c:19:2d", "98:6b:3d", "a4:6c:2a", "ac:3b:77", "b0:4e:26", "bc:4d:fb", "c0:56:27", "cc:2d:e0", "d4:6a:91", "e0:60:66", "e8:37:7a", "f0:72:8c"]);
+// Routers de operadora (España: Movistar, Vodafone, Orange, Yoigo, Digi…).
+// Prefijos sin solapamientos con TP-Link, Netgear o Ubiquiti para no confundir marcas.
+addEntries(OUI, "Sercomm", "sercomm", ["00:13:c8", "00:15:56", "00:19:15", "00:1d:20", "00:24:ba", "04:20:9a", "0c:4c:39", "10:62:eb", "14:91:82", "18:83:bf", "20:2b:c1", "28:be:9b", "34:6b:46", "38:6b:1c", "40:65:a3", "48:31:b7", "58:23:8c", "64:66:24", "6c:63:9c", "70:54:d2", "78:8c:54", "94:4a:0c", "9c:97:26", "bc:4d:fb", "c0:56:27", "c4:27:95", "d4:6a:91", "dc:08:0f", "e0:91:f5", "e8:37:7a", "f0:72:8c", "f8:8e:85"]);
+addEntries(OUI, "Sagemcom", "sagemcom", ["00:1a:2b", "00:22:07", "00:26:91", "0c:30:21", "18:1e:78", "1c:95:5d", "34:27:92", "3c:81:d8", "44:ce:7d", "4c:17:44", "50:7e:5d", "5c:35:3b", "68:7f:74", "80:3f:5d", "98:6b:3d", "ac:3b:77", "cc:2d:e0", "f4:b5:49"]);
+addEntries(OUI, "Arcadyan", "arcadyan", ["00:12:bf", "00:1d:19", "08:76:ff", "10:13:31", "14:c0:3e", "18:83:31", "38:70:0c", "44:d4:e0", "50:d4:f7", "88:d2:74", "9c:80:df", "a4:08:f5", "b4:ee:b4", "cc:33:bb", "d0:5b:a8", "e0:19:1d", "e8:cc:18", "f4:6a:dd", "fc:b4:e6"]);
+addEntries(OUI, "Technicolor", "technicolor", ["00:14:7f", "00:1f:9f", "00:24:d4", "08:76:95", "10:9f:a9", "34:8a:ae", "44:32:c8", "78:99:5c", "7c:03:d8", "84:e0:f4", "a0:55:de", "b8:16:19", "bc:64:4b", "cc:03:fa", "d4:35:1d", "dc:53:7c", "e8:3e:fc", "f8:8e:a1"]);
+addEntries(OUI, "MitraStar", "mitrastar", ["04:c0:6f", "10:62:d0", "1c:49:7b", "28:9e:fc", "40:ed:00", "8c:0c:90", "e0:19:54", "f4:06:8d"]);
+addEntries(OUI, "Askey", "askey", ["00:1e:c7", "00:23:08", "0c:f4:d5", "20:76:93", "34:8a:7b", "5c:a3:9d", "70:5a:9e", "88:96:4e", "b0:ac:d2", "cc:d4:a1", "e0:cc:f8"]);
+addEntries(OUI, "Zyxel", "zyxel", ["00:13:49", "00:19:cb", "00:23:f8", "40:4a:03", "4c:9e:ff", "5c:f4:ab", "90:ef:68", "b0:b2:dc", "bc:99:11", "d8:ec:e5", "ec:43:f6", "f4:69:d5"]);
+addEntries(OUI, "Comtrend", "comtrend", ["04:18:0f", "64:68:0c", "84:26:15", "90:5c:44", "c8:6c:87"]);
 
 addEntries(OUI, "Espressif (IoT)", "espressif", ["18:fe:34", "24:0a:c4", "24:6f:28", "2c:3a:e8", "30:ae:a4", "3c:61:05", "48:3f:da", "4c:11:ae", "50:02:91", "54:5a:a6", "5c:cf:7f", "60:01:94", "68:c6:3a", "7c:9e:bd", "80:7d:3a", "84:0d:8e", "84:cc:a8", "8c:aa:b5", "90:97:d5", "94:b5:55", "98:cd:ac", "a0:20:a6", "a4:cf:12", "ac:67:b2", "b4:e6:2d", "bc:dd:c2", "c4:4f:33", "c8:2b:96", "cc:50:e3", "d8:a0:1d", "dc:4f:22", "e0:5a:1b", "e8:31:cd", "ec:64:c9", "f0:08:d1", "f4:cf:a2", "fc:f5:c4"]);
 addEntries(OUI, "Shelly", "shelly", ["8c:aa:b5", "98:f4:ab", "c4:5b:be", "cc:50:e3", "e8:68:e7"]);
@@ -636,6 +650,14 @@ const HOSTNAME_RULES: HostnameRule[] = [
   { pattern: /\b(huawei|honor)\b/i, entry: entry("Huawei", "huawei") },
   { pattern: /\b(oppo|realme)\b/i, entry: entry("OPPO", "oppo") },
   { pattern: /\b(oneplus)\b/i, entry: entry("OnePlus", "oneplus") },
+  { pattern: /\b(arcadyan|livebox|orange[-_ ]?router)\b/i, entry: entry("Arcadyan", "arcadyan") },
+  { pattern: /\b(technicolor|thomson|speedtouch)\b/i, entry: entry("Technicolor", "technicolor") },
+  { pattern: /\b(mitrastar|hgu|movistar)\b/i, entry: entry("MitraStar", "mitrastar") },
+  { pattern: /\b(askey)\b/i, entry: entry("Askey", "askey") },
+  { pattern: /\b(zyxel|keenetic)\b/i, entry: entry("Zyxel", "zyxel") },
+  { pattern: /\b(comtrend)\b/i, entry: entry("Comtrend", "comtrend") },
+  { pattern: /\b(sercomm|vodafone)\b/i, entry: entry("Sercomm", "sercomm") },
+  { pattern: /\b(sagemcom|fast[-_ ]?[0-9]{4})\b/i, entry: entry("Sagemcom", "sagemcom") },
   { pattern: /\b(archer|deco|tapo|tplink|tp-link)\b/i, entry: entry("TP-Link", "tp-link") },
   { pattern: /\b(fritz|fritzbox|avm)\b/i, entry: entry("AVM (FRITZ!Box)", "avm") },
   { pattern: /\b(vodafone|sercomm)\b/i, entry: entry("Sercomm", "sercomm") },

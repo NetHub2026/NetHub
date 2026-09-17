@@ -16,7 +16,7 @@ import {
 import { deviceTypeLabels, type Device, type DeviceType } from "@/lib/devices";
 import { DeviceTypeIcon } from "./DeviceTypeIcon";
 import { PingCard } from "./PingCard";
-import { detectNetworkId, networks } from "@/lib/networks";
+import { detectNetworkId, type NetworkDef } from "@/lib/networks";
 import {
   PRIVATE_MAC_LABEL,
   isRandomizedMac,
@@ -45,6 +45,8 @@ interface DeviceDetailPanelProps {
   onClose: () => void;
   onUpdate: (device: Device) => void;
   onDelete: (device: Device) => void;
+  /** Subredes detectadas dinámicamente en el inventario. */
+  networks?: NetworkDef[];
 }
 
 export function DeviceDetailPanel({
@@ -52,6 +54,7 @@ export function DeviceDetailPanel({
   onClose,
   onUpdate,
   onDelete,
+  networks = [],
 }: DeviceDetailPanelProps) {
   const [tagDraft, setTagDraft] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -76,6 +79,15 @@ export function DeviceDetailPanel({
   }, [onClose]);
 
   if (!device) return null;
+
+  /** Subredes disponibles, incluyendo la del propio dispositivo. */
+  const own = device.networkId ?? detectNetworkId(device.ip);
+  const networkOptions: NetworkDef[] = networks.some((n) => n.id === own)
+    ? networks
+    : own
+      ? [...networks, { id: own, name: `${own}.x`, hint: `subred ${own}.0/24` }]
+      : networks;
+
 
   const addTag = () => {
     const tag = tagDraft.trim();
@@ -283,7 +295,7 @@ export function DeviceDetailPanel({
             )}
           </label>
           <label className="block">
-            <span className="text-xs text-muted-foreground">Red / router</span>
+            <span className="text-xs text-muted-foreground">Red / subred</span>
             <span className="mt-1 flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 focus-within:border-brand">
               <Router className="size-4 shrink-0 text-brand" />
               <select
@@ -300,7 +312,7 @@ export function DeviceDetailPanel({
                 <option value="" className="bg-popover text-popover-foreground">
                   Sin clasificar
                 </option>
-                {networks.map((net) => (
+                {networkOptions.map((net) => (
                   <option
                     key={net.id}
                     value={net.id}

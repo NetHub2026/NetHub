@@ -3,20 +3,16 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   ArrowDownUp,
-  Download,
   FileSpreadsheet,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
   Loader2,
   Moon,
-  Package,
   Radar,
   RotateCcw,
   Search,
-  Settings2,
   Sun,
-  Upload,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -40,7 +36,6 @@ import {
   type ScannerStatus,
 } from "@/lib/scanner";
 import {
-  downloadDevicesJson,
   getDbPath,
   getRuntime,
   nativeScan,
@@ -48,17 +43,16 @@ import {
   type Runtime,
 } from "@/lib/desktop";
 import { loadDevicesAnywhere, saveDevicesAnywhere } from "@/lib/persistence";
-import { exportInventoryCsv, exportInventoryJson } from "@/lib/backup";
-import { ALL_NETWORKS, countByNetwork, networkOf } from "@/lib/networks";
+import { exportInventoryCsv } from "@/lib/backup";
+import {
+  ALL_NETWORKS,
+  countByNetwork,
+  detectNetworks,
+  networkOf,
+} from "@/lib/networks";
 import { BandwidthChart } from "@/components/network/BandwidthChart";
 import { DeviceDetailPanel } from "@/components/network/DeviceDetailPanel";
-import {
-  ImportDevicesModal,
-  type RestoreMode,
-} from "@/components/network/ImportDevicesModal";
 import { NetworkTabs } from "@/components/network/NetworkTabs";
-import { PackageAppModal } from "@/components/network/PackageAppModal";
-import { ScannerSetupModal } from "@/components/network/ScannerSetupModal";
 import { SpeedTestPanel } from "@/components/network/SpeedTestPanel";
 import { VendorIcon } from "@/components/network/VendorIcon";
 import { DeviceTypeIcon } from "@/components/network/DeviceTypeIcon";
@@ -105,11 +99,8 @@ function Dashboard() {
   const [status, setStatus] = useState<ScannerStatus>("unknown");
   const [scanning, setScanning] = useState(false);
   const [meta, setMeta] = useState<ScanMeta>({ lastScanAt: null, source: null });
-  const [setupOpen, setSetupOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
-  const [packageOpen, setPackageOpen] = useState(false);
   const [runtime, setRuntime] = useState<Runtime>("web");
   const [dbPath, setDbPath] = useState("Almacenamiento del navegador (localStorage)");
 
@@ -217,6 +208,7 @@ function Dashboard() {
   const showEmpty = hydrated && items.length === 0;
 
   const networkCounts = useMemo(() => countByNetwork(items), [items]);
+  const detectedNetworks = useMemo(() => detectNetworks(items), [items]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -248,28 +240,6 @@ function Dashboard() {
     );
   };
 
-  /** Restaura una copia de seguridad, fusionando o reemplazando el inventario. */
-  const restore = (backup: Device[], mode: RestoreMode) => {
-    const next =
-      mode === "replace"
-        ? backup
-        : (() => {
-            const byId = new Map(items.map((d) => [d.id, d]));
-            for (const device of backup) {
-              const existing = byId.get(device.id);
-              byId.set(device.id, existing ? { ...existing, ...device } : device);
-            }
-            return [...byId.values()];
-          })();
-    setItems(next);
-    void saveDevicesAnywhere(next);
-    setNotice(
-      mode === "replace"
-        ? `Copia restaurada: el inventario se ha reemplazado con ${backup.length} dispositivos.`
-        : `Copia restaurada: ${backup.length} dispositivos fusionados con tu inventario (${next.length} en total).`,
-    );
-  };
-
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
@@ -297,21 +267,6 @@ function Dashboard() {
             {scanning ? "Escaneando…" : "Escanear red"}
           </button>
           <button
-            onClick={() => setImportOpen(true)}
-            className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <Upload className="size-4" />
-            <span className="hidden sm:inline">Importar</span>
-          </button>
-          <button
-            onClick={() => setSetupOpen(true)}
-            className="rounded-md border border-border p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            aria-label="Configurar escáner Windows"
-            title="Configurar escáner Windows"
-          >
-            <Settings2 className="size-4" />
-          </button>
-          <button
             onClick={() => setDark((v) => !v)}
             className="rounded-md border border-border p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
@@ -337,25 +292,6 @@ function Dashboard() {
           </span>
           <div className="ml-auto flex flex-wrap gap-2">
             <button
-              onClick={() => setPackageOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-brand px-3 py-1.5 font-medium text-brand transition-colors hover:bg-brand/10"
-            >
-              <Package className="size-3.5" />
-              Empaquetar App Portable
-            </button>
-            <button
-              onClick={() => {
-                exportInventoryJson(items);
-                setNotice(
-                  `Inventario exportado en JSON con ${items.length} dispositivos, etiquetas y notas incluidas.`,
-                );
-              }}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <Download className="size-3.5" />
-              Exportar inventario (JSON)
-            </button>
-            <button
               onClick={() => {
                 exportInventoryCsv(items);
                 setNotice(
@@ -366,13 +302,6 @@ function Dashboard() {
             >
               <FileSpreadsheet className="size-3.5" />
               Exportar inventario (CSV)
-            </button>
-            <button
-              onClick={() => downloadDevicesJson(items)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <Download className="size-3.5" />
-              devices-db.json
             </button>
             <button
               onClick={resetData}
@@ -435,7 +364,7 @@ function Dashboard() {
             <h2 className="mt-4 text-lg font-semibold">Todavía no hay dispositivos</h2>
             <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
               Escanea tu red para descubrir automáticamente PCs, consolas, Smart TVs,
-              Home Assistant e IoT, o importa un archivo con tus datos si ya los tienes.
+              Home Assistant e IoT.
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
               <button
@@ -449,20 +378,6 @@ function Dashboard() {
                   <Radar className="size-4" />
                 )}
                 {scanning ? "Escaneando…" : "Escanear red"}
-              </button>
-              <button
-                onClick={() => setImportOpen(true)}
-                className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              >
-                <Upload className="size-4" />
-                Importar dispositivos
-              </button>
-              <button
-                onClick={() => setSetupOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
-              >
-                <Settings2 className="size-3.5" />
-                Cómo configurar el escáner
               </button>
             </div>
           </section>
@@ -511,13 +426,18 @@ function Dashboard() {
         <SpeedTestPanel />
 
         <section className="mt-8">
-          <h2 className="text-base font-semibold">Redes y routers</h2>
+          <h2 className="text-base font-semibold">Redes detectadas</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Cada equipo se clasifica por su subred; puedes cambiar su red en la ficha de
-            detalle.
+            Las subredes se detectan solas a partir de las IP encontradas; puedes cambiar
+            la red de un equipo en su ficha de detalle.
           </p>
           <div className="mt-3">
-            <NetworkTabs value={network} counts={networkCounts} onChange={setNetwork} />
+            <NetworkTabs
+              value={network}
+              counts={networkCounts}
+              networks={detectedNetworks}
+              onChange={setNetwork}
+            />
           </div>
         </section>
 
@@ -647,27 +567,7 @@ function Dashboard() {
         onClose={() => setSelectedId(null)}
         onUpdate={update}
         onDelete={remove}
-      />
-      <ScannerSetupModal open={setupOpen} onClose={() => setSetupOpen(false)} />
-      <ImportDevicesModal
-        open={importOpen}
-        onClose={() => setImportOpen(false)}
-        onImport={(devices, source) => {
-          void (async () => {
-            const fresh = await applyScan(devices, source);
-            setNotice(
-              `Importados ${devices.length} dispositivos y guardados localmente` +
-                (fresh > 0 ? ` · ${fresh} nuevos.` : "."),
-            );
-          })();
-        }}
-        onRestore={restore}
-      />
-      <PackageAppModal
-        open={packageOpen}
-        onClose={() => setPackageOpen(false)}
-        dbPath={dbPath}
-        runtimeLabel={runtimeLabels[runtime]}
+        networks={detectedNetworks}
       />
     </div>
   );
