@@ -4,6 +4,9 @@ import {
   Activity,
   ArrowDownUp,
   Download,
+  ShieldAlert,
+  ShieldCheck,
+  Sparkles,
   Gamepad2,
   HouseWifi,
   Laptop,
@@ -33,6 +36,8 @@ import {
   fetchFromAgent,
   formatScanTime,
   loadScanMeta,
+  mergeScan,
+  newDevices,
   saveScanMeta,
   type ScanMeta,
   type ScannerStatus,
@@ -51,6 +56,7 @@ import { DeviceDetailPanel } from "@/components/network/DeviceDetailPanel";
 import { ImportDevicesModal } from "@/components/network/ImportDevicesModal";
 import { PackageAppModal } from "@/components/network/PackageAppModal";
 import { ScannerSetupModal } from "@/components/network/ScannerSetupModal";
+import { VendorIcon } from "@/components/network/VendorIcon";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
@@ -132,13 +138,19 @@ function Dashboard() {
     if (hydrated) void saveDevicesAnywhere(items);
   }, [items, hydrated]);
 
+  /** Fusiona el escaneo con la lista conocida y devuelve cuántos son nuevos. */
   const applyScan = (devices: Device[], source: NonNullable<ScanMeta["source"]>) => {
-    setItems(devices);
+    const merged = mergeScan(items, devices);
+    setItems(merged);
+    void saveDevicesAnywhere(merged);
     const next: ScanMeta = { lastScanAt: new Date().toISOString(), source };
     setMeta(next);
     saveScanMeta(next);
-    void saveDevicesAnywhere(devices);
+    return newDevices(merged).length;
   };
+
+  const trustAll = () =>
+    setItems((prev) => prev.map((d) => (d.isNew ? { ...d, isNew: false, trusted: true } : d)));
 
   const scan = async () => {
     setScanning(true);
@@ -149,15 +161,21 @@ function Dashboard() {
       const native = await nativeScan();
       if (native && native.length > 0) {
         setStatus("connected");
-        applyScan(native, "native");
-        setNotice(`Escaneo nativo completado: ${native.length} dispositivos detectados.`);
+        const fresh = applyScan(native, "native");
+        setNotice(
+          `Escaneo nativo completado: ${native.length} dispositivos detectados` +
+            (fresh > 0 ? ` · ${fresh} nuevos.` : "."),
+        );
         return;
       }
       // 2) Fallback: agente local en http://localhost:8765/scan.
       const devices = await fetchFromAgent();
       setStatus("connected");
-      applyScan(devices, "agent");
-      setNotice(`Escaneo completado: ${devices.length} dispositivos detectados.`);
+      const fresh = applyScan(devices, "agent");
+      setNotice(
+        `Escaneo completado: ${devices.length} dispositivos detectados` +
+          (fresh > 0 ? ` · ${fresh} nuevos.` : "."),
+      );
     } catch {
       setStatus("disconnected");
       setNotice(
@@ -179,6 +197,7 @@ function Dashboard() {
   const online = items.filter((d) => d.status === "online");
   const totalDown = online.reduce((sum, d) => sum + d.downstream, 0);
   const totalUp = online.reduce((sum, d) => sum + d.upstream, 0);
+  const intruders = newDevices(items);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -294,6 +313,43 @@ function Dashboard() {
           </p>
         )}
 
+        {intruders.length > 0 && (
+          <section className="mb-6 rounded-2xl border border-warning/40 bg-warning/10 p-5">
+            <div className="flex flex-wrap items-start gap-4">
+              <ShieldAlert className="mt-0.5 size-5 shrink-0 text-warning" />
+              <div className="min-w-0 flex-1">
+                <h2 className="text-sm font-semibold text-warning">
+                  {intruders.length} dispositivo{intruders.length > 1 ? "s" : ""} nuevo
+                  {intruders.length > 1 ? "s" : ""} en tu red
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Visto{intruders.length > 1 ? "s" : ""} por primera vez en el último
+                  escaneo:{" "}
+                  {intruders
+                    .slice(0, 4)
+                    .map((d) => `${d.name} (${d.ip})`)
+                    .join(", ")}
+                  {intruders.length > 4 ? "…" : ""}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedId(intruders[0]!.id)}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-warning/50 px-3 py-1.5 text-xs text-warning transition-colors hover:bg-warning/15"
+                  >
+                    <Sparkles className="size-3.5" /> Revisar el primero
+                  </button>
+                  <button
+                    onClick={trustAll}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-success px-3 py-1.5 text-xs font-medium text-background transition-opacity hover:opacity-90"
+                  >
+                    <ShieldCheck className="size-3.5" /> Marcar todos como conocidos
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Stat
             icon={<Wifi className="size-4" />}
@@ -405,10 +461,19 @@ function Dashboard() {
                       )}
                     />
                   </span>
-                  <span className="mt-0.5 block truncate font-mono text-xs text-muted-foreground">
-                    {d.ip} · {d.vendor}
+                  <span className="mt-0.5 flex items-center gap-1.5 truncate font-mono text-xs text-muted-foreground">
+                    <VendorIcon brand={d.brand} className="size-3.5 shrink-0" />
+                    <span className="truncate">
+                      {d.ip} · {d.vendor}
+                    </span>
                   </span>
                   <span className="mt-1.5 flex flex-wrap gap-1.5">
+                    {d.isNew && !d.trusted && (
+                      <Badge className="bg-warning/15 text-warning">Nuevo</Badge>
+                    )}
+                    {d.trusted && (
+                      <Badge className="bg-success/15 text-success">Confiable</Badge>
+                    )}
                     {d.blocked && (
                       <Badge className="bg-destructive/15 text-destructive">
                         Bloqueado
