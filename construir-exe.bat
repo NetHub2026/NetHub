@@ -44,7 +44,19 @@ call npm run build
 if errorlevel 1 goto error
 
 echo.
-echo [3/3] Empaquetando el ejecutable portable...
+echo [3/4] Comprobando los archivos web compilados...
+call node scripts\ensure-index-html.mjs
+if not exist ".output\public\index.html" (
+    if not exist "dist\client\index.html" (
+        if not exist "dist\index.html" (
+            echo No se ha podido generar index.html. Revisa la compilacion.
+            goto error
+        )
+    )
+)
+
+echo.
+echo [4/4] Empaquetando el ejecutable portable...
 call npx electron-builder --win portable
 if errorlevel 1 goto error
 
