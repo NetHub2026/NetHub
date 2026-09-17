@@ -16,6 +16,9 @@ const isWindows = process.platform === "win32";
 
 /** Carpeta del ejecutable portable (o del proyecto en desarrollo). */
 function baseDir() {
+  if (process.env.PORTABLE_EXECUTABLE_DIR) {
+    return process.env.PORTABLE_EXECUTABLE_DIR;
+  }
   return app.isPackaged ? path.dirname(app.getPath("exe")) : path.join(__dirname, "..");
 }
 
