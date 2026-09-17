@@ -19,5 +19,8 @@
 - Fabricantes online desde el agente (`/vendor`, consultas secuenciales con pausa y caché en fichero), MAC privadas etiquetadas como "MAC privada (Móvil/Portátil)" y botón "Buscar fabricante en Internet" en la ficha.
 - Asistente portable con pestaña de un solo clic: `build-portable.bat` genera `NetHub.exe` y `update-portable.bat` lo actualiza conservando `devices-db.json` junto al ejecutable.
 
+- Interfaz universal: sin asistentes de escáner ni empaquetado, redes detectadas automáticamente por subred y OUI ampliado con routers de operadora españoles (Sagemcom, Sercomm, Arcadyan, Technicolor, MitraStar, Askey, Zyxel, Comtrend, Huawei, TP-Link, AVM).
+- Barra de acciones minimalista: solo Escanear red, Exportar inventario (CSV) y Restablecer (sin importar ni descargas JSON).
+
 ## Pendiente
 - Ninguna tarea abierta.
