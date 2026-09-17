@@ -19,9 +19,14 @@
   "build": {
     "appId": "dev.lovable.nethub",
     "productName": "NetHub",
+    "forceCodeSigning": false,
     "directories": { "output": "dist-electron" },
     "files": ["dist/**/*", ".output/**/*", "electron/**/*", "package.json"],
-    "win": { "target": "portable", "icon": "public/favicon.ico" }
+    "win": {
+      "target": "portable",
+      "icon": "public/favicon.ico",
+      "verifyUpdateCodeSignature": false
+    }
   },
   "overrides": {
     "rolldown": "1.2.1"
