@@ -33,6 +33,7 @@ interface RawHost {
   type?: string;
   status?: string;
   online?: boolean;
+  tags?: string[] | string;
 }
 
 function guessType(name: string, vendor: string): DeviceType {
@@ -129,6 +130,8 @@ export function parseHostsJson(input: unknown): Device[] {
     if (rawName) extra.name = rawName;
     if (raw.vendor) extra.vendor = raw.vendor;
     if (raw.type) extra.type = raw.type as DeviceType;
+    if (Array.isArray(raw.tags)) extra.tags = raw.tags;
+    if (typeof raw.tags === "string") extra.tags = [raw.tags];
     const device = makeDevice(ip, mac, extra);
     found.set(device.id, device);
   }
