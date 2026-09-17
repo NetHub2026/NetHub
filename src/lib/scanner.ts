@@ -81,16 +81,14 @@ function makeDevice(ip: string, mac: string, extra: Partial<Device> = {}): Devic
 }
 
 export async function enrichDevicesWithResolvedVendors(devices: Device[]): Promise<Device[]> {
-  return Promise.all(
-    devices.map(async (device) => {
-      if (device.manualEdit || (device.brand && device.brand !== "unknown")) return device;
-      const resolved = await resolveVendor(device.mac, device.name);
-      if (resolved.brand === "unknown" && resolved.vendor === "Fabricante desconocido") {
-        return device;
-      }
-      return { ...device, vendor: resolved.vendor, brand: resolved.brand };
-    }),
-  );
+  return devices.map((device) => {
+    if (device.manualEdit || (device.brand && device.brand !== "unknown")) return device;
+    const resolved = lookupOui(device.mac, device.name);
+    if (resolved.brand === "unknown" && resolved.vendor === "Fabricante desconocido") {
+      return device;
+    }
+    return { ...device, vendor: resolved.vendor, brand: resolved.brand };
+  });
 }
 
 /** Convierte la salida de `arp -a` (Windows o Linux/macOS) en dispositivos. */
@@ -136,6 +134,31 @@ export function parseHostsJson(input: unknown): Device[] {
     found.set(device.id, device);
   }
   return [...found.values()].sort((a, b) => a.ip.localeCompare(b.ip, undefined, { numeric: true }));
+}
+
+export function resolveVendorsInBackground(
+  devices: Device[],
+  onResolved: (devices: Device[]) => void,
+) {
+  if (typeof window === "undefined") return;
+  const pending = devices.filter((device) => {
+    if (device.manualEdit || (device.brand && device.brand !== "unknown")) return false;
+    const local = lookupOui(device.mac, device.name);
+    return local.brand === "unknown";
+  });
+  if (pending.length === 0) return;
+
+  window.setTimeout(() => {
+    void Promise.all(
+      pending.map(async (device) => {
+        const resolved = await resolveVendor(device.mac, device.name);
+        if (resolved.brand === "unknown" && resolved.vendor === "Fabricante desconocido") {
+          return device;
+        }
+        return { ...device, vendor: resolved.vendor, brand: resolved.brand };
+      }),
+    ).then(onResolved);
+  }, 0);
 }
 
 /**
