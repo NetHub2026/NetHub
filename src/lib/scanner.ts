@@ -1,5 +1,12 @@
 import { type Device, type DeviceType } from "./devices";
-import { lookupOui, normalizeMac, suggestedName } from "./oui";
+import {
+  brandFromVendorName,
+  lookupByHostname,
+  lookupOui,
+  normalizeMac,
+  resolveVendor,
+  suggestedName,
+} from "./oui";
 
 export { vendorFromMac, suggestedName, isRandomizedMac } from "./oui";
 
@@ -32,25 +39,29 @@ function guessType(name: string, vendor: string): DeviceType {
   const text = `${name} ${vendor}`.toLowerCase();
   if (/playstation|xbox|nintendo|switch|steam|sony interactive|valve|microsoft/.test(text))
     return "console";
-  if (/tv|roku|chromecast|firestick|bravia|lg electronics|samsung/.test(text)) return "tv";
+  if (/iphone|ipad|android|pixel|galaxy|phone|movil|m[oó]vil|tablet|xiaomi|redmi|poco|huawei|honor|oppo|oneplus/.test(text))
+    return "phone";
+  if (/tv|roku|chromecast|firestick|fire.?tv|bravia|webos|lg electronics|samsung/.test(text))
+    return "tv";
   if (/home.?assistant|hass|raspberry/.test(text)) return "home-assistant";
-  if (/router|gateway|fritz|asuswrt|tp-link|netgear|ubiquiti|unifi|openwrt/.test(text))
+  if (/router|gateway|fritz|livebox|sercomm|sagemcom|asuswrt|archer|deco|tp-link|netgear|ubiquiti|unifi|openwrt/.test(text))
     return "router";
-  if (/printer|impresora|brother|epson|canon|hp /.test(text)) return "printer";
+  if (/printer|impresora|brother|epson|canon|laserjet|officejet|hp /.test(text))
+    return "printer";
   if (/cam|camera|reolink|hikvision|dahua|tapo/.test(text)) return "camera";
   if (/echo|alexa|sonos|homepod|nest.?(mini|audio)|speaker|altavoz/.test(text))
     return "speaker";
-  if (/iphone|ipad|android|pixel|phone|movil|m[oó]vil|tablet|xiaomi|redmi|oneplus/.test(text))
-    return "phone";
   if (/pc|desktop|laptop|macbook|apple|asus|msi|lenovo|dell|intel/.test(text)) return "pc";
   return "iot";
 }
 
 function makeDevice(ip: string, mac: string, extra: Partial<Device> = {}): Device {
   const normalizedMac = normalizeMac(mac);
-  const oui = lookupOui(normalizedMac);
-  const vendor = extra.vendor || oui.vendor;
   const name = extra.name || suggestedName(normalizedMac, ip);
+  const byHostname = lookupByHostname(name);
+  const oui = lookupOui(normalizedMac, name);
+  const vendor = extra.vendor || byHostname?.vendor || oui.vendor;
+  const brand = extra.brand ?? brandFromVendorName(vendor) ?? byHostname?.brand ?? oui.brand;
   return {
     id: normalizedMac || ip,
     name,
@@ -59,12 +70,25 @@ function makeDevice(ip: string, mac: string, extra: Partial<Device> = {}): Devic
     mac: normalizedMac,
     status: extra.status ?? "online",
     vendor,
-    brand: oui.brand,
+    brand,
     lastSeen: extra.lastSeen ?? "Detectado en el último escaneo",
     downstream: extra.downstream ?? 0,
     upstream: extra.upstream ?? 0,
     tags: extra.tags ?? ["Escaneado"],
   };
+}
+
+export async function enrichDevicesWithResolvedVendors(devices: Device[]): Promise<Device[]> {
+  return Promise.all(
+    devices.map(async (device) => {
+      if (device.manualEdit || (device.brand && device.brand !== "unknown")) return device;
+      const resolved = await resolveVendor(device.mac, device.name);
+      if (resolved.brand === "unknown" && resolved.vendor === "Fabricante desconocido") {
+        return device;
+      }
+      return { ...device, vendor: resolved.vendor, brand: resolved.brand };
+    }),
+  );
 }
 
 /** Convierte la salida de `arp -a` (Windows o Linux/macOS) en dispositivos. */
@@ -126,7 +150,13 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
     if (!old) {
       return { ...fresh, firstSeenAt: now, isNew: true, trusted: false };
     }
-    const brand = old.brand ?? fresh.brand;
+    const freshVendorIsKnown = fresh.vendor && fresh.vendor !== "Fabricante desconocido";
+    const vendor = old.manualEdit ? old.vendor : freshVendorIsKnown ? fresh.vendor : old.vendor;
+    const brand = old.manualEdit
+      ? old.brand
+      : fresh.brand && fresh.brand !== "unknown"
+        ? fresh.brand
+        : old.brand;
     const result: Device = {
       ...old,
       ip: fresh.ip,
@@ -135,10 +165,10 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
       // El nombre, tipo y fabricante editados a mano nunca se sobrescriben.
       name: old.name,
       type: old.type,
-      vendor: old.vendor || fresh.vendor,
+      vendor,
       firstSeenAt: old.firstSeenAt ?? now,
       isNew: old.trusted ? false : (old.isNew ?? false),
-      ...(brand && !old.manualEdit ? { brand } : {}),
+      ...(brand ? { brand } : {}),
     };
     return result;
   });
