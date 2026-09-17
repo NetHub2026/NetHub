@@ -1,6 +1,20 @@
 import { useEffect, useState } from "react";
-import { Ban, Gauge, RotateCw, X, Plus } from "lucide-react";
+import {
+  Ban,
+  ExternalLink,
+  Gauge,
+  Loader2,
+  RotateCw,
+  ShieldCheck,
+  Sparkles,
+  X,
+  Plus,
+  Radar,
+} from "lucide-react";
 import { deviceTypeLabels, type Device } from "@/lib/devices";
+import { isRandomizedMac, suggestedName } from "@/lib/oui";
+import { detectServices, likelyServices, type ServiceHit } from "@/lib/services";
+import { VendorIcon } from "./VendorIcon";
 import { cn } from "@/lib/utils";
 
 interface DeviceDetailPanelProps {
@@ -12,10 +26,13 @@ interface DeviceDetailPanelProps {
 export function DeviceDetailPanel({ device, onClose, onUpdate }: DeviceDetailPanelProps) {
   const [tagDraft, setTagDraft] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [probing, setProbing] = useState(false);
+  const [probeNote, setProbeNote] = useState<string | null>(null);
 
   useEffect(() => {
     setTagDraft("");
     setFeedback(null);
+    setProbeNote(null);
   }, [device?.id]);
 
   useEffect(() => {
@@ -33,10 +50,30 @@ export function DeviceDetailPanel({ device, onClose, onUpdate }: DeviceDetailPan
     setTagDraft("");
   };
 
+  const probe = async () => {
+    setProbing(true);
+    setProbeNote(null);
+    const hits = await detectServices(device.ip);
+    onUpdate({ ...device, services: hits, servicesScannedAt: new Date().toISOString() });
+    setProbing(false);
+    setProbeNote(
+      hits.length > 0
+        ? `${hits.length} servicios abiertos detectados.`
+        : "Ningún servicio ha respondido. El navegador solo puede sondear puertos web; usa la app portable para un escaneo completo.",
+    );
+  };
+
+  const suggestion = suggestedName(device.mac, device.ip);
+  const services: ServiceHit[] =
+    device.services && device.services.length > 0
+      ? device.services
+      : likelyServices(device.ip, device.type);
+  const suggested = !device.services || device.services.length === 0;
+
   const rows: Array<[string, string]> = [
     ["Tipo", deviceTypeLabels[device.type]],
     ["Dirección IP", device.ip],
-    ["Dirección MAC", device.mac],
+    ["Dirección MAC", device.mac + (isRandomizedMac(device.mac) ? " (aleatoria)" : "")],
     ["Fabricante", device.vendor],
     ["Última conexión", device.lastSeen],
     ["Descarga actual", `${device.downstream.toFixed(1)} Mbps`],
