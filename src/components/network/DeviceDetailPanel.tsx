@@ -17,7 +17,13 @@ import { deviceTypeLabels, type Device, type DeviceType } from "@/lib/devices";
 import { DeviceTypeIcon } from "./DeviceTypeIcon";
 import { PingCard } from "./PingCard";
 import { detectNetworkId, networks } from "@/lib/networks";
-import { isRandomizedMac, suggestedName } from "@/lib/oui";
+import {
+  PRIVATE_MAC_LABEL,
+  isRandomizedMac,
+  resolveVendor,
+  suggestedName,
+} from "@/lib/oui";
+import { Globe } from "lucide-react";
 import { detectServices, likelyServices, type ServiceHit } from "@/lib/services";
 import { VendorIcon } from "./VendorIcon";
 import { cn } from "@/lib/utils";
@@ -103,9 +109,11 @@ export function DeviceDetailPanel({
       : likelyServices(device.ip, device.type);
   const suggested = !device.services || device.services.length === 0;
 
+  const privateMac = isRandomizedMac(device.mac);
+
   const rows: Array<[string, string]> = [
     ["Dirección IP", device.ip],
-    ["Dirección MAC", device.mac + (isRandomizedMac(device.mac) ? " (aleatoria)" : "")],
+    ["Dirección MAC", device.mac + (privateMac ? " · privada" : "")],
     ["Última conexión", device.lastSeen],
     ["Descarga actual", `${device.downstream.toFixed(1)} Mbps`],
     ["Subida actual", `${device.upstream.toFixed(1)} Mbps`],
