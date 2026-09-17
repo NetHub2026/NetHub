@@ -1,4 +1,7 @@
 import { type Device, type DeviceType } from "./devices";
+import { lookupOui, normalizeMac, suggestedName } from "./oui";
+
+export { vendorFromMac, suggestedName, isRandomizedMac } from "./oui";
 
 export const AGENT_URL = "http://localhost:8765/scan";
 const STORAGE_KEY = "nethub.devices.v1";
@@ -25,43 +28,21 @@ interface RawHost {
   online?: boolean;
 }
 
-const vendorPrefixes: Record<string, string> = {
-  "00:1a:11": "Google",
-  "3c:cd:93": "LG Electronics",
-  "78:c8:81": "Sony Interactive",
-  "98:b6:e9": "Nintendo",
-  "b8:27:eb": "Raspberry Pi",
-  "dc:a6:32": "Raspberry Pi",
-  "f0:18:98": "Apple",
-  "a4:5e:60": "Apple",
-  "8c:79:f5": "Samsung",
-  "50:02:91": "Espressif",
-  "e0:98:06": "Aqara",
-  "44:65:0d": "Amazon",
-};
-
-export function vendorFromMac(mac: string): string {
-  const prefix = mac.toLowerCase().replace(/-/g, ":").slice(0, 8);
-  return vendorPrefixes[prefix] ?? "Fabricante desconocido";
-}
-
 function guessType(name: string, vendor: string): DeviceType {
   const text = `${name} ${vendor}`.toLowerCase();
-  if (/playstation|xbox|nintendo|switch|steam|sony interactive/.test(text)) return "console";
+  if (/playstation|xbox|nintendo|switch|steam|sony interactive|valve|microsoft/.test(text))
+    return "console";
   if (/tv|roku|chromecast|firestick|bravia|lg electronics|samsung/.test(text)) return "tv";
   if (/home.?assistant|hass|raspberry/.test(text)) return "home-assistant";
-  if (/pc|desktop|laptop|macbook|apple|asus|msi|lenovo|dell/.test(text)) return "pc";
+  if (/pc|desktop|laptop|macbook|apple|asus|msi|lenovo|dell|intel/.test(text)) return "pc";
   return "iot";
-}
-
-function normalizeMac(mac: string): string {
-  return mac.trim().toUpperCase().replace(/-/g, ":");
 }
 
 function makeDevice(ip: string, mac: string, extra: Partial<Device> = {}): Device {
   const normalizedMac = normalizeMac(mac);
-  const vendor = extra.vendor || vendorFromMac(normalizedMac);
-  const name = extra.name || `Dispositivo ${ip.split(".").pop()}`;
+  const oui = lookupOui(normalizedMac);
+  const vendor = extra.vendor || oui.vendor;
+  const name = extra.name || suggestedName(normalizedMac, ip);
   return {
     id: normalizedMac || ip,
     name,
@@ -70,6 +51,7 @@ function makeDevice(ip: string, mac: string, extra: Partial<Device> = {}): Devic
     mac: normalizedMac,
     status: extra.status ?? "online",
     vendor,
+    brand: oui.brand,
     lastSeen: extra.lastSeen ?? "Detectado en el último escaneo",
     downstream: extra.downstream ?? 0,
     upstream: extra.upstream ?? 0,
@@ -119,6 +101,52 @@ export function parseHostsJson(input: unknown): Device[] {
   }
   return [...found.values()].sort((a, b) => a.ip.localeCompare(b.ip, undefined, { numeric: true }));
 }
+
+/**
+ * Fusiona un escaneo nuevo con la lista conocida:
+ * - conserva nombre editado, etiquetas, notas, controles y confianza;
+ * - marca como `isNew` los dispositivos vistos por primera vez;
+ * - deja como `offline` los conocidos que ya no aparecen.
+ */
+export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
+  const now = new Date().toISOString();
+  const byId = new Map(previous.map((d) => [d.id, d]));
+  const seen = new Set(scanned.map((d) => d.id));
+
+  const merged: Device[] = scanned.map((fresh) => {
+    const old = byId.get(fresh.id);
+    if (!old) {
+      return { ...fresh, firstSeenAt: now, isNew: true, trusted: false };
+    }
+    const brand = old.brand ?? fresh.brand;
+    const result: Device = {
+      ...old,
+      ip: fresh.ip,
+      status: fresh.status,
+      lastSeen: fresh.lastSeen,
+      vendor: old.vendor || fresh.vendor,
+      firstSeenAt: old.firstSeenAt ?? now,
+      isNew: old.trusted ? false : (old.isNew ?? false),
+      ...(brand ? { brand } : {}),
+    };
+    return result;
+  });
+
+  const missing = previous
+    .filter((d) => !seen.has(d.id))
+    .map((d) => ({ ...d, status: "offline" as const, downstream: 0, upstream: 0 }));
+
+  return [...merged, ...missing].sort((a, b) =>
+    a.ip.localeCompare(b.ip, undefined, { numeric: true }),
+  );
+}
+
+/** Dispositivos detectados por primera vez y todavía no marcados como conocidos. */
+export function newDevices(devices: Device[]): Device[] {
+  return devices.filter((d) => d.isNew && !d.trusted);
+}
+
+
 
 /** Consulta al agente local. Lanza error si no responde. */
 export async function fetchFromAgent(signal?: AbortSignal): Promise<Device[]> {

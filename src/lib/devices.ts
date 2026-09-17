@@ -1,3 +1,6 @@
+import type { VendorBrand } from "./oui";
+import type { ServiceHit } from "./services";
+
 export type DeviceType = "pc" | "console" | "tv" | "home-assistant" | "iot";
 
 export type DeviceStatus = "online" | "offline";
@@ -19,6 +22,17 @@ export interface Device {
   /** Controles locales (simulados, listos para enviar al router/API) */
   blocked?: boolean;
   prioritized?: boolean;
+  /** Marca detectada por prefijo MAC (base OUI local) */
+  brand?: VendorBrand;
+  /** ISO de la primera vez que se vio el dispositivo en un escaneo */
+  firstSeenAt?: string;
+  /** Detectado por primera vez en el último escaneo */
+  isNew?: boolean;
+  /** Marcado manualmente como conocido / confiable */
+  trusted?: boolean;
+  /** Servicios detectados en el último sondeo de puertos */
+  services?: ServiceHit[];
+  servicesScannedAt?: string;
 }
 
 export const deviceTypeLabels: Record<DeviceType, string> = {
