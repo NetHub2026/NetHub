@@ -637,7 +637,9 @@ function Dashboard() {
               Ningún dispositivo coincide con los filtros aplicados.
             </p>
           )}
-        </section>
+            </section>
+          </>
+        )}
       </main>
 
       <DeviceDetailPanel
