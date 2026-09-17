@@ -102,6 +102,51 @@ export function parseHostsJson(input: unknown): Device[] {
   return [...found.values()].sort((a, b) => a.ip.localeCompare(b.ip, undefined, { numeric: true }));
 }
 
+/**
+ * Fusiona un escaneo nuevo con la lista conocida:
+ * - conserva nombre editado, etiquetas, notas, controles y confianza;
+ * - marca como `isNew` los dispositivos vistos por primera vez;
+ * - deja como `offline` los conocidos que ya no aparecen.
+ */
+export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
+  const now = new Date().toISOString();
+  const byId = new Map(previous.map((d) => [d.id, d]));
+  const seen = new Set(scanned.map((d) => d.id));
+
+  const merged: Device[] = scanned.map((fresh) => {
+    const old = byId.get(fresh.id);
+    if (!old) {
+      return { ...fresh, firstSeenAt: now, isNew: true, trusted: false };
+    }
+    const result: Device = {
+      ...old,
+      ip: fresh.ip,
+      status: fresh.status,
+      lastSeen: fresh.lastSeen,
+      vendor: old.vendor || fresh.vendor,
+      brand: old.brand ?? fresh.brand,
+      firstSeenAt: old.firstSeenAt ?? now,
+      isNew: old.trusted ? false : (old.isNew ?? false),
+    };
+    return result;
+  });
+
+  const missing = previous
+    .filter((d) => !seen.has(d.id))
+    .map((d) => ({ ...d, status: "offline" as const, downstream: 0, upstream: 0 }));
+
+  return [...merged, ...missing].sort((a, b) =>
+    a.ip.localeCompare(b.ip, undefined, { numeric: true }),
+  );
+}
+
+/** Dispositivos detectados por primera vez y todavía no marcados como conocidos. */
+export function newDevices(devices: Device[]): Device[] {
+  return devices.filter((d) => d.isNew && !d.trusted);
+}
+
+
+
 /** Consulta al agente local. Lanza error si no responde. */
 export async function fetchFromAgent(signal?: AbortSignal): Promise<Device[]> {
   const res = await fetch(AGENT_URL, {
