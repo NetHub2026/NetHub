@@ -213,6 +213,9 @@ function Dashboard() {
   const totalUp = online.reduce((sum, d) => sum + d.upstream, 0);
   const intruders = newDevices(items);
 
+  /** Sin inventario y ya cargado el almacenamiento: pantalla de bienvenida. */
+  const showEmpty = hydrated && items.length === 0;
+
   const networkCounts = useMemo(() => countByNetwork(items), [items]);
 
   const visible = useMemo(() => {
@@ -372,7 +375,7 @@ function Dashboard() {
               devices-db.json
             </button>
             <button
-              onClick={resetDemo}
+              onClick={resetData}
               className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               <RotateCcw className="size-3.5" />
