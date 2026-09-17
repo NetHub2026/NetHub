@@ -423,10 +423,19 @@ function Dashboard() {
                       )}
                     />
                   </span>
-                  <span className="mt-0.5 block truncate font-mono text-xs text-muted-foreground">
-                    {d.ip} · {d.vendor}
+                  <span className="mt-0.5 flex items-center gap-1.5 truncate font-mono text-xs text-muted-foreground">
+                    <VendorIcon brand={d.brand} className="size-3.5 shrink-0" />
+                    <span className="truncate">
+                      {d.ip} · {d.vendor}
+                    </span>
                   </span>
                   <span className="mt-1.5 flex flex-wrap gap-1.5">
+                    {d.isNew && !d.trusted && (
+                      <Badge className="bg-warning/15 text-warning">Nuevo</Badge>
+                    )}
+                    {d.trusted && (
+                      <Badge className="bg-success/15 text-success">Confiable</Badge>
+                    )}
                     {d.blocked && (
                       <Badge className="bg-destructive/15 text-destructive">
                         Bloqueado
