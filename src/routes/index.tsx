@@ -613,6 +613,7 @@ function Dashboard() {
             );
           })();
         }}
+        onRestore={restore}
       />
       <PackageAppModal
         open={packageOpen}
