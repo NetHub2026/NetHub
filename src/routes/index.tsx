@@ -23,7 +23,6 @@ import {
 import {
   bandwidthSeries,
   deviceTypeLabels,
-  devices as seedDevices,
   type Device,
   type DeviceType,
 } from "@/lib/devices";
@@ -96,7 +95,7 @@ const filters: Array<{ value: DeviceType | "all"; label: string }> = [
 ];
 
 function Dashboard() {
-  const [items, setItems] = useState<Device[]>(seedDevices);
+  const [items, setItems] = useState<Device[]>([]);
   const [filter, setFilter] = useState<DeviceType | "all">("all");
   const [query, setQuery] = useState("");
   const [network, setNetwork] = useState<string>(ALL_NETWORKS);
@@ -200,12 +199,13 @@ function Dashboard() {
     }
   };
 
-  const resetDemo = () => {
+  /** Vacía el inventario por completo (borra escaneos guardados y dispositivos). */
+  const resetData = () => {
     clearStoredData();
-    setItems(seedDevices);
+    setItems([]);
     setMeta({ lastScanAt: null, source: null });
-    void saveDevicesAnywhere(seedDevices);
-    setNotice("Datos guardados borrados. Se muestra de nuevo la red de ejemplo.");
+    void saveDevicesAnywhere([]);
+    setNotice("Datos borrados: el inventario está vacío. Escanea tu red para empezar.");
   };
 
   const online = items.filter((d) => d.status === "online");

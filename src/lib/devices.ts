@@ -66,12 +66,7 @@ export const deviceTypeLabels: Record<DeviceType, string> = {
   other: "Otro",
 };
 
-/**
- * Datos simulados. Para integrar una API real (router, Home Assistant, etc.)
- * basta con sustituir esta constante por la respuesta del endpoint manteniendo
- * la forma de `Device`.
- */
-export const devices: Device[] = [];
+/** Serie horaria simulada de ancho de banda total (Mbps). */
 
 /** Serie horaria simulada de ancho de banda total (Mbps). */
 export const bandwidthSeries = [
