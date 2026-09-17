@@ -61,7 +61,8 @@ function makeDevice(ip: string, mac: string, extra: Partial<Device> = {}): Devic
   const byHostname = lookupByHostname(name);
   const oui = lookupOui(normalizedMac, name);
   const vendor = extra.vendor || byHostname?.vendor || oui.vendor;
-  const brand = extra.brand ?? brandFromVendorName(vendor) ?? byHostname?.brand ?? oui.brand;
+  const vendorBrand = brandFromVendorName(vendor);
+  const brand = extra.brand ?? (vendorBrand !== "unknown" ? vendorBrand : byHostname?.brand ?? oui.brand);
   return {
     id: normalizedMac || ip,
     name,
