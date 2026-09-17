@@ -33,6 +33,8 @@ import {
   fetchFromAgent,
   formatScanTime,
   loadScanMeta,
+  mergeScan,
+  newDevices,
   saveScanMeta,
   type ScanMeta,
   type ScannerStatus,
@@ -51,6 +53,7 @@ import { DeviceDetailPanel } from "@/components/network/DeviceDetailPanel";
 import { ImportDevicesModal } from "@/components/network/ImportDevicesModal";
 import { PackageAppModal } from "@/components/network/PackageAppModal";
 import { ScannerSetupModal } from "@/components/network/ScannerSetupModal";
+import { VendorIcon } from "@/components/network/VendorIcon";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
