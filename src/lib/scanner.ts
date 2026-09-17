@@ -296,7 +296,7 @@ export function formatScanTime(iso: string | null): string {
 export const pythonAgentScript = `# nethub_agent.py — agente de escaneo ARP + ping + Wake-on-LAN para Windows
 # Requisitos: Python 3.9+ (no necesita dependencias externas)
 # Endpoints:  /scan   /ping?ip=192.168.1.20   /wol?mac=AA:BB:CC:DD:EE:FF
-import json, re, socket, subprocess, uuid
+import json, os, re, socket, subprocess, time, urllib.request, uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -348,7 +348,7 @@ def scan():
     local = local_device()
     hosts = [h for h in hosts if h.get("mac") != local["mac"]]
     hosts.append(local)
-    return hosts
+    return annotate_vendors(hosts)
 
 
 def ping(ip):
@@ -386,6 +386,87 @@ def wol(mac):
     return sent
 
 
+# ---------------------------------------------------------------------------
+# Resolución de fabricantes (OUI) por Internet, en el propio agente.
+# Se consulta de forma secuencial y con pausa entre peticiones, y se guarda
+# el resultado en vendor-cache.json junto al script.
+# ---------------------------------------------------------------------------
+CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor-cache.json")
+try:
+    with open(CACHE_FILE, "r", encoding="utf-8") as fh:
+        VENDOR_CACHE = json.load(fh)
+except Exception:
+    VENDOR_CACHE = {}
+
+
+def _save_cache():
+    try:
+        with open(CACHE_FILE, "w", encoding="utf-8") as fh:
+            json.dump(VENDOR_CACHE, fh, indent=2)
+    except Exception:
+        pass
+
+
+def is_private_mac(mac):
+    """MAC aleatoria/privada: segundo bit del primer octeto activo."""
+    clean = re.sub(r"[^0-9a-fA-F]", "", mac or "")
+    if len(clean) < 2:
+        return False
+    return int(clean[:2], 16) & 0x02 == 0x02
+
+
+def lookup_vendor(mac):
+    clean = re.sub(r"[^0-9a-fA-F]", "", mac or "").upper()
+    if len(clean) < 6:
+        return ""
+    key = clean[:6]
+    if key in VENDOR_CACHE:
+        return VENDOR_CACHE[key]
+    if is_private_mac(mac):
+        VENDOR_CACHE[key] = ""
+        _save_cache()
+        return ""
+
+    vendor = ""
+    for url in (
+        "https://api.macvendors.com/" + clean,
+        "https://api.maclookup.app/v2/macs/" + clean,
+    ):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "NetHub-Agent"})
+            with urllib.request.urlopen(req, timeout=4) as res:
+                body = res.read().decode("utf-8", "ignore").strip()
+            if body.startswith("{"):
+                data = json.loads(body)
+                vendor = (data.get("company") or data.get("vendor") or "").strip()
+            else:
+                vendor = body
+            if vendor and "not found" not in vendor.lower():
+                break
+            vendor = ""
+        except Exception:
+            vendor = ""
+        time.sleep(0.6)  # pausa para no ser bloqueado por límite de peticiones
+
+    VENDOR_CACHE[key] = vendor
+    _save_cache()
+    return vendor
+
+
+def annotate_vendors(hosts):
+    for host in hosts:
+        if host.get("vendor"):
+            continue
+        vendor = lookup_vendor(host.get("mac", ""))
+        if vendor:
+            host["vendor"] = vendor
+        elif is_private_mac(host.get("mac", "")):
+            host["vendor"] = "MAC privada (Móvil/Portátil)"
+        time.sleep(0.2)
+    return hosts
+
+
+
 class Handler(BaseHTTPRequestHandler):
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -415,6 +496,9 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"devices": scan()})
         elif route == "/ping":
             self._json(ping((query.get("ip") or [""])[0]))
+        elif route == "/vendor":
+            mac = (query.get("mac") or [""])[0]
+            self._json({"mac": mac, "vendor": lookup_vendor(mac)})
         elif route == "/wol":
             ok = wol((query.get("mac") or [""])[0])
             self._json({"ok": ok}, 200 if ok else 400)
