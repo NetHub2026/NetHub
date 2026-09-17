@@ -230,6 +230,10 @@ function startAgentServer() {
         res.end(JSON.stringify(await pingIp(url.searchParams.get("ip"))));
         return;
       }
+      if (url.pathname === "/traffic") {
+        res.end(JSON.stringify(await readTraffic()));
+        return;
+      }
       if (url.pathname === "/wol") {
         res.end(JSON.stringify({ ok: await sendWol(url.searchParams.get("mac")) }));
         return;
