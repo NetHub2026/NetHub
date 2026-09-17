@@ -14,7 +14,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "build:portable": "npm run build && electron-builder --win portable"
+    "ensure:index": "node scripts/ensure-index-html.mjs",
+    "build:portable": "npm run build && npm run ensure:index && electron-builder --win portable"
   },
   "build": {
     "appId": "dev.lovable.nethub",
