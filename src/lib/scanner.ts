@@ -1,4 +1,7 @@
 import { type Device, type DeviceType } from "./devices";
+import { lookupOui, normalizeMac, suggestedName, vendorFromMac } from "./oui";
+
+export { vendorFromMac, suggestedName, isRandomizedMac } from "./oui";
 
 export const AGENT_URL = "http://localhost:8765/scan";
 const STORAGE_KEY = "nethub.devices.v1";
