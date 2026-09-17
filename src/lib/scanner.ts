@@ -430,12 +430,13 @@ if __name__ == "__main__":
     HTTPServer(("127.0.0.1", 8765), Handler).serve_forever()
 `;
 
-export const powershellAgentScript = `# nethub-agent.ps1 — agente de escaneo ARP para Windows (PowerShell 5+)
+export const powershellAgentScript = `# nethub-agent.ps1 — agente de escaneo ARP + ping + Wake-on-LAN (PowerShell 5+)
 # Uso:  powershell -ExecutionPolicy Bypass -File .\\nethub-agent.ps1
+# Endpoints:  /scan   /ping?ip=192.168.1.20   /wol?mac=AA:BB:CC:DD:EE:FF
 $listener = [System.Net.HttpListener]::new()
 $listener.Prefixes.Add("http://localhost:8765/")
 $listener.Start()
-Write-Host "NetHub agent escuchando en http://localhost:8765/scan"
+Write-Host "NetHub agent escuchando en http://localhost:8765 (/scan, /ping, /wol)"
 
 function Get-NetBiosNameMap {
   $names = @{}
