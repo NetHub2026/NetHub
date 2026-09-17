@@ -11,4 +11,4 @@
 - Mejoras actuales: selector con contraste correcto, OUI ampliada con resolución externa/fallback por hostname y etiquetas rápidas.
 
 ## Pendiente
-- Ninguna tarea abierta.
+- Añadir el propio PC local a los scripts Python y PowerShell del agente de escaneo.
