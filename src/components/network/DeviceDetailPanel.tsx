@@ -19,6 +19,18 @@ import { detectServices, likelyServices, type ServiceHit } from "@/lib/services"
 import { VendorIcon } from "./VendorIcon";
 import { cn } from "@/lib/utils";
 
+const quickTagGroups: Array<{ label: string; tags: string[] }> = [
+  { label: "Ubicaciones", tags: ["Salón", "Dormitorio", "Cocina", "Despacho", "Entrada"] },
+  {
+    label: "Conexión",
+    tags: ["Cableado / Ethernet", "Wi-Fi 2.4GHz", "Wi-Fi 5GHz", "Wi-Fi 6"],
+  },
+  {
+    label: "Uso / Prioridad",
+    tags: ["Domótica", "Streaming", "Gaming", "Servidor", "24/7", "Prioridad alta", "Invitados"],
+  },
+];
+
 interface DeviceDetailPanelProps {
   device: Device | null;
   onClose: () => void;
@@ -58,6 +70,14 @@ export function DeviceDetailPanel({
     if (!tag || device.tags.includes(tag)) return;
     onUpdate({ ...device, tags: [...device.tags, tag] });
     setTagDraft("");
+  };
+
+  const toggleTag = (tag: string) => {
+    const active = device.tags.includes(tag);
+    onUpdate({
+      ...device,
+      tags: active ? device.tags.filter((t) => t !== tag) : [...device.tags, tag],
+    });
   };
 
   const probe = async () => {
@@ -183,10 +203,10 @@ export function DeviceDetailPanel({
                     manualEdit: true,
                   })
                 }
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+                className="min-w-0 flex-1 rounded-sm bg-popover text-sm text-popover-foreground outline-none"
               >
                 {(Object.keys(deviceTypeLabels) as DeviceType[]).map((t) => (
-                  <option key={t} value={t}>
+                  <option key={t} value={t} className="bg-popover text-popover-foreground">
                     {deviceTypeLabels[t]}
                   </option>
                 ))}
@@ -223,7 +243,7 @@ export function DeviceDetailPanel({
 
         {suggestion !== device.name && (
           <button
-            onClick={() => onUpdate({ ...device, name: suggestion })}
+            onClick={() => onUpdate({ ...device, name: suggestion, manualEdit: true })}
             className="mt-3 w-full rounded-xl border border-dashed border-border px-4 py-3 text-left text-xs text-muted-foreground transition-colors hover:border-brand hover:text-foreground"
           >
             Nombre sugerido por fabricante:{" "}
@@ -308,6 +328,35 @@ export function DeviceDetailPanel({
         <h3 className="mt-6 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Etiquetas
         </h3>
+        <div className="mt-3 space-y-3 rounded-xl border border-border p-4">
+          {quickTagGroups.map((group) => (
+            <div key={group.label}>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {group.label}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {group.tags.map((tag) => {
+                  const active = device.tags.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      onClick={() => toggleTag(tag)}
+                      className={cn(
+                        "rounded-full border px-3 py-1 text-xs transition-colors",
+                        active
+                          ? "border-brand bg-brand/15 text-brand"
+                          : "border-border text-muted-foreground hover:bg-accent hover:text-foreground",
+                      )}
+                      aria-pressed={active}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
         <div className="mt-3 flex flex-wrap gap-2">
           {device.tags.map((tag) => (
             <button
