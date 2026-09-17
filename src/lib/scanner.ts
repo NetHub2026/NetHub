@@ -293,11 +293,14 @@ export function formatScanTime(iso: string | null): string {
   });
 }
 
-export const pythonAgentScript = `# nethub_agent.py — agente de escaneo ARP para Windows
+export const pythonAgentScript = `# nethub_agent.py — agente de escaneo ARP + ping + Wake-on-LAN para Windows
 # Requisitos: Python 3.9+ (no necesita dependencias externas)
-# Uso:  python nethub_agent.py     ->  http://localhost:8765/scan
+# Endpoints:  /scan   /ping?ip=192.168.1.20   /wol?mac=AA:BB:CC:DD:EE:FF
 import json, re, socket, subprocess, uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import urlparse, parse_qs
+
+TIME_RE = re.compile(r"(?:tiempo|time)[=<]\\s*(\\d+(?:[.,]\\d+)?)\\s*ms", re.IGNORECASE)
 
 IP_RE = re.compile(r"(\\d{1,3}(?:\\.\\d{1,3}){3})")
 MAC_RE = re.compile(r"([0-9a-fA-F]{2}(?:[:-][0-9a-fA-F]{2}){5})")
