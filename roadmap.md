@@ -10,6 +10,7 @@
 - Edición individual: tipo con icono, nombre, fabricante, eliminación/olvido y preservación de cambios manuales.
 - Mejoras actuales: selector con contraste correcto, OUI ampliada con resolución externa/fallback por hostname y etiquetas rápidas.
 - Scripts del agente actualizados para incluir el propio PC local con nombre, IP, MAC, tipo PC y etiquetas.
+- Escaneo optimizado: PowerShell evita DNS bloqueante por IP y la consulta externa de fabricantes queda en segundo plano.
 
 ## Pendiente
 - Ninguna tarea abierta.
