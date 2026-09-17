@@ -9,4 +9,5 @@ contextBridge.exposeInMainWorld("nethub", {
   dbPath: () => ipcRenderer.invoke("nethub:path"),
   ping: (ip) => ipcRenderer.invoke("nethub:ping", ip),
   wol: (mac) => ipcRenderer.invoke("nethub:wol", mac),
+  traffic: () => ipcRenderer.invoke("nethub:traffic"),
 });
