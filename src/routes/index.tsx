@@ -17,7 +17,6 @@ import {
   WifiOff,
 } from "lucide-react";
 import {
-  bandwidthSeries,
   deviceTypeLabels,
   type Device,
   type DeviceType,
