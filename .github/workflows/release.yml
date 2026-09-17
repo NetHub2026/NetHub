@@ -1,0 +1,46 @@
+name: Release NetHub portable
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Construir ejecutable portable
+        run: npm run build:portable
+
+      - name: Renombrar ejecutable a NetHub.exe
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path dist-electron -Filter *.exe -File |
+            Sort-Object Length -Descending | Select-Object -First 1
+          if (-not $exe) { throw "No se ha encontrado ningun .exe en dist-electron" }
+          $target = Join-Path dist-electron "NetHub.exe"
+          if ($exe.FullName -ne (Resolve-Path -LiteralPath $target -ErrorAction SilentlyContinue)) {
+            Move-Item -LiteralPath $exe.FullName -Destination $target -Force
+          }
+          Get-ChildItem dist-electron
+
+      - name: Publicar release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', github.run_number) }}
+          name: NetHub ${{ github.ref_type == 'tag' && github.ref_name || format('build {0}', github.run_number) }}
+          files: dist-electron/NetHub.exe
+          generate_release_notes: true
