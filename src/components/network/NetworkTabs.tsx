@@ -1,25 +1,26 @@
 import { Network, Router } from "lucide-react";
-import { ALL_NETWORKS, networks } from "@/lib/networks";
+import { ALL_NETWORKS, UNKNOWN_NETWORK, type NetworkDef } from "@/lib/networks";
 import { cn } from "@/lib/utils";
 
 interface NetworkTabsProps {
   value: string;
   counts: Record<string, number>;
+  networks: NetworkDef[];
   onChange: (value: string) => void;
 }
 
-export function NetworkTabs({ value, counts, onChange }: NetworkTabsProps) {
-  const tabs = [
+export function NetworkTabs({ value, counts, networks, onChange }: NetworkTabsProps) {
+  const tabs: NetworkDef[] = [
     { id: ALL_NETWORKS, name: "Todas las redes", hint: "inventario completo" },
     ...networks,
-    { id: "unknown", name: "Sin clasificar", hint: "otras subredes" },
+    { id: UNKNOWN_NETWORK, name: "Sin clasificar", hint: "IP no reconocida" },
   ];
 
   return (
     <div className="flex flex-wrap gap-2">
       {tabs.map((tab) => {
         const count = counts[tab.id] ?? 0;
-        if (tab.id === "unknown" && count === 0) return null;
+        if (tab.id === UNKNOWN_NETWORK && count === 0) return null;
         const active = value === tab.id;
         return (
           <button
