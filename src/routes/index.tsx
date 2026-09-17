@@ -161,15 +161,21 @@ function Dashboard() {
       const native = await nativeScan();
       if (native && native.length > 0) {
         setStatus("connected");
-        applyScan(native, "native");
-        setNotice(`Escaneo nativo completado: ${native.length} dispositivos detectados.`);
+        const fresh = applyScan(native, "native");
+        setNotice(
+          `Escaneo nativo completado: ${native.length} dispositivos detectados` +
+            (fresh > 0 ? ` · ${fresh} nuevos.` : "."),
+        );
         return;
       }
       // 2) Fallback: agente local en http://localhost:8765/scan.
       const devices = await fetchFromAgent();
       setStatus("connected");
-      applyScan(devices, "agent");
-      setNotice(`Escaneo completado: ${devices.length} dispositivos detectados.`);
+      const fresh = applyScan(devices, "agent");
+      setNotice(
+        `Escaneo completado: ${devices.length} dispositivos detectados` +
+          (fresh > 0 ? ` · ${fresh} nuevos.` : "."),
+      );
     } catch {
       setStatus("disconnected");
       setNotice(
