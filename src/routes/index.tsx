@@ -98,6 +98,7 @@ function Dashboard() {
   const [items, setItems] = useState<Device[]>(seedDevices);
   const [filter, setFilter] = useState<DeviceType | "all">("all");
   const [query, setQuery] = useState("");
+  const [network, setNetwork] = useState<string>(ALL_NETWORKS);
   const [onlyOnline, setOnlyOnline] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dark, setDark] = useState(true);
