@@ -18,6 +18,8 @@ interface ElectronBridge {
   writeDevices?: (json: string) => Promise<void>;
   scanNetwork?: () => Promise<unknown>;
   dbPath?: () => Promise<string>;
+  ping?: (ip: string) => Promise<{ ok: boolean; rtt: number | null }>;
+  wol?: (mac: string) => Promise<boolean>;
 }
 
 declare global {
