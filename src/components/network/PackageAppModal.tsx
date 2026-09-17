@@ -9,7 +9,83 @@ interface PackageAppModalProps {
   runtimeLabel: string;
 }
 
-type Tab = "tauri" | "electron";
+type Tab = "bat" | "tauri" | "electron";
+
+const buildBat = `@echo off
+REM ============================================================
+REM  build-portable.bat  ·  crea NetHub.exe con un solo clic
+REM  Guarda este fichero en una carpeta vacia y haz doble clic.
+REM ============================================================
+setlocal enabledelayedexpansion
+title NetHub - Crear aplicacion portable
+cd /d "%~dp0"
+
+where node >nul 2>nul
+if errorlevel 1 (
+  echo [!] Falta Node.js. Instalalo desde https://nodejs.org (version LTS) y repite.
+  pause & exit /b 1
+)
+
+REM 1) Codigo fuente: si no esta, se descarga del repositorio
+if not exist "package.json" (
+  if not exist "nethub\\package.json" (
+    where git >nul 2>nul
+    if errorlevel 1 (
+      echo [!] Falta Git. Instalalo desde https://git-scm.com y repite.
+      pause & exit /b 1
+    )
+    echo [1/5] Descargando el codigo...
+    git clone %NETHUB_REPO% nethub || (echo [!] Define NETHUB_REPO con la URL de tu repositorio. & pause & exit /b 1)
+  )
+  cd nethub
+)
+
+echo [2/5] Instalando dependencias...
+call npm install || (pause & exit /b 1)
+call npm install --save-dev electron electron-builder || (pause & exit /b 1)
+
+echo [3/5] Compilando la interfaz...
+call npm run build || (pause & exit /b 1)
+
+echo [4/5] Generando el ejecutable portable...
+call npx electron-builder --win portable || (pause & exit /b 1)
+
+echo [5/5] Copiando NetHub.exe...
+for %%F in ("release\\*.exe") do copy /y "%%F" "%~dp0NetHub.exe" >nul
+
+echo.
+echo  Listo: %~dp0NetHub.exe
+echo  Tus datos se guardaran en devices-db.json junto al .exe
+pause`;
+
+const updateBat = `@echo off
+REM ============================================================
+REM  update-portable.bat  ·  actualiza NetHub sin perder datos
+REM  devices-db.json NUNCA se toca: vive junto al .exe
+REM ============================================================
+setlocal
+title NetHub - Actualizar aplicacion portable
+cd /d "%~dp0"
+
+if not exist "nethub\\package.json" (
+  echo [!] No encuentro el codigo. Ejecuta primero build-portable.bat
+  pause & exit /b 1
+)
+
+cd nethub
+echo [1/4] Descargando la ultima version...
+call git pull || (pause & exit /b 1)
+echo [2/4] Actualizando dependencias...
+call npm install || (pause & exit /b 1)
+echo [3/4] Compilando...
+call npm run build && call npx electron-builder --win portable || (pause & exit /b 1)
+
+echo [4/4] Reemplazando el ejecutable...
+for %%F in ("release\\*.exe") do copy /y "%%F" "%~dp0NetHub.exe" >nul
+
+echo.
+echo  Actualizado. devices-db.json se ha conservado intacto.
+pause`;
 
 const tauriCommands = `# 1) Dependencias de Tauri (una sola vez)
 npm install -D @tauri-apps/cli
