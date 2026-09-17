@@ -16,6 +16,8 @@
 - Wake-on-LAN desde la ficha con Magic Packet vía agente (`/wol`) o nativo.
 - Segmentación por redes: pestañas con contadores, detección por subred y asignación manual en la ficha.
 - Copia de seguridad: exportar inventario en JSON o CSV y restaurar fusionando o reemplazando.
+- Fabricantes online desde el agente (`/vendor`, consultas secuenciales con pausa y caché en fichero), MAC privadas etiquetadas como "MAC privada (Móvil/Portátil)" y botón "Buscar fabricante en Internet" en la ficha.
+- Asistente portable con pestaña de un solo clic: `build-portable.bat` genera `NetHub.exe` y `update-portable.bat` lo actualiza conservando `devices-db.json` junto al ejecutable.
 
 ## Pendiente
 - Ninguna tarea abierta.
