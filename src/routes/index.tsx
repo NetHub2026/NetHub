@@ -23,7 +23,6 @@ import {
 import {
   bandwidthSeries,
   deviceTypeLabels,
-  devices as seedDevices,
   type Device,
   type DeviceType,
 } from "@/lib/devices";
@@ -96,7 +95,7 @@ const filters: Array<{ value: DeviceType | "all"; label: string }> = [
 ];
 
 function Dashboard() {
-  const [items, setItems] = useState<Device[]>(seedDevices);
+  const [items, setItems] = useState<Device[]>([]);
   const [filter, setFilter] = useState<DeviceType | "all">("all");
   const [query, setQuery] = useState("");
   const [network, setNetwork] = useState<string>(ALL_NETWORKS);
@@ -200,18 +199,22 @@ function Dashboard() {
     }
   };
 
-  const resetDemo = () => {
+  /** Vacía el inventario por completo (borra escaneos guardados y dispositivos). */
+  const resetData = () => {
     clearStoredData();
-    setItems(seedDevices);
+    setItems([]);
     setMeta({ lastScanAt: null, source: null });
-    void saveDevicesAnywhere(seedDevices);
-    setNotice("Datos guardados borrados. Se muestra de nuevo la red de ejemplo.");
+    void saveDevicesAnywhere([]);
+    setNotice("Datos borrados: el inventario está vacío. Escanea tu red para empezar.");
   };
 
   const online = items.filter((d) => d.status === "online");
   const totalDown = online.reduce((sum, d) => sum + d.downstream, 0);
   const totalUp = online.reduce((sum, d) => sum + d.upstream, 0);
   const intruders = newDevices(items);
+
+  /** Sin inventario y ya cargado el almacenamiento: pantalla de bienvenida. */
+  const showEmpty = hydrated && items.length === 0;
 
   const networkCounts = useMemo(() => countByNetwork(items), [items]);
 
@@ -372,7 +375,7 @@ function Dashboard() {
               devices-db.json
             </button>
             <button
-              onClick={resetDemo}
+              onClick={resetData}
               className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               <RotateCcw className="size-3.5" />
@@ -424,9 +427,52 @@ function Dashboard() {
           </section>
         )}
 
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat
-            icon={<Wifi className="size-4" />}
+        {showEmpty && (
+          <section className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
+            <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-brand/15 text-brand">
+              <Radar className="size-7" />
+            </div>
+            <h2 className="mt-4 text-lg font-semibold">Todavía no hay dispositivos</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+              Escanea tu red para descubrir automáticamente PCs, consolas, Smart TVs,
+              Home Assistant e IoT, o importa un archivo con tus datos si ya los tienes.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+              <button
+                onClick={scan}
+                disabled={scanning}
+                className="inline-flex items-center gap-2 rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-brand-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+              >
+                {scanning ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Radar className="size-4" />
+                )}
+                {scanning ? "Escaneando…" : "Escanear red"}
+              </button>
+              <button
+                onClick={() => setImportOpen(true)}
+                className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <Upload className="size-4" />
+                Importar dispositivos
+              </button>
+              <button
+                onClick={() => setSetupOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+              >
+                <Settings2 className="size-3.5" />
+                Cómo configurar el escáner
+              </button>
+            </div>
+          </section>
+        )}
+
+        {!showEmpty && (
+          <>
+            <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Stat
+                icon={<Wifi className="size-4" />}
             label="Dispositivos activos"
             value={`${online.length}`}
             hint={`de ${items.length} conocidos`}
@@ -591,7 +637,9 @@ function Dashboard() {
               Ningún dispositivo coincide con los filtros aplicados.
             </p>
           )}
-        </section>
+            </section>
+          </>
+        )}
       </main>
 
       <DeviceDetailPanel
