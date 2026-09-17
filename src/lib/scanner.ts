@@ -81,16 +81,14 @@ function makeDevice(ip: string, mac: string, extra: Partial<Device> = {}): Devic
 }
 
 export async function enrichDevicesWithResolvedVendors(devices: Device[]): Promise<Device[]> {
-  return Promise.all(
-    devices.map(async (device) => {
-      if (device.manualEdit || (device.brand && device.brand !== "unknown")) return device;
-      const resolved = await resolveVendor(device.mac, device.name);
-      if (resolved.brand === "unknown" && resolved.vendor === "Fabricante desconocido") {
-        return device;
-      }
-      return { ...device, vendor: resolved.vendor, brand: resolved.brand };
-    }),
-  );
+  return devices.map((device) => {
+    if (device.manualEdit || (device.brand && device.brand !== "unknown")) return device;
+    const resolved = lookupOui(device.mac, device.name);
+    if (resolved.brand === "unknown" && resolved.vendor === "Fabricante desconocido") {
+      return device;
+    }
+    return { ...device, vendor: resolved.vendor, brand: resolved.brand };
+  });
 }
 
 /** Convierte la salida de `arp -a` (Windows o Linux/macOS) en dispositivos. */
@@ -136,6 +134,31 @@ export function parseHostsJson(input: unknown): Device[] {
     found.set(device.id, device);
   }
   return [...found.values()].sort((a, b) => a.ip.localeCompare(b.ip, undefined, { numeric: true }));
+}
+
+export function resolveVendorsInBackground(
+  devices: Device[],
+  onResolved: (devices: Device[]) => void,
+) {
+  if (typeof window === "undefined") return;
+  const pending = devices.filter((device) => {
+    if (device.manualEdit || (device.brand && device.brand !== "unknown")) return false;
+    const local = lookupOui(device.mac, device.name);
+    return local.brand === "unknown";
+  });
+  if (pending.length === 0) return;
+
+  window.setTimeout(() => {
+    void Promise.all(
+      pending.map(async (device) => {
+        const resolved = await resolveVendor(device.mac, device.name);
+        if (resolved.brand === "unknown" && resolved.vendor === "Fabricante desconocido") {
+          return device;
+        }
+        return { ...device, vendor: resolved.vendor, brand: resolved.brand };
+      }),
+    ).then(onResolved);
+  }, 0);
 }
 
 /**
@@ -366,23 +389,19 @@ $listener.Prefixes.Add("http://localhost:8765/")
 $listener.Start()
 Write-Host "NetHub agent escuchando en http://localhost:8765/scan"
 
-function Resolve-HostName([string]$ip) {
-  # 1) DNS inverso del sistema (rápido en redes con router que publica nombres)
+function Get-NetBiosNameMap {
+  $names = @{}
   try {
-    $entry = [System.Net.Dns]::GetHostEntry($ip)
-    if ($entry -and $entry.HostName -and $entry.HostName -ne $ip) {
-      return ($entry.HostName -split '\\.')[0]
+    (nbtstat -c) | ForEach-Object {
+      $line = $_.Trim()
+      if ($line -match '^([^\\s<]+)\\s+<\\d+>\\s+\\S+\\s+(\\d{1,3}(\\.\\d{1,3}){3})') {
+        $name = $matches[1]
+        $ip = $matches[2]
+        if ($name -and $ip -and -not $names.ContainsKey($ip)) { $names[$ip] = $name }
+      }
     }
   } catch {}
-  # 2) Resolve-DnsName (PowerShell 5+, incluye respuestas mDNS/LLMNR del router)
-  if (Get-Command Resolve-DnsName -ErrorAction SilentlyContinue) {
-    try {
-      $ptr = Resolve-DnsName -Name $ip -Type PTR -QuickTimeout -ErrorAction Stop |
-        Select-Object -First 1
-      if ($ptr -and $ptr.NameHost) { return ($ptr.NameHost -split '\\.')[0] }
-    } catch {}
-  }
-  return $null
+  return $names
 }
 
 function Get-LocalDevice {
@@ -417,12 +436,13 @@ function Get-LocalDevice {
 
 function Get-ArpDevices {
   $rows = @()
+  $nameMap = Get-NetBiosNameMap
   if (Get-Command Get-NetNeighbor -ErrorAction SilentlyContinue) {
     $rows = Get-NetNeighbor -AddressFamily IPv4 |
       Where-Object { $_.State -ne 'Unreachable' -and $_.LinkLayerAddress -notmatch '^(00-00-00|FF-FF-FF)' } |
       ForEach-Object {
         $item = @{ ip = $_.IPAddress; mac = ($_.LinkLayerAddress -replace '-', ':'); online = $true }
-        $hostName = Resolve-HostName $_.IPAddress
+        $hostName = $nameMap[$_.IPAddress]
         if ($hostName) { $item.name = $hostName }
         $item
       }
@@ -430,7 +450,7 @@ function Get-ArpDevices {
     $rows = (arp -a) | ForEach-Object {
       if ($_ -match '(\\d{1,3}(\\.\\d{1,3}){3})\\s+([0-9a-fA-F-]{17})') {
         $item = @{ ip = $matches[1]; mac = ($matches[3].ToUpper() -replace '-', ':'); online = $true }
-        $hostName = Resolve-HostName $matches[1]
+        $hostName = $nameMap[$matches[1]]
         if ($hostName) { $item.name = $hostName }
         $item
       }
