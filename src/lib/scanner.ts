@@ -1,5 +1,12 @@
 import { type Device, type DeviceType } from "./devices";
-import { lookupOui, normalizeMac, suggestedName } from "./oui";
+import {
+  brandFromVendorName,
+  lookupByHostname,
+  lookupOui,
+  normalizeMac,
+  resolveVendor,
+  suggestedName,
+} from "./oui";
 
 export { vendorFromMac, suggestedName, isRandomizedMac } from "./oui";
 
@@ -26,31 +33,37 @@ interface RawHost {
   type?: string;
   status?: string;
   online?: boolean;
+  tags?: string[] | string;
 }
 
 function guessType(name: string, vendor: string): DeviceType {
   const text = `${name} ${vendor}`.toLowerCase();
   if (/playstation|xbox|nintendo|switch|steam|sony interactive|valve|microsoft/.test(text))
     return "console";
-  if (/tv|roku|chromecast|firestick|bravia|lg electronics|samsung/.test(text)) return "tv";
+  if (/iphone|ipad|android|pixel|galaxy|phone|movil|m[oó]vil|tablet|xiaomi|redmi|poco|huawei|honor|oppo|oneplus/.test(text))
+    return "phone";
+  if (/tv|roku|chromecast|firestick|fire.?tv|bravia|webos|lg electronics|samsung/.test(text))
+    return "tv";
   if (/home.?assistant|hass|raspberry/.test(text)) return "home-assistant";
-  if (/router|gateway|fritz|asuswrt|tp-link|netgear|ubiquiti|unifi|openwrt/.test(text))
+  if (/router|gateway|fritz|livebox|sercomm|sagemcom|asuswrt|archer|deco|tp-link|netgear|ubiquiti|unifi|openwrt/.test(text))
     return "router";
-  if (/printer|impresora|brother|epson|canon|hp /.test(text)) return "printer";
+  if (/printer|impresora|brother|epson|canon|laserjet|officejet|hp /.test(text))
+    return "printer";
   if (/cam|camera|reolink|hikvision|dahua|tapo/.test(text)) return "camera";
   if (/echo|alexa|sonos|homepod|nest.?(mini|audio)|speaker|altavoz/.test(text))
     return "speaker";
-  if (/iphone|ipad|android|pixel|phone|movil|m[oó]vil|tablet|xiaomi|redmi|oneplus/.test(text))
-    return "phone";
   if (/pc|desktop|laptop|macbook|apple|asus|msi|lenovo|dell|intel/.test(text)) return "pc";
   return "iot";
 }
 
 function makeDevice(ip: string, mac: string, extra: Partial<Device> = {}): Device {
   const normalizedMac = normalizeMac(mac);
-  const oui = lookupOui(normalizedMac);
-  const vendor = extra.vendor || oui.vendor;
   const name = extra.name || suggestedName(normalizedMac, ip);
+  const byHostname = lookupByHostname(name);
+  const oui = lookupOui(normalizedMac, name);
+  const vendor = extra.vendor || byHostname?.vendor || oui.vendor;
+  const vendorBrand = brandFromVendorName(vendor);
+  const brand = extra.brand ?? (vendorBrand !== "unknown" ? vendorBrand : byHostname?.brand ?? oui.brand);
   return {
     id: normalizedMac || ip,
     name,
@@ -59,12 +72,25 @@ function makeDevice(ip: string, mac: string, extra: Partial<Device> = {}): Devic
     mac: normalizedMac,
     status: extra.status ?? "online",
     vendor,
-    brand: oui.brand,
+    brand,
     lastSeen: extra.lastSeen ?? "Detectado en el último escaneo",
     downstream: extra.downstream ?? 0,
     upstream: extra.upstream ?? 0,
     tags: extra.tags ?? ["Escaneado"],
   };
+}
+
+export async function enrichDevicesWithResolvedVendors(devices: Device[]): Promise<Device[]> {
+  return Promise.all(
+    devices.map(async (device) => {
+      if (device.manualEdit || (device.brand && device.brand !== "unknown")) return device;
+      const resolved = await resolveVendor(device.mac, device.name);
+      if (resolved.brand === "unknown" && resolved.vendor === "Fabricante desconocido") {
+        return device;
+      }
+      return { ...device, vendor: resolved.vendor, brand: resolved.brand };
+    }),
+  );
 }
 
 /** Convierte la salida de `arp -a` (Windows o Linux/macOS) en dispositivos. */
@@ -104,6 +130,8 @@ export function parseHostsJson(input: unknown): Device[] {
     if (rawName) extra.name = rawName;
     if (raw.vendor) extra.vendor = raw.vendor;
     if (raw.type) extra.type = raw.type as DeviceType;
+    if (Array.isArray(raw.tags)) extra.tags = raw.tags;
+    if (typeof raw.tags === "string") extra.tags = [raw.tags];
     const device = makeDevice(ip, mac, extra);
     found.set(device.id, device);
   }
@@ -126,7 +154,13 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
     if (!old) {
       return { ...fresh, firstSeenAt: now, isNew: true, trusted: false };
     }
-    const brand = old.brand ?? fresh.brand;
+    const freshVendorIsKnown = fresh.vendor && fresh.vendor !== "Fabricante desconocido";
+    const vendor = old.manualEdit ? old.vendor : freshVendorIsKnown ? fresh.vendor : old.vendor;
+    const brand = old.manualEdit
+      ? old.brand
+      : fresh.brand && fresh.brand !== "unknown"
+        ? fresh.brand
+        : old.brand;
     const result: Device = {
       ...old,
       ip: fresh.ip,
@@ -135,10 +169,10 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
       // El nombre, tipo y fabricante editados a mano nunca se sobrescriben.
       name: old.name,
       type: old.type,
-      vendor: old.vendor || fresh.vendor,
+      vendor,
       firstSeenAt: old.firstSeenAt ?? now,
       isNew: old.trusted ? false : (old.isNew ?? false),
-      ...(brand && !old.manualEdit ? { brand } : {}),
+      ...(brand ? { brand } : {}),
     };
     return result;
   });
@@ -239,11 +273,37 @@ export function formatScanTime(iso: string | null): string {
 export const pythonAgentScript = `# nethub_agent.py — agente de escaneo ARP para Windows
 # Requisitos: Python 3.9+ (no necesita dependencias externas)
 # Uso:  python nethub_agent.py     ->  http://localhost:8765/scan
-import json, re, subprocess
+import json, re, socket, subprocess, uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 IP_RE = re.compile(r"(\\d{1,3}(?:\\.\\d{1,3}){3})")
 MAC_RE = re.compile(r"([0-9a-fA-F]{2}(?:[:-][0-9a-fA-F]{2}){5})")
+
+
+def local_device():
+    hostname = socket.gethostname()
+    ip = "127.0.0.1"
+    try:
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        probe.connect(("8.8.8.8", 80))
+        ip = probe.getsockname()[0]
+        probe.close()
+    except Exception:
+        try:
+            ip = socket.gethostbyname(hostname)
+        except Exception:
+            pass
+
+    mac_int = uuid.getnode()
+    mac = ":".join(f"{(mac_int >> shift) & 0xff:02X}" for shift in range(40, -1, -8))
+    return {
+        "ip": ip,
+        "mac": mac,
+        "name": hostname,
+        "type": "pc",
+        "online": True,
+        "tags": ["Este equipo", "Local"],
+    }
 
 
 def scan():
@@ -259,6 +319,9 @@ def scan():
             continue
         seen.add(mac_v)
         hosts.append({"ip": ip.group(1), "mac": mac_v, "online": True})
+    local = local_device()
+    hosts = [h for h in hosts if h.get("mac") != local["mac"]]
+    hosts.append(local)
     return hosts
 
 
@@ -322,6 +385,36 @@ function Resolve-HostName([string]$ip) {
   return $null
 }
 
+function Get-LocalDevice {
+  $computerName = $env:COMPUTERNAME
+  try {
+    $config = Get-NetIPConfiguration |
+      Where-Object { $_.IPv4Address -and $_.NetAdapter.Status -eq 'Up' -and $_.NetAdapter.HardwareInterface } |
+      Sort-Object { if ($_.IPv4DefaultGateway) { 0 } else { 1 } } |
+      Select-Object -First 1
+    if ($config -and $config.IPv4Address) {
+      $ip = $config.IPv4Address.IPAddress
+      $adapter = Get-NetAdapter -InterfaceIndex $config.InterfaceIndex -ErrorAction Stop
+      $mac = ($adapter.MacAddress -replace '-', ':').ToUpper()
+      return @{ ip = $ip; mac = $mac; name = $computerName; type = 'pc'; online = $true; tags = @('Este equipo', 'Local') }
+    }
+  } catch {}
+
+  try {
+    $adapter = Get-NetAdapter |
+      Where-Object { $_.Status -eq 'Up' -and $_.MacAddress } |
+      Select-Object -First 1
+    $ip = [System.Net.Dns]::GetHostAddresses($computerName) |
+      Where-Object { $_.AddressFamily -eq 'InterNetwork' -and $_.IPAddressToString -notlike '127.*' } |
+      Select-Object -First 1
+    if ($adapter -and $ip) {
+      $mac = ($adapter.MacAddress -replace '-', ':').ToUpper()
+      return @{ ip = $ip.IPAddressToString; mac = $mac; name = $computerName; type = 'pc'; online = $true; tags = @('Este equipo', 'Local') }
+    }
+  } catch {}
+  return $null
+}
+
 function Get-ArpDevices {
   $rows = @()
   if (Get-Command Get-NetNeighbor -ErrorAction SilentlyContinue) {
@@ -342,6 +435,11 @@ function Get-ArpDevices {
         $item
       }
     }
+  }
+  $local = Get-LocalDevice
+  if ($local) {
+    $rows = @($rows | Where-Object { $_ -ne $null -and $_.mac -ne $local.mac })
+    $rows += $local
   }
   return @($rows | Where-Object { $_ -ne $null })
 }
