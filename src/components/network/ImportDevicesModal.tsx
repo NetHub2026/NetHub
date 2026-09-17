@@ -1,19 +1,44 @@
 import { useEffect, useRef, useState } from "react";
-import { FileJson, Upload, X } from "lucide-react";
+import { DatabaseBackup, FileJson, Upload, X } from "lucide-react";
 import { parseArpOutput, parseHostsJson } from "@/lib/scanner";
+import { parseBackup } from "@/lib/backup";
 import type { Device } from "@/lib/devices";
 import { cn } from "@/lib/utils";
+
+export type RestoreMode = "merge" | "replace";
 
 interface ImportDevicesModalProps {
   open: boolean;
   onClose: () => void;
   onImport: (devices: Device[], source: "arp" | "json") => void;
+  onRestore: (devices: Device[], mode: RestoreMode) => void;
 }
 
-export function ImportDevicesModal({ open, onClose, onImport }: ImportDevicesModalProps) {
+export function ImportDevicesModal({
+  open,
+  onClose,
+  onImport,
+  onRestore,
+}: ImportDevicesModalProps) {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<RestoreMode>("merge");
   const fileRef = useRef<HTMLInputElement>(null);
+  const backupRef = useRef<HTMLInputElement>(null);
+
+  const restoreFile = async (file: File) => {
+    try {
+      const devices = parseBackup(await file.text(), file.name);
+      if (devices.length === 0) {
+        setError("La copia de seguridad no contiene dispositivos reconocibles.");
+        return;
+      }
+      onRestore(devices, mode);
+      onClose();
+    } catch {
+      setError("No se ha podido leer la copia de seguridad.");
+    }
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
