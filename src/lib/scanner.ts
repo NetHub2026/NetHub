@@ -270,11 +270,37 @@ export function formatScanTime(iso: string | null): string {
 export const pythonAgentScript = `# nethub_agent.py — agente de escaneo ARP para Windows
 # Requisitos: Python 3.9+ (no necesita dependencias externas)
 # Uso:  python nethub_agent.py     ->  http://localhost:8765/scan
-import json, re, subprocess
+import json, re, socket, subprocess, uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 IP_RE = re.compile(r"(\\d{1,3}(?:\\.\\d{1,3}){3})")
 MAC_RE = re.compile(r"([0-9a-fA-F]{2}(?:[:-][0-9a-fA-F]{2}){5})")
+
+
+def local_device():
+    hostname = socket.gethostname()
+    ip = "127.0.0.1"
+    try:
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        probe.connect(("8.8.8.8", 80))
+        ip = probe.getsockname()[0]
+        probe.close()
+    except Exception:
+        try:
+            ip = socket.gethostbyname(hostname)
+        except Exception:
+            pass
+
+    mac_int = uuid.getnode()
+    mac = ":".join(f"{(mac_int >> shift) & 0xff:02X}" for shift in range(40, -1, -8))
+    return {
+        "ip": ip,
+        "mac": mac,
+        "name": hostname,
+        "type": "pc",
+        "online": True,
+        "tags": ["Este equipo", "Local"],
+    }
 
 
 def scan():
@@ -290,6 +316,9 @@ def scan():
             continue
         seen.add(mac_v)
         hosts.append({"ip": ip.group(1), "mac": mac_v, "online": True})
+    local = local_device()
+    hosts = [h for h in hosts if h.get("mac") != local["mac"]]
+    hosts.append(local)
     return hosts
 
 
@@ -353,6 +382,36 @@ function Resolve-HostName([string]$ip) {
   return $null
 }
 
+function Get-LocalDevice {
+  $computerName = $env:COMPUTERNAME
+  try {
+    $config = Get-NetIPConfiguration |
+      Where-Object { $_.IPv4Address -and $_.NetAdapter.Status -eq 'Up' -and $_.NetAdapter.HardwareInterface } |
+      Sort-Object { if ($_.IPv4DefaultGateway) { 0 } else { 1 } } |
+      Select-Object -First 1
+    if ($config -and $config.IPv4Address) {
+      $ip = $config.IPv4Address.IPAddress
+      $adapter = Get-NetAdapter -InterfaceIndex $config.InterfaceIndex -ErrorAction Stop
+      $mac = ($adapter.MacAddress -replace '-', ':').ToUpper()
+      return @{ ip = $ip; mac = $mac; name = $computerName; type = 'pc'; online = $true; tags = @('Este equipo', 'Local') }
+    }
+  } catch {}
+
+  try {
+    $adapter = Get-NetAdapter |
+      Where-Object { $_.Status -eq 'Up' -and $_.MacAddress } |
+      Select-Object -First 1
+    $ip = [System.Net.Dns]::GetHostAddresses($computerName) |
+      Where-Object { $_.AddressFamily -eq 'InterNetwork' -and $_.IPAddressToString -notlike '127.*' } |
+      Select-Object -First 1
+    if ($adapter -and $ip) {
+      $mac = ($adapter.MacAddress -replace '-', ':').ToUpper()
+      return @{ ip = $ip.IPAddressToString; mac = $mac; name = $computerName; type = 'pc'; online = $true; tags = @('Este equipo', 'Local') }
+    }
+  } catch {}
+  return $null
+}
+
 function Get-ArpDevices {
   $rows = @()
   if (Get-Command Get-NetNeighbor -ErrorAction SilentlyContinue) {
@@ -373,6 +432,11 @@ function Get-ArpDevices {
         $item
       }
     }
+  }
+  $local = Get-LocalDevice
+  if ($local) {
+    $rows = @($rows | Where-Object { $_ -ne $null -and $_.mac -ne $local.mac })
+    $rows += $local
   }
   return @($rows | Where-Object { $_ -ne $null })
 }
