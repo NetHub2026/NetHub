@@ -119,6 +119,61 @@ export async function nativeScan(): Promise<Device[] | null> {
   return null;
 }
 
+/* ------------------------------------------------------------------ */
+/* Ping ICMP y Wake-on-LAN nativos                                     */
+/* ------------------------------------------------------------------ */
+
+function parsePingOutput(output: string): { ok: boolean; rtt: number | null } {
+  const match = output.match(/(?:tiempo|time)[=<]\s*(\d+(?:[.,]\d+)?)\s*ms/i);
+  if (match?.[1]) {
+    return { ok: true, rtt: Math.round(Number(match[1].replace(",", "."))) };
+  }
+  return { ok: false, rtt: null };
+}
+
+export async function nativePing(
+  ip: string,
+): Promise<{ reachable: boolean; rtt: number | null } | null> {
+  const runtime = getRuntime();
+  try {
+    if (runtime === "electron" && window.nethub?.ping) {
+      const result = await window.nethub.ping(ip);
+      return { reachable: result.ok, rtt: result.rtt };
+    }
+    if (runtime === "tauri") {
+      const shell = await optionalImport("@tauri-apps/plugin-shell");
+      const isWindows = navigator.userAgent.includes("Windows");
+      const args = isWindows ? ["-n", "1", "-w", "1000", ip] : ["-c", "1", "-W", "1", ip];
+      const output = await shell.Command.create("ping", args).execute();
+      const parsed = parsePingOutput(`${output.stdout}\n${output.stderr}`);
+      return { reachable: parsed.ok, rtt: parsed.rtt };
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+export async function nativeWol(mac: string): Promise<boolean> {
+  const runtime = getRuntime();
+  try {
+    if (runtime === "electron" && window.nethub?.wol) {
+      return await window.nethub.wol(mac);
+    }
+    if (runtime === "tauri") {
+      // Requiere el agente o un comando del sistema; en Tauri usamos PowerShell.
+      const shell = await optionalImport("@tauri-apps/plugin-shell");
+      const clean = mac.replace(/[^0-9a-fA-F]/g, "");
+      const script = `$m=[byte[]]::new(6);for($i=0;$i -lt 6;$i++){$m[$i]=[Convert]::ToByte('${clean}'.Substring($i*2,2),16)};$p=,[byte]0xFF*6;for($i=0;$i -lt 16;$i++){$p+=$m};$u=New-Object System.Net.Sockets.UdpClient;$u.EnableBroadcast=$true;$u.Connect(([System.Net.IPAddress]::Broadcast),9);$u.Send($p,$p.Length)|Out-Null;$u.Close()`;
+      await shell.Command.create("powershell", ["-NoProfile", "-Command", script]).execute();
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 /** Ruta informativa del fichero de datos para mostrar en la interfaz. */
 export async function getDbPath(): Promise<string> {
   const runtime = getRuntime();
