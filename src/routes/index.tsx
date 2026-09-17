@@ -489,13 +489,18 @@ function Dashboard() {
         <SpeedTestPanel />
 
         <section className="mt-8">
-          <h2 className="text-base font-semibold">Redes y routers</h2>
+          <h2 className="text-base font-semibold">Redes detectadas</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Cada equipo se clasifica por su subred; puedes cambiar su red en la ficha de
-            detalle.
+            Las subredes se detectan solas a partir de las IP encontradas; puedes cambiar
+            la red de un equipo en su ficha de detalle.
           </p>
           <div className="mt-3">
-            <NetworkTabs value={network} counts={networkCounts} onChange={setNetwork} />
+            <NetworkTabs
+              value={network}
+              counts={networkCounts}
+              networks={detectedNetworks}
+              onChange={setNetwork}
+            />
           </div>
         </section>
 
