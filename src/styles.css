@@ -161,6 +161,12 @@
     font-family: var(--font-sans);
   }
 
+  select,
+  option {
+    background-color: var(--color-popover);
+    color: var(--color-popover-foreground);
+  }
+
   h1,
   h2,
   h3 {
