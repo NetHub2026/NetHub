@@ -1,7 +1,18 @@
 import type { VendorBrand } from "./oui";
 import type { ServiceHit } from "./services";
 
-export type DeviceType = "pc" | "console" | "tv" | "home-assistant" | "iot";
+export type DeviceType =
+  | "pc"
+  | "phone"
+  | "tv"
+  | "console"
+  | "home-assistant"
+  | "router"
+  | "printer"
+  | "camera"
+  | "iot"
+  | "speaker"
+  | "other";
 
 export type DeviceStatus = "online" | "offline";
 
@@ -33,14 +44,22 @@ export interface Device {
   /** Servicios detectados en el último sondeo de puertos */
   services?: ServiceHit[];
   servicesScannedAt?: string;
+  /** El usuario ha editado manualmente nombre, tipo o fabricante */
+  manualEdit?: boolean;
 }
 
 export const deviceTypeLabels: Record<DeviceType, string> = {
   pc: "PC / Portátil",
-  console: "Consola",
+  phone: "Smartphone / Tablet",
   tv: "Smart TV",
-  "home-assistant": "Home Assistant",
-  iot: "IoT",
+  console: "Consola",
+  "home-assistant": "Domótica / Home Assistant",
+  router: "Router / Red",
+  printer: "Impresora",
+  camera: "Cámara IP",
+  iot: "IoT / Enchufe",
+  speaker: "Altavoz inteligente",
+  other: "Otro",
 };
 
 /**
