@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   ArrowDownUp,
-  Download,
   FileSpreadsheet,
   ShieldAlert,
   ShieldCheck,
@@ -14,7 +13,6 @@ import {
   RotateCcw,
   Search,
   Sun,
-  Upload,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -38,7 +36,6 @@ import {
   type ScannerStatus,
 } from "@/lib/scanner";
 import {
-  downloadDevicesJson,
   getDbPath,
   getRuntime,
   nativeScan,
@@ -46,7 +43,7 @@ import {
   type Runtime,
 } from "@/lib/desktop";
 import { loadDevicesAnywhere, saveDevicesAnywhere } from "@/lib/persistence";
-import { exportInventoryCsv, exportInventoryJson } from "@/lib/backup";
+import { exportInventoryCsv } from "@/lib/backup";
 import {
   ALL_NETWORKS,
   countByNetwork,
@@ -55,10 +52,6 @@ import {
 } from "@/lib/networks";
 import { BandwidthChart } from "@/components/network/BandwidthChart";
 import { DeviceDetailPanel } from "@/components/network/DeviceDetailPanel";
-import {
-  ImportDevicesModal,
-  type RestoreMode,
-} from "@/components/network/ImportDevicesModal";
 import { NetworkTabs } from "@/components/network/NetworkTabs";
 import { SpeedTestPanel } from "@/components/network/SpeedTestPanel";
 import { VendorIcon } from "@/components/network/VendorIcon";
@@ -106,7 +99,6 @@ function Dashboard() {
   const [status, setStatus] = useState<ScannerStatus>("unknown");
   const [scanning, setScanning] = useState(false);
   const [meta, setMeta] = useState<ScanMeta>({ lastScanAt: null, source: null });
-  const [importOpen, setImportOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [runtime, setRuntime] = useState<Runtime>("web");
@@ -245,28 +237,6 @@ function Dashboard() {
     setSelectedId(null);
     setNotice(
       `«${device.name}» eliminado de la lista. Si vuelve a aparecer en un escaneo se marcará como nuevo.`,
-    );
-  };
-
-  /** Restaura una copia de seguridad, fusionando o reemplazando el inventario. */
-  const restore = (backup: Device[], mode: RestoreMode) => {
-    const next =
-      mode === "replace"
-        ? backup
-        : (() => {
-            const byId = new Map(items.map((d) => [d.id, d]));
-            for (const device of backup) {
-              const existing = byId.get(device.id);
-              byId.set(device.id, existing ? { ...existing, ...device } : device);
-            }
-            return [...byId.values()];
-          })();
-    setItems(next);
-    void saveDevicesAnywhere(next);
-    setNotice(
-      mode === "replace"
-        ? `Copia restaurada: el inventario se ha reemplazado con ${backup.length} dispositivos.`
-        : `Copia restaurada: ${backup.length} dispositivos fusionados con tu inventario (${next.length} en total).`,
     );
   };
 
