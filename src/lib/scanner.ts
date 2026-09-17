@@ -394,7 +394,7 @@ function Get-NetBiosNameMap {
   try {
     (nbtstat -c) | ForEach-Object {
       $line = $_.Trim()
-      if ($line -match '^([^\s<]+)\s+<\d+>\s+\S+\s+(\d{1,3}(\.\d{1,3}){3})') {
+      if ($line -match '^([^\\s<]+)\\s+<\\d+>\\s+\\S+\\s+(\\d{1,3}(\\.\\d{1,3}){3})') {
         $name = $matches[1]
         $ip = $matches[2]
         if ($name -and $ip -and -not $names.ContainsKey($ip)) { $names[$ip] = $name }
