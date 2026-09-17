@@ -12,4 +12,5 @@
 - Scripts del agente actualizados para incluir el propio PC local con nombre, IP, MAC, tipo PC y etiquetas.
 
 ## Pendiente
-- Ninguna tarea abierta.
+- Optimizar escaneo PowerShell para responder en menos de 2 segundos y evitar DNS bloqueante.
+- Evitar que la resolución externa de fabricantes bloquee el escaneo o la interfaz.
