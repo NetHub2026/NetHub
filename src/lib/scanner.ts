@@ -436,12 +436,13 @@ function Get-LocalDevice {
 
 function Get-ArpDevices {
   $rows = @()
+  $nameMap = Get-NetBiosNameMap
   if (Get-Command Get-NetNeighbor -ErrorAction SilentlyContinue) {
     $rows = Get-NetNeighbor -AddressFamily IPv4 |
       Where-Object { $_.State -ne 'Unreachable' -and $_.LinkLayerAddress -notmatch '^(00-00-00|FF-FF-FF)' } |
       ForEach-Object {
         $item = @{ ip = $_.IPAddress; mac = ($_.LinkLayerAddress -replace '-', ':'); online = $true }
-        $hostName = Resolve-HostName $_.IPAddress
+        $hostName = $nameMap[$_.IPAddress]
         if ($hostName) { $item.name = $hostName }
         $item
       }
@@ -449,7 +450,7 @@ function Get-ArpDevices {
     $rows = (arp -a) | ForEach-Object {
       if ($_ -match '(\\d{1,3}(\\.\\d{1,3}){3})\\s+([0-9a-fA-F-]{17})') {
         $item = @{ ip = $matches[1]; mac = ($matches[3].ToUpper() -replace '-', ':'); online = $true }
-        $hostName = Resolve-HostName $matches[1]
+        $hostName = $nameMap[$matches[1]]
         if ($hostName) { $item.name = $hostName }
         $item
       }
