@@ -300,8 +300,8 @@ export function PackageAppModal({
           </div>
         </dl>
 
-        <div className="mt-5 flex gap-2">
-          {(["tauri", "electron"] as Tab[]).map((t) => (
+        <div className="mt-5 flex flex-wrap gap-2">
+          {(["bat", "tauri", "electron"] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -312,13 +312,25 @@ export function PackageAppModal({
                   : "border-border text-muted-foreground hover:bg-accent hover:text-foreground",
               )}
             >
-              {t === "tauri" ? "Tauri (.exe ~6 MB)" : "Electron Builder"}
+              {tabLabels[t]}
             </button>
           ))}
         </div>
 
         <p className="mt-4 rounded-xl border border-border bg-muted/40 p-4 text-xs text-muted-foreground">
-          {tab === "tauri" ? (
+          {tab === "bat" ? (
+            <>
+              Guarda los dos ficheros <code className="font-mono">.bat</code> en una carpeta
+              vacía (por ejemplo en un pendrive) y haz doble clic en{" "}
+              <code className="font-mono">build-portable.bat</code>: descarga el código,
+              compila y deja <code className="font-mono">NetHub.exe</code> listo. Solo
+              necesitas Node.js y Git. Para actualizar en el futuro, ejecuta{" "}
+              <code className="font-mono">update-portable.bat</code> o sustituye el{" "}
+              <code className="font-mono">.exe</code>: tu{" "}
+              <code className="font-mono">devices-db.json</code> se queda intacto junto al
+              ejecutable.
+            </>
+          ) : tab === "tauri" ? (
             <>
               Requisitos en Windows: Rust (rustup) y «Visual Studio Build Tools» con el
               paquete C++. El ejecutable queda en{" "}
