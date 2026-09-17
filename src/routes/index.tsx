@@ -138,13 +138,23 @@ function Dashboard() {
     if (hydrated) void saveDevicesAnywhere(items);
   }, [items, hydrated]);
 
+  /** Fusiona el escaneo con la lista conocida y devuelve cuántos son nuevos. */
   const applyScan = (devices: Device[], source: NonNullable<ScanMeta["source"]>) => {
-    setItems(devices);
+    let fresh = 0;
+    setItems((prev) => {
+      const merged = mergeScan(prev, devices);
+      fresh = newDevices(merged).length;
+      void saveDevicesAnywhere(merged);
+      return merged;
+    });
     const next: ScanMeta = { lastScanAt: new Date().toISOString(), source };
     setMeta(next);
     saveScanMeta(next);
-    void saveDevicesAnywhere(devices);
+    return fresh;
   };
+
+  const trustAll = () =>
+    setItems((prev) => prev.map((d) => (d.isNew ? { ...d, isNew: false, trusted: true } : d)));
 
   const scan = async () => {
     setScanning(true);
