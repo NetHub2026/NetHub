@@ -11,5 +11,9 @@ export default defineConfig({
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
+    // Prerender the root route so the build emits .output/public/index.html,
+    // which the portable Electron build loads directly from disk.
+    pages: [{ path: "/" }],
+    prerender: { enabled: true },
   },
 });
