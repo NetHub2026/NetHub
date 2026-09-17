@@ -140,6 +140,62 @@ function sendWol(mac) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Tráfico de red en vivo (delta por segundo → Mbps)                   */
+/* ------------------------------------------------------------------ */
+
+let lastCounters = null; // { rx, tx, at }
+
+/** Contadores acumulados de bytes recibidos/enviados del sistema. */
+async function readCounters() {
+  if (isWindows) {
+    const output = await run("netstat", ["-e"], 4000);
+    const numbers = [];
+    for (const line of output.split(/\r?\n/)) {
+      const found = line.match(/(\d{3,})\s+(\d{3,})/);
+      if (found) numbers.push([Number(found[1]), Number(found[2])]);
+    }
+    if (numbers.length === 0) return null;
+    const [rx, tx] = numbers[0];
+    return { rx, tx };
+  }
+  try {
+    const content = fs.readFileSync("/proc/net/dev", "utf8");
+    let rx = 0;
+    let tx = 0;
+    for (const line of content.split("\n").slice(2)) {
+      const [name, rest] = line.split(":");
+      if (!rest || name.trim() === "lo") continue;
+      const cols = rest.trim().split(/\s+/).map(Number);
+      rx += cols[0] || 0;
+      tx += cols[8] || 0;
+    }
+    return { rx, tx };
+  } catch {
+    return null;
+  }
+}
+
+async function readTraffic() {
+  const counters = await readCounters();
+  const now = Date.now();
+  if (!counters) return { rxMbps: 0, txMbps: 0, totalMbps: 0 };
+
+  const previous = lastCounters;
+  lastCounters = { ...counters, at: now };
+  if (!previous) return { rxMbps: 0, txMbps: 0, totalMbps: 0 };
+
+  const seconds = Math.max((now - previous.at) / 1000, 0.2);
+  const toMbps = (bytes) => Math.max(0, (bytes * 8) / seconds / 1_000_000);
+  const rxMbps = toMbps(counters.rx - previous.rx);
+  const txMbps = toMbps(counters.tx - previous.tx);
+  return {
+    rxMbps: Number(rxMbps.toFixed(2)),
+    txMbps: Number(txMbps.toFixed(2)),
+    totalMbps: Number((rxMbps + txMbps).toFixed(2)),
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* IPC                                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -149,6 +205,7 @@ ipcMain.handle("nethub:scan", () => scanNetwork());
 ipcMain.handle("nethub:path", () => dbPath());
 ipcMain.handle("nethub:ping", (_e, ip) => pingIp(ip));
 ipcMain.handle("nethub:wol", (_e, mac) => sendWol(mac));
+ipcMain.handle("nethub:traffic", () => readTraffic());
 
 /* ------------------------------------------------------------------ */
 /* Servidor HTTP de respaldo (compatibilidad con el agente local)      */
@@ -171,6 +228,10 @@ function startAgentServer() {
       }
       if (url.pathname === "/ping") {
         res.end(JSON.stringify(await pingIp(url.searchParams.get("ip"))));
+        return;
+      }
+      if (url.pathname === "/traffic") {
+        res.end(JSON.stringify(await readTraffic()));
         return;
       }
       if (url.pathname === "/wol") {

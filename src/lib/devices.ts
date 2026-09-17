@@ -69,7 +69,3 @@ export const deviceTypeLabels: Record<DeviceType, string> = {
 /** Serie horaria simulada de ancho de banda total (Mbps). */
 
 /** Serie horaria simulada de ancho de banda total (Mbps). */
-export const bandwidthSeries = [
-  32, 41, 28, 22, 18, 15, 24, 58, 96, 120, 142, 118, 96, 134, 168, 190, 240, 288, 322,
-  356, 402, 368, 254, 148,
-];

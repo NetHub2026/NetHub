@@ -20,6 +20,14 @@ interface ElectronBridge {
   dbPath?: () => Promise<string>;
   ping?: (ip: string) => Promise<{ ok: boolean; rtt: number | null }>;
   wol?: (mac: string) => Promise<boolean>;
+  traffic?: () => Promise<TrafficSample>;
+}
+
+/** Muestra instantánea de tráfico de red en Mbps. */
+export interface TrafficSample {
+  rxMbps: number;
+  txMbps: number;
+  totalMbps: number;
 }
 
 declare global {
@@ -172,6 +180,59 @@ export async function nativeWol(mac: string): Promise<boolean> {
     return false;
   }
   return false;
+}
+
+/* ------------------------------------------------------------------ */
+/* Tráfico de red en vivo                                              */
+/* ------------------------------------------------------------------ */
+
+const AGENT_TRAFFIC_URL = "http://localhost:8765/traffic";
+
+function toSample(value: unknown): TrafficSample | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const rx = Number(raw["rxMbps"]);
+  const tx = Number(raw["txMbps"]);
+  if (!Number.isFinite(rx) || !Number.isFinite(tx)) return null;
+  return { rxMbps: Math.max(0, rx), txMbps: Math.max(0, tx), totalMbps: rx + tx };
+}
+
+/** Simulación suave para el navegador: varía a partir de la muestra anterior. */
+function simulateTraffic(previous?: TrafficSample): TrafficSample {
+  const drift = (base: number, spread: number) => {
+    const next = base + (Math.random() - 0.45) * spread;
+    return Math.max(0.2, Math.min(600, next));
+  };
+  const rx = drift(previous?.rxMbps || 24, 18);
+  const tx = drift(previous?.txMbps || 6, 5);
+  return { rxMbps: rx, txMbps: tx, totalMbps: rx + tx };
+}
+
+/**
+ * Lee el tráfico actual: proceso nativo → agente local → simulación.
+ * Nunca lanza: siempre devuelve una muestra para que la gráfica avance.
+ */
+export async function readLiveTraffic(previous?: TrafficSample): Promise<TrafficSample> {
+  try {
+    if (window.nethub?.traffic) {
+      const sample = toSample(await window.nethub.traffic());
+      if (sample) return sample;
+    }
+  } catch {
+    /* seguimos con el agente */
+  }
+  try {
+    const response = await fetch(AGENT_TRAFFIC_URL, {
+      signal: AbortSignal.timeout(900),
+    });
+    if (response.ok) {
+      const sample = toSample(await response.json());
+      if (sample) return sample;
+    }
+  } catch {
+    /* sin agente: simulamos */
+  }
+  return simulateTraffic(previous);
 }
 
 /** Ruta informativa del fichero de datos para mostrar en la interfaz. */
