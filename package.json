@@ -13,7 +13,15 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "build:portable": "npm run build && electron-builder --win portable"
+  },
+  "build": {
+    "appId": "dev.lovable.nethub",
+    "productName": "NetHub",
+    "directories": { "output": "dist-electron" },
+    "files": ["dist/**/*", ".output/**/*", "electron/**/*", "package.json"],
+    "win": { "target": "portable", "icon": "public/favicon.ico" }
   },
   "overrides": {
     "rolldown": "1.2.1"

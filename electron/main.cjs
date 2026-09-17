@@ -359,16 +359,39 @@ function createWindow() {
     },
   });
 
-  const devUrl = process.env.NETHUB_DEV_URL;
-  const indexHtml = resolveIndexHtml();
-  if (devUrl) win.loadURL(devUrl);
-  else if (indexHtml) win.loadFile(indexHtml);
-  else win.loadURL("http://localhost:8080");
+  return win;
 }
 
-app.whenReady().then(() => {
+async function loadApp(win) {
+  const devUrl = process.env.NETHUB_DEV_URL;
+  if (devUrl) {
+    await win.loadURL(devUrl).catch(() => win.loadURL(fallbackPage()));
+    return;
+  }
+
+  const root = resolveStaticRoot();
+  if (root) {
+    const url = await startStaticServer(root);
+    if (url) {
+      await win.loadURL(url).catch(() => win.loadFile(path.join(root, "index.html")));
+      return;
+    }
+    await win.loadFile(path.join(root, "index.html")).catch(() => win.loadURL(fallbackPage()));
+    return;
+  }
+
+  // Último recurso en desarrollo: servidor de vite; si no responde, pantalla amigable.
+  try {
+    await win.loadURL("http://localhost:8080");
+  } catch {
+    await win.loadURL(fallbackPage());
+  }
+}
+
+app.whenReady().then(async () => {
   startAgentServer();
-  createWindow();
+  const win = createWindow();
+  await loadApp(win);
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
