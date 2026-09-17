@@ -144,7 +144,7 @@ function Dashboard() {
       setItems((prev) => {
         const updated = prev.map((device) => {
           const fresh = byId.get(device.id);
-          if (!fresh || device.manualEdit || fresh.brand === "unknown") return device;
+          if (!fresh || device.manualEdit || !fresh.brand || fresh.brand === "unknown") return device;
           return { ...device, vendor: fresh.vendor, brand: fresh.brand };
         });
         void saveDevicesAnywhere(updated);
