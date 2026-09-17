@@ -34,6 +34,7 @@ import {
   loadScanMeta,
   mergeScan,
   newDevices,
+  resolveVendorsInBackground,
   saveScanMeta,
   type ScanMeta,
   type ScannerStatus,
@@ -138,6 +139,18 @@ function Dashboard() {
     const next: ScanMeta = { lastScanAt: new Date().toISOString(), source };
     setMeta(next);
     saveScanMeta(next);
+    resolveVendorsInBackground(resolved, (external) => {
+      const byId = new Map(external.map((device) => [device.id, device]));
+      setItems((prev) => {
+        const updated = prev.map((device) => {
+          const fresh = byId.get(device.id);
+          if (!fresh || device.manualEdit || fresh.brand === "unknown") return device;
+          return { ...device, vendor: fresh.vendor, brand: fresh.brand };
+        });
+        void saveDevicesAnywhere(updated);
+        return updated;
+      });
+    });
     return newDevices(merged).length;
   };
 
