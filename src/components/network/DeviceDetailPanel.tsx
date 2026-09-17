@@ -7,11 +7,13 @@ import {
   RotateCw,
   ShieldCheck,
   Sparkles,
+  Trash2,
   X,
   Plus,
   Radar,
 } from "lucide-react";
-import { deviceTypeLabels, type Device } from "@/lib/devices";
+import { deviceTypeLabels, type Device, type DeviceType } from "@/lib/devices";
+import { DeviceTypeIcon } from "./DeviceTypeIcon";
 import { isRandomizedMac, suggestedName } from "@/lib/oui";
 import { detectServices, likelyServices, type ServiceHit } from "@/lib/services";
 import { VendorIcon } from "./VendorIcon";
@@ -21,18 +23,26 @@ interface DeviceDetailPanelProps {
   device: Device | null;
   onClose: () => void;
   onUpdate: (device: Device) => void;
+  onDelete: (device: Device) => void;
 }
 
-export function DeviceDetailPanel({ device, onClose, onUpdate }: DeviceDetailPanelProps) {
+export function DeviceDetailPanel({
+  device,
+  onClose,
+  onUpdate,
+  onDelete,
+}: DeviceDetailPanelProps) {
   const [tagDraft, setTagDraft] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [probing, setProbing] = useState(false);
   const [probeNote, setProbeNote] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     setTagDraft("");
     setFeedback(null);
     setProbeNote(null);
+    setConfirmDelete(false);
   }, [device?.id]);
 
   useEffect(() => {
@@ -71,10 +81,8 @@ export function DeviceDetailPanel({ device, onClose, onUpdate }: DeviceDetailPan
   const suggested = !device.services || device.services.length === 0;
 
   const rows: Array<[string, string]> = [
-    ["Tipo", deviceTypeLabels[device.type]],
     ["Dirección IP", device.ip],
     ["Dirección MAC", device.mac + (isRandomizedMac(device.mac) ? " (aleatoria)" : "")],
-    ["Fabricante", device.vendor],
     ["Última conexión", device.lastSeen],
     ["Descarga actual", `${device.downstream.toFixed(1)} Mbps`],
     ["Subida actual", `${device.upstream.toFixed(1)} Mbps`],
@@ -119,7 +127,7 @@ export function DeviceDetailPanel({ device, onClose, onUpdate }: DeviceDetailPan
               )}
             </div>
             <h2 className="mt-3 flex items-center gap-2 text-2xl font-semibold">
-              <VendorIcon brand={device.brand} className="text-brand" />
+              <DeviceTypeIcon type={device.type} className="size-6 text-brand" />
               {device.name}
             </h2>
             <p className="font-mono text-sm text-muted-foreground">{device.ip}</p>
@@ -147,6 +155,62 @@ export function DeviceDetailPanel({ device, onClose, onUpdate }: DeviceDetailPan
             </button>
           </div>
         )}
+
+        <h3 className="mt-8 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          Editar dispositivo
+        </h3>
+        <div className="mt-3 space-y-3 rounded-xl border border-border p-4">
+          <label className="block">
+            <span className="text-xs text-muted-foreground">Nombre</span>
+            <input
+              value={device.name}
+              onChange={(e) =>
+                onUpdate({ ...device, name: e.target.value, manualEdit: true })
+              }
+              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-brand"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs text-muted-foreground">Tipo de dispositivo</span>
+            <span className="mt-1 flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 focus-within:border-brand">
+              <DeviceTypeIcon type={device.type} className="shrink-0 text-brand" />
+              <select
+                value={device.type}
+                onChange={(e) =>
+                  onUpdate({
+                    ...device,
+                    type: e.target.value as DeviceType,
+                    manualEdit: true,
+                  })
+                }
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+              >
+                {(Object.keys(deviceTypeLabels) as DeviceType[]).map((t) => (
+                  <option key={t} value={t}>
+                    {deviceTypeLabels[t]}
+                  </option>
+                ))}
+              </select>
+            </span>
+          </label>
+          <label className="block">
+            <span className="text-xs text-muted-foreground">Fabricante / marca</span>
+            <span className="mt-1 flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 focus-within:border-brand">
+              <VendorIcon brand={device.brand} className="shrink-0 text-muted-foreground" />
+              <input
+                value={device.vendor}
+                onChange={(e) =>
+                  onUpdate({ ...device, vendor: e.target.value, manualEdit: true })
+                }
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+              />
+            </span>
+          </label>
+          <p className="text-xs text-muted-foreground">
+            Estos cambios se guardan en tu equipo y no se sobrescriben en escaneos
+            posteriores.
+          </p>
+        </div>
 
         <dl className="mt-6 divide-y divide-border rounded-xl border border-border">
           {rows.map(([label, value]) => (
@@ -308,6 +372,39 @@ export function DeviceDetailPanel({ device, onClose, onUpdate }: DeviceDetailPan
           Las acciones de control se aplican de forma local en esta demo y están
           preparadas para conectarse al router o a Home Assistant.
         </p>
+
+        <div className="mt-8 rounded-xl border border-destructive/40 bg-destructive/5 p-4">
+          {confirmDelete ? (
+            <div>
+              <p className="text-sm text-destructive">
+                ¿Eliminar «{device.name}» de la lista? Se borrará de los datos guardados;
+                si vuelve a aparecer en un escaneo, se mostrará como nuevo.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  onClick={() => onDelete(device)}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground transition-opacity hover:opacity-90"
+                >
+                  <Trash2 className="size-4" /> Sí, eliminar
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="rounded-md border border-border px-3 py-2 text-sm transition-colors hover:bg-accent"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="flex w-full items-center gap-3 text-left text-sm text-destructive"
+            >
+              <Trash2 className="size-4" />
+              <span className="flex-1">Eliminar / olvidar dispositivo</span>
+            </button>
+          )}
+        </div>
       </aside>
     </div>
   );
