@@ -3,36 +3,18 @@ setlocal
 title NetHub - Construir ejecutable portable
 cd /d "%~dp0"
 
-REM === Comprobacion de permisos de Administrador ===
-net session >nul 2>&1
-if %errorlevel% neq 0 (
-    echo No tienes permisos de Administrador.
-    echo Intentando elevar automaticamente...
-    powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
-    if not errorlevel 1 (
-        rem Se relanzo como Administrador; esta ventana ya no es necesaria
-        exit /b 0
-    )
-    echo.
-    echo ============================================
-    echo   ATENCION: se necesitan permisos de
-    echo   Administrador para extraer las herramientas
-    echo   de compilacion (enlaces simbolicos).
-    echo.
-    echo   Cierra esta ventana, haz clic derecho sobre
-    echo   construir-exe.bat y elige
-    echo   "Ejecutar como administrador".
-    echo ============================================
-    echo.
-    pause
-    exit /b 1
-)
-
 echo ============================================
 echo   NetHub - Generando NetHub.exe portable
 echo ============================================
 echo.
 
+echo Comprobando Node.js y npm...
+where node >nul 2>&1
+if errorlevel 1 goto nonode
+where npm >nul 2>&1
+if errorlevel 1 goto nonode
+echo Node.js y npm encontrados.
+echo.
 
 echo [1/4] Instalando dependencias...
 call npm install
@@ -46,16 +28,16 @@ if errorlevel 1 goto error
 echo.
 echo [3/4] Comprobando los archivos web compilados...
 call node scripts\ensure-index-html.mjs
-if not exist ".output\public\index.html" (
-    if not exist "dist\client\index.html" (
-        if not exist "dist\index.html" (
-            echo No se ha podido generar index.html. Revisa la compilacion.
-            goto error
-        )
-    )
-)
+if errorlevel 1 goto error
 
+set HAVE_INDEX=0
+if exist ".output\public\index.html" set HAVE_INDEX=1
+if exist "dist\client\index.html" set HAVE_INDEX=1
+if exist "dist\index.html" set HAVE_INDEX=1
+if "%HAVE_INDEX%"=="0" goto noindex
+echo index.html encontrado.
 echo.
+
 echo [4/4] Empaquetando el ejecutable portable...
 call npx electron-builder --win portable
 if errorlevel 1 goto error
@@ -69,6 +51,21 @@ echo ============================================
 echo.
 pause
 exit /b 0
+
+:nonode
+echo.
+echo ERROR: Node.js o npm no se han encontrado en el sistema.
+echo Instala Node.js desde https://nodejs.org y vuelve a intentarlo.
+echo.
+pause
+exit /b 1
+
+:noindex
+echo.
+echo ERROR: No se ha podido generar index.html. Revisa la compilacion.
+echo.
+pause
+exit /b 1
 
 :error
 echo.
