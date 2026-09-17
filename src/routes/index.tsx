@@ -212,10 +212,13 @@ function Dashboard() {
   const totalUp = online.reduce((sum, d) => sum + d.upstream, 0);
   const intruders = newDevices(items);
 
+  const networkCounts = useMemo(() => countByNetwork(items), [items]);
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return items.filter((d) => {
       if (filter !== "all" && d.type !== filter) return false;
+      if (network !== ALL_NETWORKS && (networkOf(d) ?? "unknown") !== network) return false;
       if (onlyOnline && d.status !== "online") return false;
       if (!q) return true;
       return [d.name, d.ip, d.mac, d.vendor, ...d.tags]
@@ -223,7 +226,7 @@ function Dashboard() {
         .toLowerCase()
         .includes(q);
     });
-  }, [items, filter, onlyOnline, query]);
+  }, [items, filter, network, onlyOnline, query]);
 
   const selected = items.find((d) => d.id === selectedId) ?? null;
 
@@ -238,6 +241,28 @@ function Dashboard() {
     setSelectedId(null);
     setNotice(
       `«${device.name}» eliminado de la lista. Si vuelve a aparecer en un escaneo se marcará como nuevo.`,
+    );
+  };
+
+  /** Restaura una copia de seguridad, fusionando o reemplazando el inventario. */
+  const restore = (backup: Device[], mode: RestoreMode) => {
+    const next =
+      mode === "replace"
+        ? backup
+        : (() => {
+            const byId = new Map(items.map((d) => [d.id, d]));
+            for (const device of backup) {
+              const existing = byId.get(device.id);
+              byId.set(device.id, existing ? { ...existing, ...device } : device);
+            }
+            return [...byId.values()];
+          })();
+    setItems(next);
+    void saveDevicesAnywhere(next);
+    setNotice(
+      mode === "replace"
+        ? `Copia restaurada: el inventario se ha reemplazado con ${backup.length} dispositivos.`
+        : `Copia restaurada: ${backup.length} dispositivos fusionados con tu inventario (${next.length} en total).`,
     );
   };
 
