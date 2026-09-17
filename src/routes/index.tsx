@@ -197,6 +197,7 @@ function Dashboard() {
   const online = items.filter((d) => d.status === "online");
   const totalDown = online.reduce((sum, d) => sum + d.downstream, 0);
   const totalUp = online.reduce((sum, d) => sum + d.upstream, 0);
+  const intruders = newDevices(items);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
