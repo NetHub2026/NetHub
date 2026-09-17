@@ -106,11 +106,9 @@ function Dashboard() {
   const [status, setStatus] = useState<ScannerStatus>("unknown");
   const [scanning, setScanning] = useState(false);
   const [meta, setMeta] = useState<ScanMeta>({ lastScanAt: null, source: null });
-  const [setupOpen, setSetupOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
-  const [packageOpen, setPackageOpen] = useState(false);
   const [runtime, setRuntime] = useState<Runtime>("web");
   const [dbPath, setDbPath] = useState("Almacenamiento del navegador (localStorage)");
 
@@ -218,6 +216,7 @@ function Dashboard() {
   const showEmpty = hydrated && items.length === 0;
 
   const networkCounts = useMemo(() => countByNetwork(items), [items]);
+  const detectedNetworks = useMemo(() => detectNetworks(items), [items]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -305,14 +304,6 @@ function Dashboard() {
             <span className="hidden sm:inline">Importar</span>
           </button>
           <button
-            onClick={() => setSetupOpen(true)}
-            className="rounded-md border border-border p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            aria-label="Configurar escáner Windows"
-            title="Configurar escáner Windows"
-          >
-            <Settings2 className="size-4" />
-          </button>
-          <button
             onClick={() => setDark((v) => !v)}
             className="rounded-md border border-border p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
@@ -337,13 +328,6 @@ function Dashboard() {
             Datos en <span className="font-mono text-foreground">{dbPath}</span>
           </span>
           <div className="ml-auto flex flex-wrap gap-2">
-            <button
-              onClick={() => setPackageOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-brand px-3 py-1.5 font-medium text-brand transition-colors hover:bg-brand/10"
-            >
-              <Package className="size-3.5" />
-              Empaquetar App Portable
-            </button>
             <button
               onClick={() => {
                 exportInventoryJson(items);
@@ -457,13 +441,6 @@ function Dashboard() {
               >
                 <Upload className="size-4" />
                 Importar dispositivos
-              </button>
-              <button
-                onClick={() => setSetupOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
-              >
-                <Settings2 className="size-3.5" />
-                Cómo configurar el escáner
               </button>
             </div>
           </section>
@@ -648,8 +625,8 @@ function Dashboard() {
         onClose={() => setSelectedId(null)}
         onUpdate={update}
         onDelete={remove}
+        networks={detectedNetworks}
       />
-      <ScannerSetupModal open={setupOpen} onClose={() => setSetupOpen(false)} />
       <ImportDevicesModal
         open={importOpen}
         onClose={() => setImportOpen(false)}
@@ -663,12 +640,6 @@ function Dashboard() {
           })();
         }}
         onRestore={restore}
-      />
-      <PackageAppModal
-        open={packageOpen}
-        onClose={() => setPackageOpen(false)}
-        dbPath={dbPath}
-        runtimeLabel={runtimeLabels[runtime]}
       />
     </div>
   );
