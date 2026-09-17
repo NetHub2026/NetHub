@@ -297,13 +297,6 @@ function Dashboard() {
             {scanning ? "Escaneando…" : "Escanear red"}
           </button>
           <button
-            onClick={() => setImportOpen(true)}
-            className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <Upload className="size-4" />
-            <span className="hidden sm:inline">Importar</span>
-          </button>
-          <button
             onClick={() => setDark((v) => !v)}
             className="rounded-md border border-border p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
@@ -401,7 +394,7 @@ function Dashboard() {
             <h2 className="mt-4 text-lg font-semibold">Todavía no hay dispositivos</h2>
             <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
               Escanea tu red para descubrir automáticamente PCs, consolas, Smart TVs,
-              Home Assistant e IoT, o importa un archivo con tus datos si ya los tienes.
+              Home Assistant e IoT.
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
               <button
@@ -415,13 +408,6 @@ function Dashboard() {
                   <Radar className="size-4" />
                 )}
                 {scanning ? "Escaneando…" : "Escanear red"}
-              </button>
-              <button
-                onClick={() => setImportOpen(true)}
-                className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              >
-                <Upload className="size-4" />
-                Importar dispositivos
               </button>
             </div>
           </section>
@@ -612,20 +598,6 @@ function Dashboard() {
         onUpdate={update}
         onDelete={remove}
         networks={detectedNetworks}
-      />
-      <ImportDevicesModal
-        open={importOpen}
-        onClose={() => setImportOpen(false)}
-        onImport={(devices, source) => {
-          void (async () => {
-            const fresh = await applyScan(devices, source);
-            setNotice(
-              `Importados ${devices.length} dispositivos y guardados localmente` +
-                (fresh > 0 ? ` · ${fresh} nuevos.` : "."),
-            );
-          })();
-        }}
-        onRestore={restore}
       />
     </div>
   );
