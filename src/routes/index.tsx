@@ -48,11 +48,18 @@ import {
   type Runtime,
 } from "@/lib/desktop";
 import { loadDevicesAnywhere, saveDevicesAnywhere } from "@/lib/persistence";
+import { exportInventoryCsv, exportInventoryJson } from "@/lib/backup";
+import { ALL_NETWORKS, countByNetwork, networkOf } from "@/lib/networks";
 import { BandwidthChart } from "@/components/network/BandwidthChart";
 import { DeviceDetailPanel } from "@/components/network/DeviceDetailPanel";
-import { ImportDevicesModal } from "@/components/network/ImportDevicesModal";
+import {
+  ImportDevicesModal,
+  type RestoreMode,
+} from "@/components/network/ImportDevicesModal";
+import { NetworkTabs } from "@/components/network/NetworkTabs";
 import { PackageAppModal } from "@/components/network/PackageAppModal";
 import { ScannerSetupModal } from "@/components/network/ScannerSetupModal";
+import { SpeedTestPanel } from "@/components/network/SpeedTestPanel";
 import { VendorIcon } from "@/components/network/VendorIcon";
 import { DeviceTypeIcon } from "@/components/network/DeviceTypeIcon";
 import { cn } from "@/lib/utils";
