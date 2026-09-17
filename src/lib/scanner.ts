@@ -118,15 +118,16 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
     if (!old) {
       return { ...fresh, firstSeenAt: now, isNew: true, trusted: false };
     }
+    const brand = old.brand ?? fresh.brand;
     const result: Device = {
       ...old,
       ip: fresh.ip,
       status: fresh.status,
       lastSeen: fresh.lastSeen,
       vendor: old.vendor || fresh.vendor,
-      brand: old.brand ?? fresh.brand,
       firstSeenAt: old.firstSeenAt ?? now,
       isNew: old.trusted ? false : (old.isNew ?? false),
+      ...(brand ? { brand } : {}),
     };
     return result;
   });
