@@ -5,6 +5,7 @@ import {
   Gauge,
   Loader2,
   RotateCw,
+  Router,
   ShieldCheck,
   Sparkles,
   Trash2,
@@ -14,6 +15,8 @@ import {
 } from "lucide-react";
 import { deviceTypeLabels, type Device, type DeviceType } from "@/lib/devices";
 import { DeviceTypeIcon } from "./DeviceTypeIcon";
+import { PingCard } from "./PingCard";
+import { detectNetworkId, networks } from "@/lib/networks";
 import { isRandomizedMac, suggestedName } from "@/lib/oui";
 import { detectServices, likelyServices, type ServiceHit } from "@/lib/services";
 import { VendorIcon } from "./VendorIcon";
@@ -226,6 +229,39 @@ export function DeviceDetailPanel({
               />
             </span>
           </label>
+          <label className="block">
+            <span className="text-xs text-muted-foreground">Red / router</span>
+            <span className="mt-1 flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 focus-within:border-brand">
+              <Router className="size-4 shrink-0 text-brand" />
+              <select
+                value={device.networkId ?? detectNetworkId(device.ip) ?? ""}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const next: Device = { ...device };
+                  if (value) next.networkId = value;
+                  else delete next.networkId;
+                  onUpdate(next);
+                }}
+                className="min-w-0 flex-1 rounded-sm bg-popover text-sm text-popover-foreground outline-none"
+              >
+                <option value="" className="bg-popover text-popover-foreground">
+                  Sin clasificar
+                </option>
+                {networks.map((net) => (
+                  <option
+                    key={net.id}
+                    value={net.id}
+                    className="bg-popover text-popover-foreground"
+                  >
+                    {net.name} ({net.hint})
+                  </option>
+                ))}
+              </select>
+            </span>
+            <span className="mt-1 block text-[11px] text-muted-foreground">
+              Detectada automáticamente por la subred; puedes cambiarla a mano.
+            </span>
+          </label>
           <p className="text-xs text-muted-foreground">
             Estos cambios se guardan en tu equipo y no se sobrescriben en escaneos
             posteriores.
@@ -240,6 +276,11 @@ export function DeviceDetailPanel({
             </div>
           ))}
         </dl>
+
+        <h3 className="mt-8 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          Latencia y encendido remoto
+        </h3>
+        <PingCard device={device} onUpdate={onUpdate} />
 
         {suggestion !== device.name && (
           <button

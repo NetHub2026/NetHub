@@ -4,6 +4,7 @@ import {
   Activity,
   ArrowDownUp,
   Download,
+  FileSpreadsheet,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
@@ -48,11 +49,18 @@ import {
   type Runtime,
 } from "@/lib/desktop";
 import { loadDevicesAnywhere, saveDevicesAnywhere } from "@/lib/persistence";
+import { exportInventoryCsv, exportInventoryJson } from "@/lib/backup";
+import { ALL_NETWORKS, countByNetwork, networkOf } from "@/lib/networks";
 import { BandwidthChart } from "@/components/network/BandwidthChart";
 import { DeviceDetailPanel } from "@/components/network/DeviceDetailPanel";
-import { ImportDevicesModal } from "@/components/network/ImportDevicesModal";
+import {
+  ImportDevicesModal,
+  type RestoreMode,
+} from "@/components/network/ImportDevicesModal";
+import { NetworkTabs } from "@/components/network/NetworkTabs";
 import { PackageAppModal } from "@/components/network/PackageAppModal";
 import { ScannerSetupModal } from "@/components/network/ScannerSetupModal";
+import { SpeedTestPanel } from "@/components/network/SpeedTestPanel";
 import { VendorIcon } from "@/components/network/VendorIcon";
 import { DeviceTypeIcon } from "@/components/network/DeviceTypeIcon";
 import { cn } from "@/lib/utils";
@@ -91,6 +99,7 @@ function Dashboard() {
   const [items, setItems] = useState<Device[]>(seedDevices);
   const [filter, setFilter] = useState<DeviceType | "all">("all");
   const [query, setQuery] = useState("");
+  const [network, setNetwork] = useState<string>(ALL_NETWORKS);
   const [onlyOnline, setOnlyOnline] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dark, setDark] = useState(true);
@@ -204,10 +213,13 @@ function Dashboard() {
   const totalUp = online.reduce((sum, d) => sum + d.upstream, 0);
   const intruders = newDevices(items);
 
+  const networkCounts = useMemo(() => countByNetwork(items), [items]);
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return items.filter((d) => {
       if (filter !== "all" && d.type !== filter) return false;
+      if (network !== ALL_NETWORKS && (networkOf(d) ?? "unknown") !== network) return false;
       if (onlyOnline && d.status !== "online") return false;
       if (!q) return true;
       return [d.name, d.ip, d.mac, d.vendor, ...d.tags]
@@ -215,7 +227,7 @@ function Dashboard() {
         .toLowerCase()
         .includes(q);
     });
-  }, [items, filter, onlyOnline, query]);
+  }, [items, filter, network, onlyOnline, query]);
 
   const selected = items.find((d) => d.id === selectedId) ?? null;
 
@@ -230,6 +242,28 @@ function Dashboard() {
     setSelectedId(null);
     setNotice(
       `«${device.name}» eliminado de la lista. Si vuelve a aparecer en un escaneo se marcará como nuevo.`,
+    );
+  };
+
+  /** Restaura una copia de seguridad, fusionando o reemplazando el inventario. */
+  const restore = (backup: Device[], mode: RestoreMode) => {
+    const next =
+      mode === "replace"
+        ? backup
+        : (() => {
+            const byId = new Map(items.map((d) => [d.id, d]));
+            for (const device of backup) {
+              const existing = byId.get(device.id);
+              byId.set(device.id, existing ? { ...existing, ...device } : device);
+            }
+            return [...byId.values()];
+          })();
+    setItems(next);
+    void saveDevicesAnywhere(next);
+    setNotice(
+      mode === "replace"
+        ? `Copia restaurada: el inventario se ha reemplazado con ${backup.length} dispositivos.`
+        : `Copia restaurada: ${backup.length} dispositivos fusionados con tu inventario (${next.length} en total).`,
     );
   };
 
@@ -307,11 +341,35 @@ function Dashboard() {
               Empaquetar App Portable
             </button>
             <button
+              onClick={() => {
+                exportInventoryJson(items);
+                setNotice(
+                  `Inventario exportado en JSON con ${items.length} dispositivos, etiquetas y notas incluidas.`,
+                );
+              }}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <Download className="size-3.5" />
+              Exportar inventario (JSON)
+            </button>
+            <button
+              onClick={() => {
+                exportInventoryCsv(items);
+                setNotice(
+                  `Inventario exportado en CSV con ${items.length} dispositivos, listo para hoja de cálculo.`,
+                );
+              }}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <FileSpreadsheet className="size-3.5" />
+              Exportar inventario (CSV)
+            </button>
+            <button
               onClick={() => downloadDevicesJson(items)}
               className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               <Download className="size-3.5" />
-              Exportar devices-db.json
+              devices-db.json
             </button>
             <button
               onClick={resetDemo}
@@ -402,6 +460,19 @@ function Dashboard() {
             </p>
           </div>
           <BandwidthChart data={bandwidthSeries} />
+        </section>
+
+        <SpeedTestPanel />
+
+        <section className="mt-8">
+          <h2 className="text-base font-semibold">Redes y routers</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Cada equipo se clasifica por su subred; puedes cambiar su red en la ficha de
+            detalle.
+          </p>
+          <div className="mt-3">
+            <NetworkTabs value={network} counts={networkCounts} onChange={setNetwork} />
+          </div>
         </section>
 
         <section className="mt-8">
@@ -542,6 +613,7 @@ function Dashboard() {
             );
           })();
         }}
+        onRestore={restore}
       />
       <PackageAppModal
         open={packageOpen}

@@ -293,11 +293,14 @@ export function formatScanTime(iso: string | null): string {
   });
 }
 
-export const pythonAgentScript = `# nethub_agent.py — agente de escaneo ARP para Windows
+export const pythonAgentScript = `# nethub_agent.py — agente de escaneo ARP + ping + Wake-on-LAN para Windows
 # Requisitos: Python 3.9+ (no necesita dependencias externas)
-# Uso:  python nethub_agent.py     ->  http://localhost:8765/scan
+# Endpoints:  /scan   /ping?ip=192.168.1.20   /wol?mac=AA:BB:CC:DD:EE:FF
 import json, re, socket, subprocess, uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import urlparse, parse_qs
+
+TIME_RE = re.compile(r"(?:tiempo|time)[=<]\\s*(\\d+(?:[.,]\\d+)?)\\s*ms", re.IGNORECASE)
 
 IP_RE = re.compile(r"(\\d{1,3}(?:\\.\\d{1,3}){3})")
 MAC_RE = re.compile(r"([0-9a-fA-F]{2}(?:[:-][0-9a-fA-F]{2}){5})")
@@ -348,11 +351,55 @@ def scan():
     return hosts
 
 
+def ping(ip):
+    """Ping ICMP real: 1 paquete, 1 segundo de espera."""
+    if not re.fullmatch(r"\\d{1,3}(?:\\.\\d{1,3}){3}", ip or ""):
+        return {"ok": False, "rtt": None}
+    out = subprocess.run(
+        ["ping", "-n", "1", "-w", "1000", ip],
+        capture_output=True, text=True, shell=True,
+    ).stdout
+    found = TIME_RE.search(out)
+    if found:
+        return {"ok": True, "rtt": float(found.group(1).replace(",", "."))}
+    if "TTL=" in out.upper():
+        return {"ok": True, "rtt": 0.0}
+    return {"ok": False, "rtt": None}
+
+
+def wol(mac):
+    """Envía el Magic Packet de Wake-on-LAN por UDP al puerto 9 en difusión."""
+    clean = re.sub(r"[^0-9a-fA-F]", "", mac or "")
+    if len(clean) != 12:
+        return False
+    packet = b"\\xff" * 6 + bytes.fromhex(clean) * 16
+    sent = False
+    for target in ("255.255.255.255", "192.168.255.255"):
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            sock.sendto(packet, (target, 9))
+            sock.close()
+            sent = True
+        except Exception:
+            pass
+    return sent
+
+
 class Handler(BaseHTTPRequestHandler):
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "*")
+
+    def _json(self, payload, code=200):
+        body = json.dumps(payload).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self._cors()
+        self.end_headers()
+        self.wfile.write(body)
 
     def do_OPTIONS(self):
         self.send_response(204)
@@ -360,34 +407,36 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        if self.path.rstrip("/") != "/scan":
-            self.send_response(404)
-            self._cors()
-            self.end_headers()
-            return
-        body = json.dumps({"devices": scan()}).encode()
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self._cors()
-        self.end_headers()
-        self.wfile.write(body)
+        parsed = urlparse(self.path)
+        route = parsed.path.rstrip("/") or "/"
+        query = parse_qs(parsed.query)
+
+        if route == "/scan":
+            self._json({"devices": scan()})
+        elif route == "/ping":
+            self._json(ping((query.get("ip") or [""])[0]))
+        elif route == "/wol":
+            ok = wol((query.get("mac") or [""])[0])
+            self._json({"ok": ok}, 200 if ok else 400)
+        else:
+            self._json({"error": "not found"}, 404)
 
     def log_message(self, *args):
         pass
 
 
 if __name__ == "__main__":
-    print("NetHub agent escuchando en http://localhost:8765/scan")
+    print("NetHub agent escuchando en http://localhost:8765 (/scan, /ping, /wol)")
     HTTPServer(("127.0.0.1", 8765), Handler).serve_forever()
 `;
 
-export const powershellAgentScript = `# nethub-agent.ps1 — agente de escaneo ARP para Windows (PowerShell 5+)
+export const powershellAgentScript = `# nethub-agent.ps1 — agente de escaneo ARP + ping + Wake-on-LAN (PowerShell 5+)
 # Uso:  powershell -ExecutionPolicy Bypass -File .\\nethub-agent.ps1
+# Endpoints:  /scan   /ping?ip=192.168.1.20   /wol?mac=AA:BB:CC:DD:EE:FF
 $listener = [System.Net.HttpListener]::new()
 $listener.Prefixes.Add("http://localhost:8765/")
 $listener.Start()
-Write-Host "NetHub agent escuchando en http://localhost:8765/scan"
+Write-Host "NetHub agent escuchando en http://localhost:8765 (/scan, /ping, /wol)"
 
 function Get-NetBiosNameMap {
   $names = @{}
@@ -464,6 +513,35 @@ function Get-ArpDevices {
   return @($rows | Where-Object { $_ -ne $null })
 }
 
+function Invoke-PingHost($ip) {
+  if (-not ($ip -match '^\\d{1,3}(\\.\\d{1,3}){3}$')) { return @{ ok = $false; rtt = $null } }
+  try {
+    $reply = (New-Object System.Net.NetworkInformation.Ping).Send($ip, 1000)
+    if ($reply.Status -eq 'Success') { return @{ ok = $true; rtt = [int]$reply.RoundtripTime } }
+  } catch {}
+  return @{ ok = $false; rtt = $null }
+}
+
+function Send-WolPacket($mac) {
+  $clean = ($mac -replace '[^0-9a-fA-F]', '')
+  if ($clean.Length -ne 12) { return $false }
+  try {
+    $macBytes = New-Object byte[] 6
+    for ($i = 0; $i -lt 6; $i++) { $macBytes[$i] = [Convert]::ToByte($clean.Substring($i * 2, 2), 16) }
+    $packet = New-Object System.Collections.Generic.List[byte]
+    for ($i = 0; $i -lt 6; $i++) { $packet.Add([byte]0xFF) }
+    for ($i = 0; $i -lt 16; $i++) { $packet.AddRange($macBytes) }
+    $bytes = $packet.ToArray()
+    $udp = New-Object System.Net.Sockets.UdpClient
+    $udp.EnableBroadcast = $true
+    $udp.Connect([System.Net.IPAddress]::Broadcast, 9)
+    [void]$udp.Send($bytes, $bytes.Length)
+    $udp.Close()
+    return $true
+  } catch {}
+  return $false
+}
+
 while ($listener.IsListening) {
   $ctx = $listener.GetContext()
   $res = $ctx.Response
@@ -477,13 +555,18 @@ while ($listener.IsListening) {
     continue
   }
 
-  if ($ctx.Request.Url.AbsolutePath.TrimEnd('/') -ne "/scan") {
-    $res.StatusCode = 404
-    $res.Close()
-    continue
+  $route = $ctx.Request.Url.AbsolutePath.TrimEnd('/')
+  if ($route -eq '') { $route = '/' }
+  $payload = $null
+
+  switch ($route) {
+    '/scan' { $payload = @{ devices = (Get-ArpDevices) } }
+    '/ping' { $payload = (Invoke-PingHost $ctx.Request.QueryString['ip']) }
+    '/wol'  { $payload = @{ ok = (Send-WolPacket $ctx.Request.QueryString['mac']) } }
+    default { $payload = @{ error = 'not found' }; $res.StatusCode = 404 }
   }
 
-  $json = @{ devices = (Get-ArpDevices) } | ConvertTo-Json -Depth 4
+  $json = $payload | ConvertTo-Json -Depth 4
   $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
   $res.ContentType = "application/json"
   $res.ContentLength64 = $bytes.Length

@@ -46,6 +46,10 @@ export interface Device {
   servicesScannedAt?: string;
   /** El usuario ha editado manualmente nombre, tipo o fabricante */
   manualEdit?: boolean;
+  /** Red / router al que pertenece (asignada a mano; si falta se deduce por subred) */
+  networkId?: string;
+  /** Últimas medidas de latencia (ms), la más reciente al final */
+  latency?: Array<{ rtt: number | null; at: string }>;
 }
 
 export const deviceTypeLabels: Record<DeviceType, string> = {
