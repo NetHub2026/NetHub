@@ -34,6 +34,14 @@ function guessType(name: string, vendor: string): DeviceType {
     return "console";
   if (/tv|roku|chromecast|firestick|bravia|lg electronics|samsung/.test(text)) return "tv";
   if (/home.?assistant|hass|raspberry/.test(text)) return "home-assistant";
+  if (/router|gateway|fritz|asuswrt|tp-link|netgear|ubiquiti|unifi|openwrt/.test(text))
+    return "router";
+  if (/printer|impresora|brother|epson|canon|hp /.test(text)) return "printer";
+  if (/cam|camera|reolink|hikvision|dahua|tapo/.test(text)) return "camera";
+  if (/echo|alexa|sonos|homepod|nest.?(mini|audio)|speaker|altavoz/.test(text))
+    return "speaker";
+  if (/iphone|ipad|android|pixel|phone|movil|m[oó]vil|tablet|xiaomi|redmi|oneplus/.test(text))
+    return "phone";
   if (/pc|desktop|laptop|macbook|apple|asus|msi|lenovo|dell|intel/.test(text)) return "pc";
   return "iot";
 }
@@ -124,10 +132,13 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
       ip: fresh.ip,
       status: fresh.status,
       lastSeen: fresh.lastSeen,
+      // El nombre, tipo y fabricante editados a mano nunca se sobrescriben.
+      name: old.name,
+      type: old.type,
       vendor: old.vendor || fresh.vendor,
       firstSeenAt: old.firstSeenAt ?? now,
       isNew: old.trusted ? false : (old.isNew ?? false),
-      ...(brand ? { brand } : {}),
+      ...(brand && !old.manualEdit ? { brand } : {}),
     };
     return result;
   });
@@ -292,18 +303,43 @@ $listener.Prefixes.Add("http://localhost:8765/")
 $listener.Start()
 Write-Host "NetHub agent escuchando en http://localhost:8765/scan"
 
+function Resolve-HostName([string]$ip) {
+  # 1) DNS inverso del sistema (rápido en redes con router que publica nombres)
+  try {
+    $entry = [System.Net.Dns]::GetHostEntry($ip)
+    if ($entry -and $entry.HostName -and $entry.HostName -ne $ip) {
+      return ($entry.HostName -split '\\.')[0]
+    }
+  } catch {}
+  # 2) Resolve-DnsName (PowerShell 5+, incluye respuestas mDNS/LLMNR del router)
+  if (Get-Command Resolve-DnsName -ErrorAction SilentlyContinue) {
+    try {
+      $ptr = Resolve-DnsName -Name $ip -Type PTR -QuickTimeout -ErrorAction Stop |
+        Select-Object -First 1
+      if ($ptr -and $ptr.NameHost) { return ($ptr.NameHost -split '\\.')[0] }
+    } catch {}
+  }
+  return $null
+}
+
 function Get-ArpDevices {
   $rows = @()
   if (Get-Command Get-NetNeighbor -ErrorAction SilentlyContinue) {
     $rows = Get-NetNeighbor -AddressFamily IPv4 |
       Where-Object { $_.State -ne 'Unreachable' -and $_.LinkLayerAddress -notmatch '^(00-00-00|FF-FF-FF)' } |
       ForEach-Object {
-        @{ ip = $_.IPAddress; mac = ($_.LinkLayerAddress -replace '-', ':'); online = $true }
+        $item = @{ ip = $_.IPAddress; mac = ($_.LinkLayerAddress -replace '-', ':'); online = $true }
+        $hostName = Resolve-HostName $_.IPAddress
+        if ($hostName) { $item.name = $hostName }
+        $item
       }
   } else {
     $rows = (arp -a) | ForEach-Object {
       if ($_ -match '(\\d{1,3}(\\.\\d{1,3}){3})\\s+([0-9a-fA-F-]{17})') {
-        @{ ip = $matches[1]; mac = ($matches[3].ToUpper() -replace '-', ':'); online = $true }
+        $item = @{ ip = $matches[1]; mac = ($matches[3].ToUpper() -replace '-', ':'); online = $true }
+        $hostName = Resolve-HostName $matches[1]
+        if ($hostName) { $item.name = $hostName }
+        $item
       }
     }
   }
