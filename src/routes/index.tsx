@@ -589,7 +589,10 @@ function Dashboard() {
         onDelete={remove}
         networks={detectedNetworks}
       />
+
+      <UpdateModal open={updateOpen} onClose={() => setUpdateOpen(false)} />
     </div>
+
   );
 }
 
