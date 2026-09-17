@@ -34,17 +34,29 @@ echo ============================================
 echo.
 
 
-echo [1/3] Instalando dependencias...
+echo [1/4] Instalando dependencias...
 call npm install
 if errorlevel 1 goto error
 
 echo.
-echo [2/3] Compilando la aplicacion...
+echo [2/4] Compilando la aplicacion...
 call npm run build
 if errorlevel 1 goto error
 
 echo.
-echo [3/3] Empaquetando el ejecutable portable...
+echo [3/4] Comprobando los archivos web compilados...
+call node scripts\ensure-index-html.mjs
+if not exist ".output\public\index.html" (
+    if not exist "dist\client\index.html" (
+        if not exist "dist\index.html" (
+            echo No se ha podido generar index.html. Revisa la compilacion.
+            goto error
+        )
+    )
+)
+
+echo.
+echo [4/4] Empaquetando el ejecutable portable...
 call npx electron-builder --win portable
 if errorlevel 1 goto error
 

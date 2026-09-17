@@ -256,7 +256,20 @@ function startAgentServer() {
 /** Raíces posibles de la app compilada, en orden de preferencia. */
 function staticRoots() {
   const roots = [];
-  for (const base of [path.join(__dirname, ".."), process.resourcesPath || "", path.join(process.resourcesPath || "", "app")]) {
+  let appPath = "";
+  try {
+    appPath = app.getAppPath();
+  } catch {
+    appPath = "";
+  }
+  const bases = [
+    path.join(__dirname, ".."),
+    appPath,
+    process.resourcesPath || "",
+    path.join(process.resourcesPath || "", "app"),
+    path.join(process.resourcesPath || "", "app.asar"),
+  ];
+  for (const base of bases) {
     if (!base) continue;
     roots.push(
       path.join(base, "dist", "client"),
@@ -267,8 +280,47 @@ function staticRoots() {
   return roots;
 }
 
+/**
+ * Si existe la carpeta compilada pero falta index.html (build sin prerender),
+ * genera uno mínimo enlazando los bundles encontrados en assets/.
+ */
+function ensureIndexHtml(dir) {
+  try {
+    const indexFile = path.join(dir, "index.html");
+    if (fs.existsSync(indexFile)) return true;
+    if (!fs.existsSync(dir)) return false;
+    const assetsDir = path.join(dir, "assets");
+    if (!fs.existsSync(assetsDir)) return false;
+    const files = fs.readdirSync(assetsDir);
+    const js = files.filter((f) => f.endsWith(".js") && /^(index|client|main|entry)/i.test(f));
+    const css = files.filter((f) => f.endsWith(".css"));
+    if (!js.length) return false;
+    const html = `<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NetHub</title>
+${css.map((f) => `    <link rel="stylesheet" href="/assets/${f}" />`).join("\n")}
+  </head>
+  <body>
+    <div id="root"></div>
+${js.map((f) => `    <script type="module" src="/assets/${f}"></script>`).join("\n")}
+  </body>
+</html>
+`;
+    fs.writeFileSync(indexFile, html, "utf8");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function resolveStaticRoot() {
-  return staticRoots().find((dir) => fs.existsSync(path.join(dir, "index.html"))) || null;
+  const roots = staticRoots();
+  const direct = roots.find((dir) => fs.existsSync(path.join(dir, "index.html")));
+  if (direct) return direct;
+  return roots.find((dir) => ensureIndexHtml(dir)) || null;
 }
 
 const MIME = {
