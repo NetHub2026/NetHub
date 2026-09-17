@@ -114,6 +114,24 @@ export function DeviceDetailPanel({
 
   const privateMac = isRandomizedMac(device.mac);
 
+  const findVendorOnline = async () => {
+    setVendorLookup(true);
+    setVendorNote(null);
+    const resolved = await resolveVendor(device.mac, device.name);
+    setVendorLookup(false);
+    if (resolved.vendor && resolved.vendor !== device.vendor) {
+      onUpdate({ ...device, vendor: resolved.vendor, brand: resolved.brand });
+      setVendorNote(`Fabricante actualizado: ${resolved.vendor}.`);
+      return;
+    }
+    setVendorNote(
+      privateMac
+        ? "La dirección es privada, no hay fabricante que consultar."
+        : "No se ha encontrado más información. Con el agente en marcha la búsqueda es más fiable.",
+    );
+  };
+
+
   const rows: Array<[string, string]> = [
     ["Dirección IP", device.ip],
     ["Dirección MAC", device.mac + (privateMac ? " · privada" : "")],
