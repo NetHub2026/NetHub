@@ -58,12 +58,15 @@ export function DeviceDetailPanel({
   const [probing, setProbing] = useState(false);
   const [probeNote, setProbeNote] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [vendorLookup, setVendorLookup] = useState(false);
+  const [vendorNote, setVendorNote] = useState<string | null>(null);
 
   useEffect(() => {
     setTagDraft("");
     setFeedback(null);
     setProbeNote(null);
     setConfirmDelete(false);
+    setVendorNote(null);
   }, [device?.id]);
 
   useEffect(() => {
@@ -236,6 +239,30 @@ export function DeviceDetailPanel({
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none"
               />
             </span>
+            <button
+              type="button"
+              onClick={findVendorOnline}
+              disabled={vendorLookup}
+              className="mt-2 inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:border-brand hover:text-brand disabled:opacity-60"
+            >
+              {vendorLookup ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Globe className="size-3.5" />
+              )}
+              Buscar fabricante en Internet
+            </button>
+            {privateMac && (
+              <span className="mt-2 block text-[11px] text-muted-foreground">
+                {PRIVATE_MAC_LABEL}: este equipo oculta su dirección real, así que el
+                fabricante no puede deducirse.
+              </span>
+            )}
+            {vendorNote && (
+              <span className="mt-1 block text-[11px] text-muted-foreground">
+                {vendorNote}
+              </span>
+            )}
           </label>
           <label className="block">
             <span className="text-xs text-muted-foreground">Red / router</span>
