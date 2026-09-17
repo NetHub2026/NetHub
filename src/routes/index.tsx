@@ -340,11 +340,35 @@ function Dashboard() {
               Empaquetar App Portable
             </button>
             <button
+              onClick={() => {
+                exportInventoryJson(items);
+                setNotice(
+                  `Inventario exportado en JSON con ${items.length} dispositivos, etiquetas y notas incluidas.`,
+                );
+              }}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <Download className="size-3.5" />
+              Exportar inventario (JSON)
+            </button>
+            <button
+              onClick={() => {
+                exportInventoryCsv(items);
+                setNotice(
+                  `Inventario exportado en CSV con ${items.length} dispositivos, listo para hoja de cálculo.`,
+                );
+              }}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <FileSpreadsheet className="size-3.5" />
+              Exportar inventario (CSV)
+            </button>
+            <button
               onClick={() => downloadDevicesJson(items)}
               className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               <Download className="size-3.5" />
-              Exportar devices-db.json
+              devices-db.json
             </button>
             <button
               onClick={resetDemo}
