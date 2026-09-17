@@ -16,7 +16,7 @@ import {
 import { deviceTypeLabels, type Device, type DeviceType } from "@/lib/devices";
 import { DeviceTypeIcon } from "./DeviceTypeIcon";
 import { PingCard } from "./PingCard";
-import { detectNetworkId, networks } from "@/lib/networks";
+import { detectNetworkId, type NetworkDef } from "@/lib/networks";
 import {
   PRIVATE_MAC_LABEL,
   isRandomizedMac,
@@ -45,6 +45,8 @@ interface DeviceDetailPanelProps {
   onClose: () => void;
   onUpdate: (device: Device) => void;
   onDelete: (device: Device) => void;
+  /** Subredes detectadas dinámicamente en el inventario. */
+  networks?: NetworkDef[];
 }
 
 export function DeviceDetailPanel({
@@ -52,6 +54,7 @@ export function DeviceDetailPanel({
   onClose,
   onUpdate,
   onDelete,
+  networks = [],
 }: DeviceDetailPanelProps) {
   const [tagDraft, setTagDraft] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
