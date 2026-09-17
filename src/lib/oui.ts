@@ -739,7 +739,7 @@ export async function resolveVendor(mac: string, hostname?: string | null): Prom
   for (const url of urls) {
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 2500);
+      const timer = setTimeout(() => controller.abort(), 900);
       const res = await fetch(url, { signal: controller.signal, cache: "no-store" });
       clearTimeout(timer);
       if (!res.ok) continue;
