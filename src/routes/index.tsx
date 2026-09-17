@@ -427,9 +427,52 @@ function Dashboard() {
           </section>
         )}
 
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat
-            icon={<Wifi className="size-4" />}
+        {showEmpty && (
+          <section className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
+            <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-brand/15 text-brand">
+              <Radar className="size-7" />
+            </div>
+            <h2 className="mt-4 text-lg font-semibold">Todavía no hay dispositivos</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+              Escanea tu red para descubrir automáticamente PCs, consolas, Smart TVs,
+              Home Assistant e IoT, o importa un archivo con tus datos si ya los tienes.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+              <button
+                onClick={scan}
+                disabled={scanning}
+                className="inline-flex items-center gap-2 rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-brand-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+              >
+                {scanning ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Radar className="size-4" />
+                )}
+                {scanning ? "Escaneando…" : "Escanear red"}
+              </button>
+              <button
+                onClick={() => setImportOpen(true)}
+                className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <Upload className="size-4" />
+                Importar dispositivos
+              </button>
+              <button
+                onClick={() => setSetupOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+              >
+                <Settings2 className="size-3.5" />
+                Cómo configurar el escáner
+              </button>
+            </div>
+          </section>
+        )}
+
+        {!showEmpty && (
+          <>
+            <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Stat
+                icon={<Wifi className="size-4" />}
             label="Dispositivos activos"
             value={`${online.length}`}
             hint={`de ${items.length} conocidos`}
