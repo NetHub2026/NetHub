@@ -191,8 +191,8 @@ const AGENT_TRAFFIC_URL = "http://localhost:8765/traffic";
 function toSample(value: unknown): TrafficSample | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
-  const rx = Number(raw.rxMbps);
-  const tx = Number(raw.txMbps);
+  const rx = Number(raw["rxMbps"]);
+  const tx = Number(raw["txMbps"]);
   if (!Number.isFinite(rx) || !Number.isFinite(tx)) return null;
   return { rxMbps: Math.max(0, rx), txMbps: Math.max(0, tx), totalMbps: rx + tx };
 }
