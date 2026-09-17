@@ -389,23 +389,19 @@ $listener.Prefixes.Add("http://localhost:8765/")
 $listener.Start()
 Write-Host "NetHub agent escuchando en http://localhost:8765/scan"
 
-function Resolve-HostName([string]$ip) {
-  # 1) DNS inverso del sistema (rápido en redes con router que publica nombres)
+function Get-NetBiosNameMap {
+  $names = @{}
   try {
-    $entry = [System.Net.Dns]::GetHostEntry($ip)
-    if ($entry -and $entry.HostName -and $entry.HostName -ne $ip) {
-      return ($entry.HostName -split '\\.')[0]
+    (nbtstat -c) | ForEach-Object {
+      $line = $_.Trim()
+      if ($line -match '^([^\s<]+)\s+<\d+>\s+\S+\s+(\d{1,3}(\.\d{1,3}){3})') {
+        $name = $matches[1]
+        $ip = $matches[2]
+        if ($name -and $ip -and -not $names.ContainsKey($ip)) { $names[$ip] = $name }
+      }
     }
   } catch {}
-  # 2) Resolve-DnsName (PowerShell 5+, incluye respuestas mDNS/LLMNR del router)
-  if (Get-Command Resolve-DnsName -ErrorAction SilentlyContinue) {
-    try {
-      $ptr = Resolve-DnsName -Name $ip -Type PTR -QuickTimeout -ErrorAction Stop |
-        Select-Object -First 1
-      if ($ptr -and $ptr.NameHost) { return ($ptr.NameHost -split '\\.')[0] }
-    } catch {}
-  }
-  return $null
+  return $names
 }
 
 function Get-LocalDevice {
