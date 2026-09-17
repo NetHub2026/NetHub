@@ -9,6 +9,7 @@
 - Puertos y servicios comunes en el detalle del dispositivo con enlaces al panel de administración.
 - Edición individual: tipo con icono, nombre, fabricante, eliminación/olvido y preservación de cambios manuales.
 - Mejoras actuales: selector con contraste correcto, OUI ampliada con resolución externa/fallback por hostname y etiquetas rápidas.
+- Scripts del agente actualizados para incluir el propio PC local con nombre, IP, MAC, tipo PC y etiquetas.
 
 ## Pendiente
-- Añadir el propio PC local a los scripts Python y PowerShell del agente de escaneo.
+- Ninguna tarea abierta.
