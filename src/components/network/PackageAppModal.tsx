@@ -9,7 +9,83 @@ interface PackageAppModalProps {
   runtimeLabel: string;
 }
 
-type Tab = "tauri" | "electron";
+type Tab = "bat" | "tauri" | "electron";
+
+const buildBat = `@echo off
+REM ============================================================
+REM  build-portable.bat  ·  crea NetHub.exe con un solo clic
+REM  Guarda este fichero en una carpeta vacia y haz doble clic.
+REM ============================================================
+setlocal enabledelayedexpansion
+title NetHub - Crear aplicacion portable
+cd /d "%~dp0"
+
+where node >nul 2>nul
+if errorlevel 1 (
+  echo [!] Falta Node.js. Instalalo desde https://nodejs.org (version LTS) y repite.
+  pause & exit /b 1
+)
+
+REM 1) Codigo fuente: si no esta, se descarga del repositorio
+if not exist "package.json" (
+  if not exist "nethub\\package.json" (
+    where git >nul 2>nul
+    if errorlevel 1 (
+      echo [!] Falta Git. Instalalo desde https://git-scm.com y repite.
+      pause & exit /b 1
+    )
+    echo [1/5] Descargando el codigo...
+    git clone %NETHUB_REPO% nethub || (echo [!] Define NETHUB_REPO con la URL de tu repositorio. & pause & exit /b 1)
+  )
+  cd nethub
+)
+
+echo [2/5] Instalando dependencias...
+call npm install || (pause & exit /b 1)
+call npm install --save-dev electron electron-builder || (pause & exit /b 1)
+
+echo [3/5] Compilando la interfaz...
+call npm run build || (pause & exit /b 1)
+
+echo [4/5] Generando el ejecutable portable...
+call npx electron-builder --win portable || (pause & exit /b 1)
+
+echo [5/5] Copiando NetHub.exe...
+for %%F in ("release\\*.exe") do copy /y "%%F" "%~dp0NetHub.exe" >nul
+
+echo.
+echo  Listo: %~dp0NetHub.exe
+echo  Tus datos se guardaran en devices-db.json junto al .exe
+pause`;
+
+const updateBat = `@echo off
+REM ============================================================
+REM  update-portable.bat  ·  actualiza NetHub sin perder datos
+REM  devices-db.json NUNCA se toca: vive junto al .exe
+REM ============================================================
+setlocal
+title NetHub - Actualizar aplicacion portable
+cd /d "%~dp0"
+
+if not exist "nethub\\package.json" (
+  echo [!] No encuentro el codigo. Ejecuta primero build-portable.bat
+  pause & exit /b 1
+)
+
+cd nethub
+echo [1/4] Descargando la ultima version...
+call git pull || (pause & exit /b 1)
+echo [2/4] Actualizando dependencias...
+call npm install || (pause & exit /b 1)
+echo [3/4] Compilando...
+call npm run build && call npx electron-builder --win portable || (pause & exit /b 1)
+
+echo [4/4] Reemplazando el ejecutable...
+for %%F in ("release\\*.exe") do copy /y "%%F" "%~dp0NetHub.exe" >nul
+
+echo.
+echo  Actualizado. devices-db.json se ha conservado intacto.
+pause`;
 
 const tauriCommands = `# 1) Dependencias de Tauri (una sola vez)
 npm install -D @tauri-apps/cli
@@ -124,7 +200,7 @@ export function PackageAppModal({
   dbPath,
   runtimeLabel,
 }: PackageAppModalProps) {
-  const [tab, setTab] = useState<Tab>("tauri");
+  const [tab, setTab] = useState<Tab>("bat");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   useEffect(() => {
@@ -145,18 +221,32 @@ export function PackageAppModal({
     }
   };
 
-  const blocks: Array<{ key: string; title: string; code: string }> =
-    tab === "tauri"
-      ? [
-          { key: "t-cmd", title: "Comandos (PowerShell)", code: tauriCommands },
-          { key: "t-conf", title: "src-tauri/tauri.conf.json", code: tauriConfig },
-        ]
-      : [
-          { key: "e-cmd", title: "Comandos (PowerShell)", code: electronCommands },
-          { key: "e-main", title: "electron/main.cjs", code: electronMain },
-          { key: "e-pre", title: "electron/preload.cjs", code: electronPreload },
-          { key: "e-pkg", title: "package.json + vite.config.ts", code: electronPackageJson },
-        ];
+  const blockSets: Record<Tab, Array<{ key: string; title: string; code: string }>> = {
+    bat: [
+      { key: "b-build", title: "build-portable.bat", code: buildBat },
+      { key: "b-update", title: "update-portable.bat", code: updateBat },
+      { key: "b-main", title: "electron/main.cjs (datos junto al .exe)", code: electronMain },
+      { key: "b-pre", title: "electron/preload.cjs", code: electronPreload },
+      { key: "b-pkg", title: "package.json + vite.config.ts", code: electronPackageJson },
+    ],
+    tauri: [
+      { key: "t-cmd", title: "Comandos (PowerShell)", code: tauriCommands },
+      { key: "t-conf", title: "src-tauri/tauri.conf.json", code: tauriConfig },
+    ],
+    electron: [
+      { key: "e-cmd", title: "Comandos (PowerShell)", code: electronCommands },
+      { key: "e-main", title: "electron/main.cjs", code: electronMain },
+      { key: "e-pre", title: "electron/preload.cjs", code: electronPreload },
+      { key: "e-pkg", title: "package.json + vite.config.ts", code: electronPackageJson },
+    ],
+  };
+  const blocks = blockSets[tab];
+
+  const tabLabels: Record<Tab, string> = {
+    bat: "Un solo clic (.bat)",
+    tauri: "Tauri (.exe ~6 MB)",
+    electron: "Electron Builder",
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-8">
@@ -210,8 +300,8 @@ export function PackageAppModal({
           </div>
         </dl>
 
-        <div className="mt-5 flex gap-2">
-          {(["tauri", "electron"] as Tab[]).map((t) => (
+        <div className="mt-5 flex flex-wrap gap-2">
+          {(["bat", "tauri", "electron"] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -222,13 +312,25 @@ export function PackageAppModal({
                   : "border-border text-muted-foreground hover:bg-accent hover:text-foreground",
               )}
             >
-              {t === "tauri" ? "Tauri (.exe ~6 MB)" : "Electron Builder"}
+              {tabLabels[t]}
             </button>
           ))}
         </div>
 
         <p className="mt-4 rounded-xl border border-border bg-muted/40 p-4 text-xs text-muted-foreground">
-          {tab === "tauri" ? (
+          {tab === "bat" ? (
+            <>
+              Guarda los dos ficheros <code className="font-mono">.bat</code> en una carpeta
+              vacía (por ejemplo en un pendrive) y haz doble clic en{" "}
+              <code className="font-mono">build-portable.bat</code>: descarga el código,
+              compila y deja <code className="font-mono">NetHub.exe</code> listo. Solo
+              necesitas Node.js y Git. Para actualizar en el futuro, ejecuta{" "}
+              <code className="font-mono">update-portable.bat</code> o sustituye el{" "}
+              <code className="font-mono">.exe</code>: tu{" "}
+              <code className="font-mono">devices-db.json</code> se queda intacto junto al
+              ejecutable.
+            </>
+          ) : tab === "tauri" ? (
             <>
               Requisitos en Windows: Rust (rustup) y «Visual Studio Build Tools» con el
               paquete C++. El ejecutable queda en{" "}
