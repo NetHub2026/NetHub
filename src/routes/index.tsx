@@ -312,6 +312,43 @@ function Dashboard() {
           </p>
         )}
 
+        {intruders.length > 0 && (
+          <section className="mb-6 rounded-2xl border border-warning/40 bg-warning/10 p-5">
+            <div className="flex flex-wrap items-start gap-4">
+              <ShieldAlert className="mt-0.5 size-5 shrink-0 text-warning" />
+              <div className="min-w-0 flex-1">
+                <h2 className="text-sm font-semibold text-warning">
+                  {intruders.length} dispositivo{intruders.length > 1 ? "s" : ""} nuevo
+                  {intruders.length > 1 ? "s" : ""} en tu red
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Visto{intruders.length > 1 ? "s" : ""} por primera vez en el último
+                  escaneo:{" "}
+                  {intruders
+                    .slice(0, 4)
+                    .map((d) => `${d.name} (${d.ip})`)
+                    .join(", ")}
+                  {intruders.length > 4 ? "…" : ""}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedId(intruders[0]!.id)}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-warning/50 px-3 py-1.5 text-xs text-warning transition-colors hover:bg-warning/15"
+                  >
+                    <Sparkles className="size-3.5" /> Revisar el primero
+                  </button>
+                  <button
+                    onClick={trustAll}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-success px-3 py-1.5 text-xs font-medium text-background transition-opacity hover:opacity-90"
+                  >
+                    <ShieldCheck className="size-3.5" /> Marcar todos como conocidos
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Stat
             icon={<Wifi className="size-4" />}
