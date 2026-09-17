@@ -10,7 +10,9 @@ import {
   Loader2,
   Moon,
   Radar,
+  RefreshCw,
   RotateCcw,
+
   Search,
   Sun,
   Wifi,
@@ -35,6 +37,7 @@ import {
   type ScannerStatus,
 } from "@/lib/scanner";
 import {
+  APP_VERSION,
   getDbPath,
   getRuntime,
   nativeScan,
@@ -53,8 +56,10 @@ import { BandwidthChart } from "@/components/network/BandwidthChart";
 import { DeviceDetailPanel } from "@/components/network/DeviceDetailPanel";
 import { NetworkTabs } from "@/components/network/NetworkTabs";
 import { SpeedTestPanel } from "@/components/network/SpeedTestPanel";
+import { UpdateModal } from "@/components/network/UpdateModal";
 import { VendorIcon } from "@/components/network/VendorIcon";
 import { DeviceTypeIcon } from "@/components/network/DeviceTypeIcon";
+
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
@@ -102,6 +107,8 @@ function Dashboard() {
   const [hydrated, setHydrated] = useState(false);
   const [runtime, setRuntime] = useState<Runtime>("web");
   const [dbPath, setDbPath] = useState("Almacenamiento del navegador (localStorage)");
+  const [updateOpen, setUpdateOpen] = useState(false);
+
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -249,10 +256,18 @@ function Dashboard() {
           <div className="flex-1">
             <h1 className="text-lg font-semibold leading-none">NetHub</h1>
             <p className="mt-1 text-xs text-muted-foreground">
-              Red doméstica · {runtimeLabels[runtime]}
+              Red doméstica · {runtimeLabels[runtime]} · v{APP_VERSION}
             </p>
           </div>
           <StatusPill status={status} />
+          <button
+            onClick={() => setUpdateOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <RefreshCw className="size-4" />
+            Actualizaciones
+          </button>
+
           <button
             onClick={scan}
             disabled={scanning}
