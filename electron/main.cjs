@@ -7,12 +7,17 @@ const path = require("node:path");
 const fs = require("node:fs");
 const os = require("node:os");
 const http = require("node:http");
+const https = require("node:https");
 const dgram = require("node:dgram");
-const { execFile } = require("node:child_process");
+const { execFile, spawn } = require("node:child_process");
 
 const DB_FILE = "devices-db.json";
 const AGENT_PORT = 8765;
 const isWindows = process.platform === "win32";
+const GITHUB_REPO = "oyogor1985/connected-clan";
+const UPDATE_ASSET = "NetHub.exe";
+const USER_AGENT = "NetHub-Updater";
+
 
 /** Carpeta del ejecutable portable (o del proyecto en desarrollo). */
 function baseDir() {
