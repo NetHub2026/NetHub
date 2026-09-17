@@ -90,23 +90,38 @@ export function DeviceDetailPanel({ device, onClose, onUpdate }: DeviceDetailPan
       <aside className="relative flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-border bg-card p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <span
-              className={cn(
-                "inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider",
-                device.status === "online"
-                  ? "bg-success/15 text-success"
-                  : "bg-muted text-muted-foreground",
-              )}
-            >
+            <div className="flex flex-wrap items-center gap-2">
               <span
                 className={cn(
-                  "size-1.5 rounded-full",
-                  device.status === "online" ? "bg-success" : "bg-muted-foreground",
+                  "inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider",
+                  device.status === "online"
+                    ? "bg-success/15 text-success"
+                    : "bg-muted text-muted-foreground",
                 )}
-              />
-              {device.status === "online" ? "Activo" : "Inactivo"}
-            </span>
-            <h2 className="mt-3 text-2xl font-semibold">{device.name}</h2>
+              >
+                <span
+                  className={cn(
+                    "size-1.5 rounded-full",
+                    device.status === "online" ? "bg-success" : "bg-muted-foreground",
+                  )}
+                />
+                {device.status === "online" ? "Activo" : "Inactivo"}
+              </span>
+              {device.isNew && !device.trusted && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-warning/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-warning">
+                  <Sparkles className="size-3" /> Nuevo
+                </span>
+              )}
+              {device.trusted && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-success/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-success">
+                  <ShieldCheck className="size-3" /> Confiable
+                </span>
+              )}
+            </div>
+            <h2 className="mt-3 flex items-center gap-2 text-2xl font-semibold">
+              <VendorIcon brand={device.brand} className="text-brand" />
+              {device.name}
+            </h2>
             <p className="font-mono text-sm text-muted-foreground">{device.ip}</p>
           </div>
           <button
@@ -118,6 +133,21 @@ export function DeviceDetailPanel({ device, onClose, onUpdate }: DeviceDetailPan
           </button>
         </div>
 
+        {device.isNew && !device.trusted && (
+          <div className="mt-4 rounded-xl border border-warning/40 bg-warning/10 p-4">
+            <p className="text-sm text-warning">
+              Este dispositivo apareció por primera vez en el último escaneo. Si lo
+              reconoces, márcalo como conocido para dejar de recibir avisos.
+            </p>
+            <button
+              onClick={() => onUpdate({ ...device, trusted: true, isNew: false })}
+              className="mt-3 inline-flex items-center gap-2 rounded-md bg-success px-3 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+            >
+              <ShieldCheck className="size-4" /> Marcar como conocido / confiable
+            </button>
+          </div>
+        )}
+
         <dl className="mt-6 divide-y divide-border rounded-xl border border-border">
           {rows.map(([label, value]) => (
             <div key={label} className="flex items-center justify-between gap-4 px-4 py-3">
@@ -127,11 +157,89 @@ export function DeviceDetailPanel({ device, onClose, onUpdate }: DeviceDetailPan
           ))}
         </dl>
 
+        {suggestion !== device.name && (
+          <button
+            onClick={() => onUpdate({ ...device, name: suggestion })}
+            className="mt-3 w-full rounded-xl border border-dashed border-border px-4 py-3 text-left text-xs text-muted-foreground transition-colors hover:border-brand hover:text-foreground"
+          >
+            Nombre sugerido por fabricante:{" "}
+            <span className="font-medium text-foreground">{suggestion}</span> · pulsa para
+            aplicarlo
+          </button>
+        )}
+
         {device.notes && (
           <p className="mt-4 rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
             {device.notes}
           </p>
         )}
+
+        <div className="mt-8 flex items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Puertos y servicios
+          </h3>
+          <button
+            onClick={probe}
+            disabled={probing}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs transition-colors hover:bg-accent disabled:opacity-60"
+          >
+            {probing ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Radar className="size-3.5" />
+            )}
+            {probing ? "Sondeando…" : "Detectar"}
+          </button>
+        </div>
+        {suggested && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Servicios probables según el tipo de dispositivo. Pulsa «Detectar» para
+            comprobarlos.
+          </p>
+        )}
+        <div className="mt-3 space-y-2">
+          {services.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Sin servicios conocidos para este dispositivo.
+            </p>
+          )}
+          {services.map((s) => (
+            <div
+              key={s.port}
+              className="flex items-center gap-3 rounded-xl border border-border px-4 py-3"
+            >
+              <span className="w-14 shrink-0 font-mono text-xs text-muted-foreground">
+                :{s.port}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">{s.label}</span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {s.hint}
+                </span>
+              </span>
+              {s.url ? (
+                <a
+                  href={s.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-brand px-2.5 py-1.5 text-xs font-medium text-brand-foreground transition-opacity hover:opacity-90"
+                >
+                  Abrir <ExternalLink className="size-3" />
+                </a>
+              ) : (
+                <span className="shrink-0 text-[11px] text-muted-foreground">
+                  sin panel web
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+        {probeNote && (
+          <p className="mt-3 rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            {probeNote}
+          </p>
+        )}
+
 
         <h3 className="mt-6 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Etiquetas
