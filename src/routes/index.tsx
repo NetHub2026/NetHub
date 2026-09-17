@@ -30,6 +30,7 @@ import {
   clearStoredData,
   fetchFromAgent,
   formatScanTime,
+  enrichDevicesWithResolvedVendors,
   loadScanMeta,
   mergeScan,
   newDevices,
@@ -65,11 +66,13 @@ export const Route = createFileRoute("/")({
           "Monitoriza y gestiona los dispositivos de tu red doméstica: PCs, consolas, Smart TVs, Home Assistant e IoT, con consumo de ancho de banda y control por dispositivo.",
       },
       { property: "og:title", content: "NetHub — Panel de red doméstica" },
+      { property: "og:type", content: "website" },
       {
         property: "og:description",
         content:
           "Vista general de la red, filtros por tipo de dispositivo y panel de detalle con control y etiquetado.",
       },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: Dashboard,
@@ -127,8 +130,9 @@ function Dashboard() {
   }, [items, hydrated]);
 
   /** Fusiona el escaneo con la lista conocida y devuelve cuántos son nuevos. */
-  const applyScan = (devices: Device[], source: NonNullable<ScanMeta["source"]>) => {
-    const merged = mergeScan(items, devices);
+  const applyScan = async (devices: Device[], source: NonNullable<ScanMeta["source"]>) => {
+    const resolved = await enrichDevicesWithResolvedVendors(devices);
+    const merged = mergeScan(items, resolved);
     setItems(merged);
     void saveDevicesAnywhere(merged);
     const next: ScanMeta = { lastScanAt: new Date().toISOString(), source };
@@ -149,7 +153,7 @@ function Dashboard() {
       const native = await nativeScan();
       if (native && native.length > 0) {
         setStatus("connected");
-        const fresh = applyScan(native, "native");
+        const fresh = await applyScan(native, "native");
         setNotice(
           `Escaneo nativo completado: ${native.length} dispositivos detectados` +
             (fresh > 0 ? ` · ${fresh} nuevos.` : "."),
@@ -159,7 +163,7 @@ function Dashboard() {
       // 2) Fallback: agente local en http://localhost:8765/scan.
       const devices = await fetchFromAgent();
       setStatus("connected");
-      const fresh = applyScan(devices, "agent");
+      const fresh = await applyScan(devices, "agent");
       setNotice(
         `Escaneo completado: ${devices.length} dispositivos detectados` +
           (fresh > 0 ? ` · ${fresh} nuevos.` : "."),
@@ -517,8 +521,13 @@ function Dashboard() {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onImport={(devices, source) => {
-          applyScan(devices, source);
-          setNotice(`Importados ${devices.length} dispositivos y guardados localmente.`);
+          void (async () => {
+            const fresh = await applyScan(devices, source);
+            setNotice(
+              `Importados ${devices.length} dispositivos y guardados localmente` +
+                (fresh > 0 ? ` · ${fresh} nuevos.` : "."),
+            );
+          })();
         }}
       />
       <PackageAppModal
