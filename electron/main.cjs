@@ -205,6 +205,7 @@ ipcMain.handle("nethub:scan", () => scanNetwork());
 ipcMain.handle("nethub:path", () => dbPath());
 ipcMain.handle("nethub:ping", (_e, ip) => pingIp(ip));
 ipcMain.handle("nethub:wol", (_e, mac) => sendWol(mac));
+ipcMain.handle("nethub:traffic", () => readTraffic());
 
 /* ------------------------------------------------------------------ */
 /* Servidor HTTP de respaldo (compatibilidad con el agente local)      */

@@ -415,12 +415,18 @@ function Dashboard() {
 
         <section className="mt-6 rounded-2xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-base font-semibold">Ancho de banda (24 h)</h2>
-            <p className="text-xs text-muted-foreground">
-              Datos simulados · listo para conectar a la API del router
-            </p>
+            <h2 className="text-base font-semibold">
+              Tráfico en tiempo real (últimos 60 s)
+            </h2>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">
+              <span className="relative flex size-2">
+                <span className="absolute inline-flex size-2 animate-ping rounded-full bg-emerald-500 opacity-75" />
+                <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+              </span>
+              En vivo
+            </span>
           </div>
-          <BandwidthChart data={bandwidthSeries} />
+          <BandwidthChart />
         </section>
 
         <SpeedTestPanel />
