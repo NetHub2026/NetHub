@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   Activity,
   ArrowDownUp,
@@ -15,6 +16,7 @@ import {
 
   Search,
   Sun,
+  Timer,
   Wifi,
   WifiOff,
 } from "lucide-react";
