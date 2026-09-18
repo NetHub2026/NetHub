@@ -402,6 +402,25 @@ IP_RE = re.compile(r"(\\d{1,3}(?:\\.\\d{1,3}){3})")
 MAC_RE = re.compile(r"([0-9a-fA-F]{2}(?:[:-][0-9a-fA-F]{2}){5})")
 
 
+def connection_tag_for_windows():
+    try:
+        ps = (
+            "Get-NetIPConfiguration | "
+            "Where-Object {$_.IPv4Address -and $_.NetAdapter.Status -eq 'Up' -and $_.NetAdapter.HardwareInterface} | "
+            "Sort-Object { if ($_.IPv4DefaultGateway) { 0 } else { 1 } } | Select-Object -First 1 | "
+            "ForEach-Object { $a=Get-NetAdapter -InterfaceIndex $_.InterfaceIndex; "
+            "($a.Name + ' ' + $a.InterfaceDescription + ' ' + $a.MediaType + ' ' + $a.NdisPhysicalMedium) }"
+        )
+        out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, timeout=2).stdout.lower()
+        if re.search(r"wi-?fi|wireless|wlan|802\.11|inal[aá]mbrica|inalambrica", out):
+            return "Wi-Fi"
+        if re.search(r"ethernet|cable|gbe|lan|802\.3|realtek|intel|killer|marvell", out):
+            return "Cableado / Ethernet"
+    except Exception:
+        pass
+    return "Cableado / Ethernet"
+
+
 def local_device():
     hostname = socket.gethostname()
     ip = "127.0.0.1"
@@ -424,7 +443,7 @@ def local_device():
         "name": hostname,
         "type": "pc",
         "online": True,
-        "tags": ["Este equipo", "Local"],
+        "tags": ["Este equipo", "Local", connection_tag_for_windows()],
     }
 
 
@@ -689,6 +708,13 @@ function Get-NetBiosNameMap {
   return $names
 }
 
+function Get-ConnectionTag($adapter) {
+  $text = "$(if ($adapter) { $adapter.Name }) $(if ($adapter) { $adapter.InterfaceDescription }) $(if ($adapter) { $adapter.MediaType }) $(if ($adapter) { $adapter.NdisPhysicalMedium })"
+  if ($text -match '(?i)wi-?fi|wireless|wlan|802\.11|inal[aá]mbrica|inalambrica') { return 'Wi-Fi' }
+  if ($text -match '(?i)ethernet|cable|gbe|lan|802\.3|realtek|intel|killer|marvell') { return 'Cableado / Ethernet' }
+  return 'Cableado / Ethernet'
+}
+
 function Get-LocalDevice {
   $computerName = $env:COMPUTERNAME
   try {
@@ -700,7 +726,7 @@ function Get-LocalDevice {
       $ip = $config.IPv4Address.IPAddress
       $adapter = Get-NetAdapter -InterfaceIndex $config.InterfaceIndex -ErrorAction Stop
       $mac = ($adapter.MacAddress -replace '-', ':').ToUpper()
-      return @{ ip = $ip; mac = $mac; name = $computerName; type = 'pc'; online = $true; tags = @('Este equipo', 'Local') }
+      return @{ ip = $ip; mac = $mac; name = $computerName; type = 'pc'; online = $true; tags = @('Este equipo', 'Local', (Get-ConnectionTag $adapter)) }
     }
   } catch {}
 
@@ -713,7 +739,7 @@ function Get-LocalDevice {
       Select-Object -First 1
     if ($adapter -and $ip) {
       $mac = ($adapter.MacAddress -replace '-', ':').ToUpper()
-      return @{ ip = $ip.IPAddressToString; mac = $mac; name = $computerName; type = 'pc'; online = $true; tags = @('Este equipo', 'Local') }
+      return @{ ip = $ip.IPAddressToString; mac = $mac; name = $computerName; type = 'pc'; online = $true; tags = @('Este equipo', 'Local', (Get-ConnectionTag $adapter)) }
     }
   } catch {}
   return $null
