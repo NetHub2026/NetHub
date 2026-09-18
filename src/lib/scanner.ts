@@ -269,7 +269,7 @@ export function loadStoredDevices(): Device[] | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Device[]) : null;
+    return raw ? sanitizeDevices(JSON.parse(raw) as Device[]) : null;
   } catch {
     return null;
   }
@@ -278,7 +278,7 @@ export function loadStoredDevices(): Device[] | null {
 export function saveDevices(devices: Device[]) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(devices));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizeDevices(devices)));
   } catch {
     /* almacenamiento no disponible */
   }
