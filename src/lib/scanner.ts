@@ -86,6 +86,33 @@ function guessType(name: string, vendor: string): DeviceType {
   return "iot";
 }
 
+const WIFI_ONLY_TYPES = new Set<DeviceType>([
+  "smartphone",
+  "tablet",
+  "smart-plug",
+  "smart-bulb",
+  "led-strip",
+  "speaker",
+]);
+
+const CONNECTION_TAGS = [
+  "Wi-Fi",
+  "Wi-Fi 2.4GHz",
+  "Wi-Fi 5GHz",
+  "Wi-Fi 6",
+  "Cableado / Ethernet",
+];
+
+function hasConnectionTag(tags: string[]): boolean {
+  return tags.some((tag) => CONNECTION_TAGS.includes(tag));
+}
+
+function defaultTagsForType(type: DeviceType, tags: string[]): string[] {
+  if (hasConnectionTag(tags)) return tags;
+  if (WIFI_ONLY_TYPES.has(type)) return [...tags, "Wi-Fi"];
+  return tags;
+}
+
 function makeDevice(ip: string, mac: string, extra: Partial<Device> = {}): Device {
   const normalizedMac = normalizeMac(mac);
   const name = extra.name || suggestedName(normalizedMac, ip);
@@ -94,10 +121,12 @@ function makeDevice(ip: string, mac: string, extra: Partial<Device> = {}): Devic
   const vendor = extra.vendor || byHostname?.vendor || oui.vendor;
   const vendorBrand = brandFromVendorName(vendor);
   const brand = extra.brand ?? (vendorBrand !== "unknown" ? vendorBrand : byHostname?.brand ?? oui.brand);
+  const type = extra.type ? normalizeDeviceType(extra.type) : guessType(name, vendor);
+  const tags = defaultTagsForType(type, sanitizeTags(extra.tags));
   return {
     id: normalizedMac || ip,
     name,
-    type: extra.type ? normalizeDeviceType(extra.type) : guessType(name, vendor),
+    type,
     ip,
     mac: normalizedMac,
     status: extra.status ?? "online",
@@ -106,7 +135,7 @@ function makeDevice(ip: string, mac: string, extra: Partial<Device> = {}): Devic
     lastSeen: extra.lastSeen ?? "Detectado en el último escaneo",
     downstream: extra.downstream ?? 0,
     upstream: extra.upstream ?? 0,
-    tags: sanitizeTags(extra.tags),
+    tags,
   };
 }
 
@@ -116,16 +145,22 @@ const REMOVED_TAGS = ["escaneado"];
 /** Quita etiquetas obsoletas (p. ej. "Escaneado") de una lista de etiquetas. */
 export function sanitizeTags(tags?: string[]): string[] {
   if (!Array.isArray(tags)) return [];
-  return tags.filter((tag) => !REMOVED_TAGS.includes(String(tag).trim().toLowerCase()));
+  const clean = tags
+    .map((tag) => String(tag).trim())
+    .filter((tag) => tag.length > 0 && !REMOVED_TAGS.includes(tag.toLowerCase()));
+  return [...new Set(clean)];
 }
 
 /** Limpia las etiquetas obsoletas de una lista de dispositivos guardada. */
 export function sanitizeDevices(devices: Device[]): Device[] {
-  return devices.map((device) => ({
-    ...device,
-    type: normalizeDeviceType(device.type),
-    tags: sanitizeTags(device.tags),
-  }));
+  return devices.map((device) => {
+    const type = normalizeDeviceType(device.type);
+    return {
+      ...device,
+      type,
+      tags: defaultTagsForType(type, sanitizeTags(device.tags)),
+    };
+  });
 }
 
 export async function enrichDevicesWithResolvedVendors(devices: Device[]): Promise<Device[]> {
@@ -225,7 +260,7 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
     if (!old) {
       return {
         ...fresh,
-        tags: sanitizeTags(fresh.tags),
+        tags: defaultTagsForType(fresh.type, sanitizeTags(fresh.tags)),
         firstSeenAt: now,
         isNew: true,
         trusted: false,
@@ -240,7 +275,7 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
         : old.brand;
     const result: Device = {
       ...old,
-      tags: sanitizeTags(old.tags),
+      tags: defaultTagsForType(old.type, sanitizeTags(old.tags)),
       ip: fresh.ip,
       status: fresh.status,
       lastSeen: fresh.lastSeen,
@@ -259,7 +294,7 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
     .filter((d) => !seen.has(d.id))
     .map((d) => ({
       ...d,
-      tags: sanitizeTags(d.tags),
+      tags: defaultTagsForType(d.type, sanitizeTags(d.tags)),
       status: "offline" as const,
       downstream: 0,
       upstream: 0,

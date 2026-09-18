@@ -72,22 +72,10 @@ function normalizeMac(mac) {
   return mac.replace(/-/g, ":").toLowerCase();
 }
 
-/** IP y MAC de la primera interfaz activa de este equipo. */
-function localDevice() {
-  const nets = os.networkInterfaces();
-  for (const name of Object.keys(nets)) {
-    for (const net of nets[name] || []) {
-      if (net.family !== "IPv4" || net.internal) continue;
-      return {
-        ip: net.address,
-        mac: normalizeMac(net.mac || ""),
-        name: os.hostname(),
-        type: "pc",
-        online: true,
-        tags: ["Este equipo", "Local"],
-      };
-    }
-  }
+function connectionTagForInterfaceName(name = "") {
+  const text = String(name).toLowerCase();
+  if (/wi-?fi|wireless|wlan|802\.11|inal[aá]mbrica|inalambrica/.test(text)) return "Wi-Fi";
+  if (/ethernet|cable|gbe|lan|realtek|intel|killer|marvell/.test(text)) return "Cableado / Ethernet";
   return null;
 }
 
@@ -98,10 +86,30 @@ function activeIPv4Interfaces() {
   for (const name of Object.keys(nets)) {
     for (const iface of nets[name] || []) {
       if (iface.family !== "IPv4" || iface.internal) continue;
-      result.push({ address: iface.address, netmask: iface.netmask || "255.255.255.0" });
+      result.push({
+        name,
+        address: iface.address,
+        netmask: iface.netmask || "255.255.255.0",
+        mac: normalizeMac(iface.mac || ""),
+        connectionTag: connectionTagForInterfaceName(name),
+      });
     }
   }
   return result;
+}
+
+/** IP, MAC y tipo de conexión de la primera interfaz activa de este equipo. */
+function localDevice() {
+  const iface = activeIPv4Interfaces()[0];
+  if (!iface) return null;
+  return {
+    ip: iface.address,
+    mac: iface.mac,
+    name: os.hostname(),
+    type: "pc",
+    online: true,
+    tags: ["Este equipo", "Local", iface.connectionTag || "Cableado / Ethernet"],
+  };
 }
 
 /** Lista de IPs a sondear (máximo /24: .1 a .254) para cada interfaz activa. */
@@ -724,12 +732,49 @@ let mainWindow = null;
 let quitting = false;
 
 function iconPath(file) {
-  const candidates = [
-    path.join(__dirname, "..", "public", file),
-    path.join(app.getAppPath(), "public", file),
-    path.join(process.resourcesPath || "", "app.asar", "public", file),
+  let appPath = "";
+  try {
+    appPath = app.getAppPath();
+  } catch {
+    appPath = "";
+  }
+  const names = file === "favicon.ico" ? ["favicon.ico", "app-icon.png"] : [file, "favicon.ico"];
+  const bases = [
+    path.join(__dirname, "..", "public"),
+    path.join(__dirname, "..", "dist", "client"),
+    path.join(__dirname, "..", "dist"),
+    appPath ? path.join(appPath, "public") : "",
+    appPath ? path.join(appPath, "dist", "client") : "",
+    appPath ? path.join(appPath, "dist") : "",
+    path.join(process.resourcesPath || "", "app", "public"),
+    path.join(process.resourcesPath || "", "app", "dist", "client"),
+    path.join(process.resourcesPath || "", "app", "dist"),
+    path.join(process.resourcesPath || "", "app.asar", "public"),
+    path.join(process.resourcesPath || "", "app.asar", "dist", "client"),
+    path.join(process.resourcesPath || "", "app.asar", "dist"),
   ];
-  return candidates.find((candidate) => fs.existsSync(candidate)) || candidates[0];
+  for (const base of bases) {
+    if (!base) continue;
+    for (const name of names) {
+      const candidate = path.join(base, name);
+      if (fs.existsSync(candidate)) return candidate;
+    }
+  }
+  return path.join(__dirname, "..", "public", file);
+}
+
+function trayIconImage() {
+  const candidates = [
+    iconPath("favicon.ico"),
+    iconPath("app-icon.png"),
+    iconPath("favicon.png"),
+  ];
+  for (const candidate of candidates) {
+    const image = nativeImage.createFromPath(candidate);
+    if (!image.isEmpty()) return isWindows ? image.resize({ width: 16, height: 16 }) : image;
+  }
+  const fallback = nativeImage.createEmpty();
+  return fallback;
 }
 
 function showWindow() {
@@ -745,9 +790,9 @@ function showWindow() {
 
 function createTray() {
   if (tray) return tray;
-  const image = nativeImage.createFromPath(iconPath(isWindows ? "favicon.ico" : "app-icon.png"));
+  const image = trayIconImage();
   try {
-    tray = new Tray(image.isEmpty() ? nativeImage.createFromPath(iconPath("app-icon.png")) : image);
+    tray = new Tray(image);
   } catch {
     return null;
   }
