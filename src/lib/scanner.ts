@@ -1,4 +1,4 @@
-import { type Device, type DeviceType } from "./devices";
+import { normalizeDeviceType, type Device, type DeviceType } from "./devices";
 import {
   brandFromVendorName,
   lookupByHostname,
@@ -38,21 +38,51 @@ interface RawHost {
 
 function guessType(name: string, vendor: string): DeviceType {
   const text = `${name} ${vendor}`.toLowerCase();
-  if (/playstation|xbox|nintendo|switch|steam|sony interactive|valve|microsoft/.test(text))
+
+  // Consolas
+  if (/playstation|\bps[45]\b|xbox|nintendo|switch|steamdeck|steam deck|sony interactive|valve/.test(text))
     return "console";
-  if (/iphone|ipad|android|pixel|galaxy|phone|movil|m[oó]vil|tablet|xiaomi|redmi|poco|huawei|honor|oppo|oneplus/.test(text))
-    return "phone";
-  if (/tv|roku|chromecast|firestick|fire.?tv|bravia|webos|lg electronics|samsung/.test(text))
-    return "tv";
-  if (/home.?assistant|hass|raspberry/.test(text)) return "home-assistant";
-  if (/router|gateway|fritz|livebox|sercomm|sagemcom|asuswrt|archer|deco|tp-link|netgear|ubiquiti|unifi|openwrt/.test(text))
+
+  // Domótica: enchufes, bombillas y tiras LED (antes de móviles/TV para no confundir marcas)
+  if (/enchufe|smart.?plug|\bplug\b|tapo.?p1|\bp100\b|\bp110\b|hs1\d\d|kp1\d\d|meross.?mss|sonoff|shelly.?plug|wemo/.test(text))
+    return "smart-plug";
+  if (/bombilla|\bbulb\b|\bhue\b|yeelight|lifx|tapo.?l5|\bl5[123]\d\b|nanoleaf.?bulb|tradfri|wiz.?bulb/.test(text))
+    return "smart-bulb";
+  if (/tira.?led|led.?strip|lightstrip|light.?strip|govee|nanoleaf|\bl9\d\d\b|dreamview/.test(text))
+    return "led-strip";
+
+  // Decodificadores y TV boxes
+  if (/deco(dificador)?\b|set.?top|tv.?box|android.?tv|mibox|mi.?box|shield.?tv|apple.?tv|movistar.?plus|vodafone.?tv|orange.?tv|chromecast|firestick|fire.?tv|roku/.test(text))
+    return "set-top-box";
+
+  // Televisores
+  if (/\btv\b|televisi|bravia|webos|tizen|oled|qled|smart.?tv/.test(text)) return "tv";
+
+  // Tablets y móviles
+  if (/ipad|tablet|\btab\b|galaxy.?tab|mediapad|matepad|surface.?pro/.test(text)) return "tablet";
+  if (/iphone|android|pixel|galaxy|phone|movil|m[oó]vil|xiaomi|redmi|\bpoco\b|honor|oppo|oneplus|vivo|realme/.test(text))
+    return "smartphone";
+
+  // Almacenamiento en red
+  if (/\bnas\b|synology|qnap|truenas|freenas|unraid|diskstation|servidor|server|wd.?my.?cloud/.test(text))
+    return "nas";
+
+  if (/home.?assistant|hass|raspberry|hassio|domotic/.test(text)) return "home-assistant";
+  if (/router|gateway|\bhgu\b|fritz|livebox|sercomm|sagemcom|arcadyan|technicolor|mitrastar|askey|comtrend|zyxel|asuswrt|archer|deco|tp-link|netgear|ubiquiti|unifi|openwrt|repetidor|extender|access.?point/.test(text))
     return "router";
-  if (/printer|impresora|brother|epson|canon|laserjet|officejet|hp /.test(text))
+  if (/printer|impresora|brother|epson|canon|laserjet|officejet|\bhp\b/.test(text))
     return "printer";
-  if (/cam|camera|reolink|hikvision|dahua|tapo/.test(text)) return "camera";
-  if (/echo|alexa|sonos|homepod|nest.?(mini|audio)|speaker|altavoz/.test(text))
+  if (/\bcam\b|camera|c[aá]mara|reolink|hikvision|dahua|tapo.?c[0-9]|doorbell|timbre/.test(text))
+    return "camera";
+  if (/echo|alexa|sonos|homepod|nest.?(mini|audio|hub)|speaker|altavoz/.test(text))
     return "speaker";
-  if (/pc|desktop|laptop|macbook|apple|asus|msi|lenovo|dell|intel/.test(text)) return "pc";
+
+  // Portátiles y sobremesas
+  if (/laptop|portatil|port[aá]til|macbook|notebook|thinkpad|ideapad|vivobook|zenbook|latitude|inspiron|pavilion/.test(text))
+    return "laptop";
+  if (/\bpc\b|desktop|sobremesa|imac|mac.?mini|\bmsi\b|gigabyte|asrock|\basus\b|lenovo|\bdell\b|intel|torre/.test(text))
+    return "pc";
+
   return "iot";
 }
 
