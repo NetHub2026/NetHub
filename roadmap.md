@@ -30,6 +30,8 @@
 - Área de notificación de Windows: icono en la bandeja con menú Abrir NetHub / Escanear ahora / Salir y ocultado al minimizar o cerrar para seguir escaneando en segundo plano.
 - Pantallas Full HD: ventana de escritorio 1520x920 centrada y contenedor hasta 1720 px con rejilla de 3-4 columnas.
 - Tipos ampliados con iconos propios: PC de sobremesa, Portátil, Smartphone, Tablet, Decodificador/TV Box, NAS/Servidor, Enchufe, Bombilla y Tira LED, con inferencia automática por nombre y fabricante.
+- Icono de bandeja corregido: `public/**/*` incluido en el paquete, búsqueda robusta de `favicon.ico`/`app-icon.png` en desarrollo y portable, y redimensionado nativo 16x16 para Windows.
+- Clasificación inicial de conexión: móviles, tablets y domótica Wi-Fi reciben etiqueta `Wi-Fi`; el PC local detecta Wi-Fi o `Cableado / Ethernet`; la ficha permite alternar una sola etiqueta de conexión.
 
 ## Completado (18/9, segunda ronda)
 - Etiqueta "Escaneado" eliminada: no se añade en los escaneos y se limpia al cargar, guardar y fusionar dispositivos ya guardados.
