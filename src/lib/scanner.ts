@@ -189,7 +189,13 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
   const merged: Device[] = scanned.map((fresh) => {
     const old = byId.get(fresh.id);
     if (!old) {
-      return { ...fresh, firstSeenAt: now, isNew: true, trusted: false };
+      return {
+        ...fresh,
+        tags: sanitizeTags(fresh.tags),
+        firstSeenAt: now,
+        isNew: true,
+        trusted: false,
+      };
     }
     const freshVendorIsKnown = fresh.vendor && fresh.vendor !== "Fabricante desconocido";
     const vendor = old.manualEdit ? old.vendor : freshVendorIsKnown ? fresh.vendor : old.vendor;
