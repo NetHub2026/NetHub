@@ -2,7 +2,7 @@
 // - Guarda y lee devices-db.json junto al ejecutable.
 // - Escaneo ARP nativo, ping ICMP real y Wake-on-LAN por UDP.
 // - Servidor HTTP de respaldo en el puerto 8765 (/scan, /ping, /wol).
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -714,15 +714,80 @@ button{margin-top:1.5rem;padding:.6rem 1.2rem;border:0;border-radius:.6rem;backg
 }
 
 
+/* ------------------------------------------------------------------ */
+/* Icono en el área de notificación (bandeja del sistema)              */
+/* ------------------------------------------------------------------ */
+
+let tray = null;
+let mainWindow = null;
+/** true solo cuando el usuario elige «Salir»: permite cerrar de verdad. */
+let quitting = false;
+
+function iconPath(file) {
+  const candidates = [
+    path.join(__dirname, "..", "public", file),
+    path.join(app.getAppPath(), "public", file),
+    path.join(process.resourcesPath || "", "app.asar", "public", file),
+  ];
+  return candidates.find((candidate) => fs.existsSync(candidate)) || candidates[0];
+}
+
+function showWindow() {
+  if (!mainWindow) {
+    mainWindow = createWindow();
+    void loadApp(mainWindow);
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function createTray() {
+  if (tray) return tray;
+  const image = nativeImage.createFromPath(iconPath(isWindows ? "favicon.ico" : "app-icon.png"));
+  try {
+    tray = new Tray(image.isEmpty() ? nativeImage.createFromPath(iconPath("app-icon.png")) : image);
+  } catch {
+    return null;
+  }
+  tray.setToolTip("NetHub · monitor de red doméstica");
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: "Abrir NetHub", click: () => showWindow() },
+      {
+        label: "Escanear ahora",
+        click: () => {
+          showWindow();
+          mainWindow?.webContents.send("nethub:scan-now");
+          void scanNetwork().catch(() => null);
+        },
+      },
+      { type: "separator" },
+      {
+        label: "Salir",
+        click: () => {
+          quitting = true;
+          app.quit();
+        },
+      },
+    ]),
+  );
+  tray.on("double-click", () => showWindow());
+  tray.on("click", () => showWindow());
+  return tray;
+}
+
 function createWindow() {
   const win = new BrowserWindow({
-    width: 1280,
-    height: 860,
-    minWidth: 960,
-    minHeight: 640,
+    width: 1520,
+    height: 920,
+    minWidth: 1024,
+    minHeight: 680,
+    center: true,
     backgroundColor: "#0b1120",
     title: "NetHub",
-    icon: path.join(__dirname, "..", "public", "app-icon.png"),
+    icon: iconPath(isWindows ? "favicon.ico" : "app-icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -730,6 +795,20 @@ function createWindow() {
     },
   });
 
+  // Minimizar o cerrar deja NetHub en la bandeja: el auto-escaneo y los avisos siguen activos.
+  win.on("minimize", (event) => {
+    if (!tray) return;
+    event.preventDefault();
+    win.hide();
+  });
+
+  win.on("close", (event) => {
+    if (quitting || !tray) return;
+    event.preventDefault();
+    win.hide();
+  });
+
+  mainWindow = win;
   return win;
 }
 
@@ -761,13 +840,17 @@ async function loadApp(win) {
 
 app.whenReady().then(async () => {
   startAgentServer();
+  createTray();
   const win = createWindow();
   await loadApp(win);
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
+  app.on("activate", () => showWindow());
+});
+
+app.on("before-quit", () => {
+  quitting = true;
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  // Con icono en la bandeja NetHub sigue trabajando en segundo plano.
+  if (!tray && process.platform !== "darwin") app.quit();
 });
