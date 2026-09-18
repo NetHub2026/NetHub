@@ -77,6 +77,8 @@ export function DeviceDetailPanel({
 
   useEffect(() => {
     setTagDraft("");
+    setPersonDraft("");
+    setLocationDraft("");
     setFeedback(null);
     setProbeNote(null);
     setConfirmDelete(false);
@@ -338,6 +340,89 @@ export function DeviceDetailPanel({
               Detectada automáticamente por la subred; puedes cambiarla a mano.
             </span>
           </label>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <span className="text-xs text-muted-foreground">Persona</span>
+              <span className="mt-1 flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 focus-within:border-brand">
+                <User className="size-4 shrink-0 text-brand" />
+                <select
+                  value={device.person ?? ""}
+                  onChange={(e) => assign("person", e.target.value)}
+                  aria-label="Persona asignada"
+                  className="min-w-0 flex-1 rounded-sm bg-popover text-sm text-popover-foreground outline-none"
+                >
+                  <option value="" className="bg-popover text-popover-foreground">
+                    Sin asignar
+                  </option>
+                  {personOptions.map((name) => (
+                    <option key={name} value={name} className="bg-popover text-popover-foreground">
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </span>
+              <span className="mt-2 flex gap-2">
+                <input
+                  value={personDraft}
+                  onChange={(e) => setPersonDraft(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && createPerson()}
+                  placeholder="Nueva persona"
+                  className="min-w-0 flex-1 rounded-md border border-input bg-background px-2.5 py-1.5 text-xs outline-none focus:border-brand"
+                />
+                <button
+                  type="button"
+                  onClick={createPerson}
+                  className="inline-flex shrink-0 items-center rounded-md border border-border px-2 py-1.5 text-xs transition-colors hover:border-brand hover:text-brand"
+                  aria-label="Crear persona"
+                >
+                  <Plus className="size-3.5" />
+                </button>
+              </span>
+            </div>
+            <div>
+              <span className="text-xs text-muted-foreground">Ubicación</span>
+              <span className="mt-1 flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 focus-within:border-brand">
+                <MapPin className="size-4 shrink-0 text-brand" />
+                <select
+                  value={device.location ?? ""}
+                  onChange={(e) => assign("location", e.target.value)}
+                  aria-label="Ubicación asignada"
+                  className="min-w-0 flex-1 rounded-sm bg-popover text-sm text-popover-foreground outline-none"
+                >
+                  <option value="" className="bg-popover text-popover-foreground">
+                    Sin asignar
+                  </option>
+                  {locationOptions.map((name) => (
+                    <option key={name} value={name} className="bg-popover text-popover-foreground">
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </span>
+              <span className="mt-2 flex gap-2">
+                <input
+                  value={locationDraft}
+                  onChange={(e) => setLocationDraft(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && createLocation()}
+                  placeholder="Nueva ubicación"
+                  className="min-w-0 flex-1 rounded-md border border-input bg-background px-2.5 py-1.5 text-xs outline-none focus:border-brand"
+                />
+                <button
+                  type="button"
+                  onClick={createLocation}
+                  className="inline-flex shrink-0 items-center rounded-md border border-border px-2 py-1.5 text-xs transition-colors hover:border-brand hover:text-brand"
+                  aria-label="Crear ubicación"
+                >
+                  <Plus className="size-3.5" />
+                </button>
+              </span>
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Asignar persona y ubicación es opcional; las que crees quedan disponibles para
+            el resto de dispositivos.
+          </p>
           <p className="text-xs text-muted-foreground">
             Estos cambios se guardan en tu equipo y no se sobrescriben en escaneos
             posteriores.
