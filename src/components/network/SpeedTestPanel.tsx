@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Gauge, Loader2, Timer } from "lucide-react";
 import {
   loadSpeedHistory,
   runSpeedTest,
   type SpeedPhase,
+  type SpeedProgress,
   type SpeedResult,
 } from "@/lib/speedtest";
 import { cn } from "@/lib/utils";
@@ -45,7 +46,7 @@ function Speedometer({ value, unit, label }: { value: number; unit: string; labe
           stroke="currentColor"
           strokeWidth="12"
           strokeLinecap="round"
-          className="text-brand transition-all duration-500"
+          className="text-brand transition-all duration-200 ease-linear"
           style={{
             strokeDasharray: 252,
             strokeDashoffset: 252 - (252 * (angle + 90)) / 180,
@@ -59,7 +60,7 @@ function Speedometer({ value, unit, label }: { value: number; unit: string; labe
           stroke="currentColor"
           strokeWidth="3"
           strokeLinecap="round"
-          className="text-foreground transition-transform duration-500"
+          className="text-foreground transition-transform duration-200 ease-linear"
           style={{ transform: `rotate(${angle}deg)`, transformOrigin: "100px 110px" }}
         />
         <circle cx="100" cy="110" r="6" className="fill-current text-foreground" />
@@ -78,14 +79,18 @@ export function SpeedTestPanel() {
   const [running, setRunning] = useState(false);
   const [phase, setPhase] = useState<SpeedPhase>("idle");
   const [live, setLive] = useState(0);
+  const [peak, setPeak] = useState(0);
+  const [progress, setProgress] = useState({ total: 0, secondsLeft: 0 });
   const [result, setResult] = useState<SpeedResult | null>(null);
   const [history, setHistory] = useState<SpeedResult[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const rafRef = useRef(0);
 
   useEffect(() => {
     const stored = loadSpeedHistory();
     setHistory(stored);
     if (stored[0]) setResult(stored[0]);
+    return () => cancelAnimationFrame(rafRef.current);
   }, []);
 
   const start = async () => {
@@ -93,14 +98,25 @@ export function SpeedTestPanel() {
     setError(null);
     setResult(null);
     setLive(0);
+    setPeak(0);
+    setProgress({ total: 0, secondsLeft: 20 });
     try {
       const final = await runSpeedTest((p) => {
-        setPhase(p.phase);
-        if (p.phase !== "ping") setLive(p.value);
+        // Suavizado con requestAnimationFrame para que la aguja no salte.
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = requestAnimationFrame(() => {
+          setPhase(p.phase);
+          if (p.phase !== "ping") {
+            setLive(p.value);
+            setPeak(p.peak);
+          }
+          setProgress({ total: p.totalProgress, secondsLeft: p.secondsLeft });
+        });
       });
       setResult(final);
       setHistory(loadSpeedHistory());
       setPhase("done");
+      setPeak(final.peakDownload);
     } catch {
       setError("No se ha podido completar el test. Comprueba tu conexión e inténtalo de nuevo.");
       setPhase("idle");
@@ -112,6 +128,7 @@ export function SpeedTestPanel() {
 
   const gaugeValue = running ? live : (result?.download ?? 0);
   const gaugeLabel = running && phase === "upload" ? "subida" : "descarga";
+  const pct = Math.min(100, Math.round(progress.total * 100));
 
   return (
     <section className="mt-6 rounded-2xl border border-border bg-card p-6">
@@ -122,6 +139,20 @@ export function SpeedTestPanel() {
         </h2>
         <p className="text-xs text-muted-foreground">{phaseLabels[phase]}</p>
       </div>
+
+      {running && (
+        <div className="mt-3">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-brand transition-[width] duration-150 ease-linear"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <p className="mt-1 text-right font-mono text-xs text-muted-foreground">
+            {pct}% · quedan ~{progress.secondsLeft} s
+          </p>
+        </div>
+      )}
 
       <div className="mt-4 grid items-center gap-6 md:grid-cols-2">
         <Speedometer value={gaugeValue} unit="Mbps" label={gaugeLabel} />
@@ -137,12 +168,33 @@ export function SpeedTestPanel() {
           <Metric
             icon={<ArrowDown className="size-4" />}
             label="Descarga"
-            value={result ? `${result.download.toFixed(1)} Mbps` : running ? "midiendo…" : "—"}
+            value={
+              result
+                ? `${result.download.toFixed(1)} Mbps`
+                : running && phase !== "ping"
+                  ? `${live.toFixed(1)} Mbps`
+                  : running
+                    ? "midiendo…"
+                    : "—"
+            }
           />
           <Metric
             icon={<ArrowUp className="size-4" />}
             label="Subida"
-            value={result ? `${result.upload.toFixed(1)} Mbps` : running ? "midiendo…" : "—"}
+            value={
+              result
+                ? `${result.upload.toFixed(1)} Mbps`
+                : running && phase === "upload"
+                  ? `${live.toFixed(1)} Mbps`
+                  : running
+                    ? "esperando…"
+                    : "—"
+            }
+          />
+          <Metric
+            icon={<Gauge className="size-4" />}
+            label="Pico (fase actual)"
+            value={running && peak > 0 ? `${peak.toFixed(1)} Mbps` : result ? `${result.peakDownload.toFixed(1)} Mbps` : "—"}
           />
           <button
             onClick={start}
@@ -150,7 +202,7 @@ export function SpeedTestPanel() {
             className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-brand-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
           >
             {running ? <Loader2 className="size-4 animate-spin" /> : <Gauge className="size-4" />}
-            {running ? "Midiendo…" : "Iniciar test de velocidad"}
+            {running ? "Midiendo…" : "Iniciar test de velocidad (~20 s)"}
           </button>
         </div>
       </div>
