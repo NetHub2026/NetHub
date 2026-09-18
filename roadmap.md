@@ -23,7 +23,8 @@
 - Barra de acciones minimalista: solo Escanear red, Exportar inventario (CSV) y Restablecer (sin importar ni descargas JSON).
 
 ## Pendiente
-- Ninguna tarea abierta.
+- Quitar la etiqueta "Escaneado" (nuevos escaneos y datos ya guardados).
+- Monitorización automática: auto-escaneo en segundo plano con selector de intervalo (2/5 min/desactivado), cuenta atrás discreta y actualización silenciosa de estado y nuevos dispositivos.
 
 ## Completado (18/9)
 - Test de velocidad de ~20 s (descarga/subida continuas, velocímetro en vivo, pico, barra de progreso) verificado en navegador.
