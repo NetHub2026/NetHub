@@ -3,15 +3,22 @@ import type { ServiceHit } from "./services";
 
 export type DeviceType =
   | "pc"
-  | "phone"
+  | "laptop"
+  | "smartphone"
+  | "tablet"
   | "tv"
+  | "set-top-box"
   | "console"
   | "home-assistant"
   | "router"
+  | "nas"
   | "printer"
   | "camera"
-  | "iot"
+  | "smart-plug"
+  | "smart-bulb"
+  | "led-strip"
   | "speaker"
+  | "iot"
   | "other";
 
 export type DeviceStatus = "online" | "offline";
@@ -50,22 +57,44 @@ export interface Device {
   networkId?: string;
   /** Últimas medidas de latencia (ms), la más reciente al final */
   latency?: Array<{ rtt: number | null; at: string }>;
+  /** Persona a la que pertenece el dispositivo (opcional) */
+  person?: string;
+  /** Ubicación / habitación donde está el dispositivo (opcional) */
+  location?: string;
 }
 
 export const deviceTypeLabels: Record<DeviceType, string> = {
-  pc: "PC / Portátil",
-  phone: "Smartphone / Tablet",
+  pc: "PC de sobremesa",
+  laptop: "Portátil",
+  smartphone: "Smartphone",
+  tablet: "Tablet",
   tv: "Smart TV",
+  "set-top-box": "Decodificador / TV Box",
   console: "Consola",
   "home-assistant": "Domótica / Home Assistant",
   router: "Router / Red",
+  nas: "NAS / Servidor",
   printer: "Impresora",
   camera: "Cámara IP",
-  iot: "IoT / Enchufe",
+  "smart-plug": "Enchufe inteligente",
+  "smart-bulb": "Bombilla inteligente",
+  "led-strip": "Tira LED inteligente",
   speaker: "Altavoz inteligente",
+  iot: "IoT / Otros conectados",
   other: "Otro",
 };
 
-/** Serie horaria simulada de ancho de banda total (Mbps). */
+/** Tipos antiguos guardados en la base local y su equivalente actual. */
+const legacyTypes: Record<string, DeviceType> = {
+  phone: "smartphone",
+  mobile: "smartphone",
+  plug: "smart-plug",
+  bulb: "smart-bulb",
+};
 
-/** Serie horaria simulada de ancho de banda total (Mbps). */
+/** Convierte cualquier tipo guardado (incluido uno antiguo) en un tipo válido. */
+export function normalizeDeviceType(value: unknown): DeviceType {
+  const raw = String(value ?? "").trim();
+  if (raw in deviceTypeLabels) return raw as DeviceType;
+  return legacyTypes[raw] ?? "other";
+}
