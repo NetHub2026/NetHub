@@ -88,7 +88,105 @@ function localDevice() {
   return null;
 }
 
+/** Interfaces IPv4 activas con su máscara, para calcular el rango a barrer. */
+function activeIPv4Interfaces() {
+  const result = [];
+  const nets = os.networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const iface of nets[name] || []) {
+      if (iface.family !== "IPv4" || iface.internal) continue;
+      result.push({ address: iface.address, netmask: iface.netmask || "255.255.255.0" });
+    }
+  }
+  return result;
+}
+
+/** Lista de IPs a sondear (máximo /24: .1 a .254) para cada interfaz activa. */
+function sweepTargets() {
+  const targets = new Set();
+  for (const { address, netmask } of activeIPv4Interfaces()) {
+    const ipParts = address.split(".").map(Number);
+    const maskParts = netmask.split(".").map(Number);
+    // Solo barremos redes locales de tamaño /24 o menor (evita rangos enormes).
+    if (maskParts[0] !== 255 || maskParts[1] !== 255 || maskParts[2] !== 255) {
+      if (!(maskParts[0] === 255 && maskParts[1] === 255 && maskParts[2] >= 0)) continue;
+    }
+    const prefix = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}`;
+    for (let host = 1; host <= 254; host++) targets.add(`${prefix}.${host}`);
+  }
+  return [...targets];
+}
+
+/**
+ * Envía un datagrama UDP a cada IP del rango: el kernel debe resolver la MAC
+ * antes de enviarlo, así que emite un ARP "Who has X?" y puebla la tabla ARP.
+ * Es instantáneo (fire and forget) y no necesita respuesta del dispositivo.
+ */
+function udpTouch(ips) {
+  return new Promise((resolve) => {
+    let socket;
+    try {
+      socket = dgram.createSocket("udp4");
+    } catch {
+      resolve();
+      return;
+    }
+    socket.on("error", () => {});
+    const payload = Buffer.from([0x00]);
+    let index = 0;
+    const BATCH = 50;
+    const step = () => {
+      const end = Math.min(index + BATCH, ips.length);
+      for (; index < end; index++) {
+        try {
+          socket.send(payload, 0, payload.length, 9, ips[index], () => {});
+        } catch {
+          /* ignoramos IPs inalcanzables */
+        }
+      }
+      if (index < ips.length) setTimeout(step, 12);
+      else
+        setTimeout(() => {
+          try {
+            socket.close();
+          } catch {
+            /* ya cerrado */
+          }
+          resolve();
+        }, 150);
+    };
+    step();
+  });
+}
+
+/** Sondeo TCP ligero en lotes: refuerza el ARP en equipos que ignoran el UDP. */
+async function tcpTouch(ips, ports = [80, 443], timeout = 320, batch = 48) {
+  for (let i = 0; i < ips.length; i += batch) {
+    const slice = ips.slice(i, i + batch);
+    await Promise.all(
+      slice.flatMap((ip) => ports.map((port) => tcpProbe(ip, port, timeout).catch(() => null))),
+    );
+  }
+}
+
+/** Barrido activo de la subred para forzar que Windows rellene su tabla ARP. */
+async function sweepSubnet() {
+  const ips = sweepTargets();
+  if (ips.length === 0) return;
+  await udpTouch(ips);
+  await tcpTouch(ips);
+}
+
 async function scanNetwork() {
+  // 1) Barrido activo: los móviles y la domótica no hablan con el PC, así que
+  //    provocamos el ARP nosotros antes de leer la tabla.
+  try {
+    await sweepSubnet();
+  } catch {
+    /* si el barrido falla seguimos con la tabla ARP existente */
+  }
+
+  // 2) Recolectamos la tabla ARP ya poblada.
   const output = await run("arp", ["-a"]);
   const hosts = [];
   const seen = new Set();
@@ -101,12 +199,14 @@ async function scanNetwork() {
     const ip = match[1];
     const mac = normalizeMac(match[2]);
     if (mac === "ff:ff:ff:ff:ff:ff" || mac.startsWith("01:00:5e") || seen.has(mac)) continue;
+    if (mac === "00:00:00:00:00:00" || ip.endsWith(".255")) continue;
     seen.add(mac);
     hosts.push({ ip, mac, online: true });
   }
   if (local) hosts.push(local);
   return hosts;
 }
+
 
 /* ------------------------------------------------------------------ */
 /* Ping ICMP                                                           */
