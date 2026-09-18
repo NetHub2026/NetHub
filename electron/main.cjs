@@ -9,6 +9,7 @@ const os = require("node:os");
 const http = require("node:http");
 const https = require("node:https");
 const dgram = require("node:dgram");
+const net = require("node:net");
 const { execFile, spawn } = require("node:child_process");
 
 const DB_FILE = "devices-db.json";
@@ -111,13 +112,50 @@ async function scanNetwork() {
 /* Ping ICMP                                                           */
 /* ------------------------------------------------------------------ */
 
+/** Prueba TCP: muchos equipos bloquean ICMP pero responden (o rechazan) en puertos comunes. */
+function tcpProbe(ip, port, timeout = 800) {
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const socket = new net.Socket();
+    let done = false;
+    const finish = (ok) => {
+      if (done) return;
+      done = true;
+      socket.destroy();
+      resolve(ok ? { ok: true, rtt: Math.max(1, Date.now() - started) } : null);
+    };
+    socket.setTimeout(timeout);
+    socket.once("connect", () => finish(true));
+    socket.once("timeout", () => finish(false));
+    socket.once("error", (error) => finish(error && error.code === "ECONNREFUSED"));
+    try {
+      socket.connect(port, ip);
+    } catch {
+      finish(false);
+    }
+  });
+}
+
+async function tcpPing(ip) {
+  const ports = [80, 443, 445, 8080, 53, 22];
+  const results = await Promise.all(ports.map((port) => tcpProbe(ip, port)));
+  const alive = results.filter(Boolean);
+  if (!alive.length) return { ok: false, rtt: null };
+  return alive.reduce((best, cur) => (cur.rtt < best.rtt ? cur : best));
+}
+
 async function pingIp(ip) {
   if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(String(ip || ""))) return { ok: false, rtt: null };
-  const args = isWindows ? ["-n", "1", "-w", "1000", ip] : ["-c", "1", "-W", "1", ip];
-  const output = await run("ping", args, 4000);
-  const m = output.match(/(?:tiempo|time)[=<]\s*(\d+(?:[.,]\d+)?)\s*ms/i);
-  if (m) return { ok: true, rtt: Math.round(Number(m[1].replace(",", "."))) };
-  return { ok: false, rtt: null };
+  const args = isWindows ? ["-n", "2", "-w", "1500", ip] : ["-c", "2", "-W", "1", ip];
+  const output = await run("ping", args, 6000);
+
+  const time = output.match(/(?:tiempo|time)\s*[=<]\s*(\d+(?:[.,]\d+)?)\s*ms/i);
+  if (time) return { ok: true, rtt: Math.round(Number(time[1].replace(",", "."))) };
+  const avg = output.match(/(?:media|promedio|average)\s*=\s*(\d+(?:[.,]\d+)?)\s*ms/i);
+  if (avg) return { ok: true, rtt: Math.round(Number(avg[1].replace(",", "."))) };
+  if (/(?:tiempo|time)\s*<\s*1\s*ms/i.test(output)) return { ok: true, rtt: 1 };
+
+  return tcpPing(ip);
 }
 
 /* ------------------------------------------------------------------ */
@@ -569,6 +607,7 @@ function createWindow() {
     minHeight: 640,
     backgroundColor: "#0b1120",
     title: "NetHub",
+    icon: path.join(__dirname, "..", "public", "app-icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
