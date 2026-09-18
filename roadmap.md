@@ -23,9 +23,12 @@
 - Barra de acciones minimalista: solo Escanear red, Exportar inventario (CSV) y Restablecer (sin importar ni descargas JSON).
 
 ## Pendiente
-- Quitar la etiqueta "Escaneado" (nuevos escaneos y datos ya guardados).
-- Monitorización automática: auto-escaneo en segundo plano con selector de intervalo (2/5 min/desactivado), cuenta atrás discreta y actualización silenciosa de estado y nuevos dispositivos.
-- Aviso de dispositivos nuevos: insignia "Nuevo", toast con nombre/IP/fabricante que abre su ficha y acción rápida "Marcar como reconocido".
+- Ninguna tarea abierta.
+
+## Completado (18/9, segunda ronda)
+- Etiqueta "Escaneado" eliminada: no se añade en los escaneos y se limpia al cargar, guardar y fusionar dispositivos ya guardados.
+- Monitorización automática: selector Cada 2 min / Cada 5 min / Desactivado (persistente), escaneo silencioso en segundo plano y cuenta atrás con pulso discreto.
+- Avisos de dispositivos nuevos: insignia "Nuevo", aviso flotante con nombre/IP/fabricante y acciones "Ver ficha" y "Reconocer".
 
 ## Completado (18/9)
 - Test de velocidad de ~20 s (descarga/subida continuas, velocímetro en vivo, pico, barra de progreso) verificado en navegador.
