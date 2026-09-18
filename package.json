@@ -25,7 +25,7 @@
     "files": ["dist/**/*", ".output/**/*", "electron/**/*", "package.json"],
     "win": {
       "target": "portable",
-      "icon": "public/app-icon.png",
+      "icon": "public/favicon.ico",
       "verifyUpdateCodeSignature": false
     }
   },
