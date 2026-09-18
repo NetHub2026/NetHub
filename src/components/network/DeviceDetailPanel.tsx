@@ -4,6 +4,8 @@ import {
   ExternalLink,
   Gauge,
   Loader2,
+  MapPin,
+  User,
   RotateCw,
   Router,
   ShieldCheck,
@@ -101,6 +103,35 @@ export function DeviceDetailPanel({
       ? [...networks, { id: own, name: `${own}.x`, hint: `subred ${own}.0/24` }]
       : networks;
 
+
+  /** Opciones disponibles, incluyendo lo ya asignado a este dispositivo. */
+  const withCurrent = (list: string[], current?: string) =>
+    current && !list.includes(current) ? [...list, current] : list;
+  const personOptions = withCurrent(people, device.person);
+  const locationOptions = withCurrent(locations, device.location);
+
+  const assign = (field: "person" | "location", value: string) => {
+    const next: Device = { ...device };
+    if (value) next[field] = value;
+    else delete next[field];
+    onUpdate(next);
+  };
+
+  const createPerson = () => {
+    const value = personDraft.trim();
+    if (!value) return;
+    onCreatePerson?.(value);
+    assign("person", value);
+    setPersonDraft("");
+  };
+
+  const createLocation = () => {
+    const value = locationDraft.trim();
+    if (!value) return;
+    onCreateLocation?.(value);
+    assign("location", value);
+    setLocationDraft("");
+  };
 
   const addTag = () => {
     const tag = tagDraft.trim();
