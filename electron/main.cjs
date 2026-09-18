@@ -15,7 +15,10 @@ const { execFile, spawn } = require("node:child_process");
 const DB_FILE = "devices-db.json";
 const AGENT_PORT = 8765;
 const isWindows = process.platform === "win32";
-const GITHUB_REPO = "oyogor1985/connected-clan";
+// Repositorios de actualización: se prueba el nuevo nombre y, si no existe,
+// el antiguo (por si el repo aún no se ha renombrado).
+const GITHUB_REPOS = ["oyogor1985/nethub", "oyogor1985/connected-clan"];
+
 const UPDATE_ASSET = "NetHub.exe";
 const USER_AGENT = "NetHub-Updater";
 
