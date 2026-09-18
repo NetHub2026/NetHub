@@ -251,7 +251,7 @@ function Dashboard() {
       <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-4">
           <img
-            src={appIcon}
+            src="/app-icon.png"
             alt="NetHub"
             width={36}
             height={36}
