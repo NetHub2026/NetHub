@@ -97,7 +97,7 @@ function makeDevice(ip: string, mac: string, extra: Partial<Device> = {}): Devic
   return {
     id: normalizedMac || ip,
     name,
-    type: extra.type ?? guessType(name, vendor),
+    type: extra.type ? normalizeDeviceType(extra.type) : guessType(name, vendor),
     ip,
     mac: normalizedMac,
     status: extra.status ?? "online",
@@ -121,7 +121,11 @@ export function sanitizeTags(tags?: string[]): string[] {
 
 /** Limpia las etiquetas obsoletas de una lista de dispositivos guardada. */
 export function sanitizeDevices(devices: Device[]): Device[] {
-  return devices.map((device) => ({ ...device, tags: sanitizeTags(device.tags) }));
+  return devices.map((device) => ({
+    ...device,
+    type: normalizeDeviceType(device.type),
+    tags: sanitizeTags(device.tags),
+  }));
 }
 
 export async function enrichDevicesWithResolvedVendors(devices: Device[]): Promise<Device[]> {
