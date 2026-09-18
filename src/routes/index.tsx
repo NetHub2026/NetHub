@@ -413,7 +413,7 @@ function Dashboard() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-4">
+        <div className="mx-auto flex max-w-[1720px] items-center gap-4 px-5 py-4 xl:px-8">
           <img
             src="/app-icon.png"
             alt="NetHub"
@@ -458,7 +458,7 @@ function Dashboard() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-5 py-8">
+      <main className="mx-auto max-w-[1720px] px-5 py-8 xl:px-8">
         <section className="mb-6 flex flex-wrap items-center gap-x-5 gap-y-3 rounded-2xl border border-border bg-card px-5 py-4 text-xs">
           <span className="text-muted-foreground">
             Último escaneo:{" "}
@@ -751,7 +751,7 @@ function Dashboard() {
             ))}
           </div>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {visible.map((d) => (
               <button
                 key={d.id}
