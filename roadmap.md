@@ -25,6 +25,12 @@
 ## Pendiente
 - Ninguna tarea abierta.
 
+## Completado (18/9, tercera ronda)
+- Personas y ubicaciones: modelo y `devices-db.json` con listas reutilizables, selectores con creación al instante en la ficha, indicadores en las tarjetas, filtros por persona y ubicación y columnas nuevas en el CSV.
+- Área de notificación de Windows: icono en la bandeja con menú Abrir NetHub / Escanear ahora / Salir y ocultado al minimizar o cerrar para seguir escaneando en segundo plano.
+- Pantallas Full HD: ventana de escritorio 1520x920 centrada y contenedor hasta 1720 px con rejilla de 3-4 columnas.
+- Tipos ampliados con iconos propios: PC de sobremesa, Portátil, Smartphone, Tablet, Decodificador/TV Box, NAS/Servidor, Enchufe, Bombilla y Tira LED, con inferencia automática por nombre y fabricante.
+
 ## Completado (18/9, segunda ronda)
 - Etiqueta "Escaneado" eliminada: no se añade en los escaneos y se limpia al cargar, guardar y fusionar dispositivos ya guardados.
 - Monitorización automática: selector Cada 2 min / Cada 5 min / Desactivado (persistente), escaneo silencioso en segundo plano y cuenta atrás con pulso discreto.
