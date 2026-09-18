@@ -75,8 +75,28 @@ function normalizeMac(mac) {
 function connectionTagForInterfaceName(name = "") {
   const text = String(name).toLowerCase();
   if (/wi-?fi|wireless|wlan|802\.11|inal[aá]mbrica|inalambrica/.test(text)) return "Wi-Fi";
-  if (/ethernet|cable|gbe|lan|realtek|intel|killer|marvell/.test(text)) return "Cableado / Ethernet";
+  if (/ethernet|cable|gbe|lan|802\.3|realtek|intel|killer|marvell/.test(text)) return "Cableado / Ethernet";
   return null;
+}
+
+async function windowsConnectionTagForLocalDevice(ip, mac) {
+  if (!isWindows) return null;
+  const cleanMac = String(mac || "").replace(/:/g, "-").toUpperCase();
+  const script = `
+$configs = Get-NetIPConfiguration | Where-Object { $_.IPv4Address -and $_.NetAdapter.Status -eq 'Up' -and $_.NetAdapter.HardwareInterface } | Sort-Object { if ($_.IPv4DefaultGateway) { 0 } else { 1 } }
+foreach ($config in $configs) {
+  $adapter = Get-NetAdapter -InterfaceIndex $config.InterfaceIndex -ErrorAction SilentlyContinue
+  if (-not $adapter) { continue }
+  $addr = [string]$config.IPv4Address.IPAddress
+  $mac = [string]$adapter.MacAddress
+  if ($addr -eq '${ip}' -or $mac.ToUpper() -eq '${cleanMac}') {
+    Write-Output ($adapter.Name + ' ' + $adapter.InterfaceDescription + ' ' + $adapter.MediaType + ' ' + $adapter.NdisPhysicalMedium)
+    exit
+  }
+}
+`;
+  const output = await run("powershell", ["-NoProfile", "-Command", script], 2500);
+  return connectionTagForInterfaceName(output);
 }
 
 /** Interfaces IPv4 activas con su máscara, para calcular el rango a barrer. */
@@ -99,16 +119,17 @@ function activeIPv4Interfaces() {
 }
 
 /** IP, MAC y tipo de conexión de la primera interfaz activa de este equipo. */
-function localDevice() {
+async function localDevice() {
   const iface = activeIPv4Interfaces()[0];
   if (!iface) return null;
+  const connectionTag = (await windowsConnectionTagForLocalDevice(iface.address, iface.mac)) || iface.connectionTag || "Cableado / Ethernet";
   return {
     ip: iface.address,
     mac: iface.mac,
     name: os.hostname(),
     type: "pc",
     online: true,
-    tags: ["Este equipo", "Local", iface.connectionTag || "Cableado / Ethernet"],
+    tags: ["Este equipo", "Local", connectionTag],
   };
 }
 
@@ -201,7 +222,7 @@ async function scanNetwork() {
   const output = await run("arp", ["-a"]);
   const hosts = [];
   const seen = new Set();
-  const local = localDevice();
+  const local = await localDevice();
   if (local?.mac) seen.add(local.mac);
 
   const re = /(\d{1,3}(?:\.\d{1,3}){3})\s+([0-9a-fA-F]{2}(?:[:-][0-9a-fA-F]{2}){5})/g;
