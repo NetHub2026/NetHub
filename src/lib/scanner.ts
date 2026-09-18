@@ -76,8 +76,22 @@ function makeDevice(ip: string, mac: string, extra: Partial<Device> = {}): Devic
     lastSeen: extra.lastSeen ?? "Detectado en el último escaneo",
     downstream: extra.downstream ?? 0,
     upstream: extra.upstream ?? 0,
-    tags: extra.tags ?? ["Escaneado"],
+    tags: sanitizeTags(extra.tags),
   };
+}
+
+/** Etiquetas automáticas que ya no queremos mostrar en la interfaz. */
+const REMOVED_TAGS = ["escaneado"];
+
+/** Quita etiquetas obsoletas (p. ej. "Escaneado") de una lista de etiquetas. */
+export function sanitizeTags(tags?: string[]): string[] {
+  if (!Array.isArray(tags)) return [];
+  return tags.filter((tag) => !REMOVED_TAGS.includes(String(tag).trim().toLowerCase()));
+}
+
+/** Limpia las etiquetas obsoletas de una lista de dispositivos guardada. */
+export function sanitizeDevices(devices: Device[]): Device[] {
+  return devices.map((device) => ({ ...device, tags: sanitizeTags(device.tags) }));
 }
 
 export async function enrichDevicesWithResolvedVendors(devices: Device[]): Promise<Device[]> {
