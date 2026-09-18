@@ -14,9 +14,11 @@ import {
   RefreshCw,
   RotateCcw,
 
+  MapPin,
   Search,
   Sun,
   Timer,
+  Users,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -25,6 +27,13 @@ import {
   type Device,
   type DeviceType,
 } from "@/lib/devices";
+import {
+  clearStoredDirectory,
+  directoryFromDevices,
+  emptyDirectory,
+  withEntry,
+  type Directory,
+} from "@/lib/directory";
 import {
   clearStoredData,
   fetchFromAgent,
@@ -46,7 +55,12 @@ import {
   runtimeLabels,
   type Runtime,
 } from "@/lib/desktop";
-import { loadDevicesAnywhere, saveDevicesAnywhere } from "@/lib/persistence";
+import {
+  loadDevicesAnywhere,
+  loadDirectoryAnywhere,
+  saveDevicesAnywhere,
+  saveDirectoryAnywhere,
+} from "@/lib/persistence";
 import { exportInventoryCsv } from "@/lib/backup";
 import {
   ALL_NETWORKS,
