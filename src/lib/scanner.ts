@@ -76,8 +76,22 @@ function makeDevice(ip: string, mac: string, extra: Partial<Device> = {}): Devic
     lastSeen: extra.lastSeen ?? "Detectado en el último escaneo",
     downstream: extra.downstream ?? 0,
     upstream: extra.upstream ?? 0,
-    tags: extra.tags ?? ["Escaneado"],
+    tags: sanitizeTags(extra.tags),
   };
+}
+
+/** Etiquetas automáticas que ya no queremos mostrar en la interfaz. */
+const REMOVED_TAGS = ["escaneado"];
+
+/** Quita etiquetas obsoletas (p. ej. "Escaneado") de una lista de etiquetas. */
+export function sanitizeTags(tags?: string[]): string[] {
+  if (!Array.isArray(tags)) return [];
+  return tags.filter((tag) => !REMOVED_TAGS.includes(String(tag).trim().toLowerCase()));
+}
+
+/** Limpia las etiquetas obsoletas de una lista de dispositivos guardada. */
+export function sanitizeDevices(devices: Device[]): Device[] {
+  return devices.map((device) => ({ ...device, tags: sanitizeTags(device.tags) }));
 }
 
 export async function enrichDevicesWithResolvedVendors(devices: Device[]): Promise<Device[]> {
@@ -175,7 +189,13 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
   const merged: Device[] = scanned.map((fresh) => {
     const old = byId.get(fresh.id);
     if (!old) {
-      return { ...fresh, firstSeenAt: now, isNew: true, trusted: false };
+      return {
+        ...fresh,
+        tags: sanitizeTags(fresh.tags),
+        firstSeenAt: now,
+        isNew: true,
+        trusted: false,
+      };
     }
     const freshVendorIsKnown = fresh.vendor && fresh.vendor !== "Fabricante desconocido";
     const vendor = old.manualEdit ? old.vendor : freshVendorIsKnown ? fresh.vendor : old.vendor;
@@ -186,6 +206,7 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
         : old.brand;
     const result: Device = {
       ...old,
+      tags: sanitizeTags(old.tags),
       ip: fresh.ip,
       status: fresh.status,
       lastSeen: fresh.lastSeen,
@@ -202,7 +223,13 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
 
   const missing = previous
     .filter((d) => !seen.has(d.id))
-    .map((d) => ({ ...d, status: "offline" as const, downstream: 0, upstream: 0 }));
+    .map((d) => ({
+      ...d,
+      tags: sanitizeTags(d.tags),
+      status: "offline" as const,
+      downstream: 0,
+      upstream: 0,
+    }));
 
   return [...merged, ...missing].sort((a, b) =>
     a.ip.localeCompare(b.ip, undefined, { numeric: true }),
@@ -242,7 +269,7 @@ export function loadStoredDevices(): Device[] | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Device[]) : null;
+    return raw ? sanitizeDevices(JSON.parse(raw) as Device[]) : null;
   } catch {
     return null;
   }
@@ -251,7 +278,7 @@ export function loadStoredDevices(): Device[] | null {
 export function saveDevices(devices: Device[]) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(devices));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizeDevices(devices)));
   } catch {
     /* almacenamiento no disponible */
   }
