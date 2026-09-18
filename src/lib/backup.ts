@@ -147,6 +147,10 @@ export function parseBackupCsv(text: string): Device[] {
     };
     const brand = at("brand");
     if (brand) device.brand = brand as NonNullable<Device["brand"]>;
+    const person = at("person");
+    if (person) device.person = person;
+    const location = at("location");
+    if (location) device.location = location;
     const networkId = at("networkid");
     if (networkId) device.networkId = networkId;
     const notes = at("notes");
