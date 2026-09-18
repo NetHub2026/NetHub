@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   Activity,
   ArrowDownUp,
@@ -15,6 +16,7 @@ import {
 
   Search,
   Sun,
+  Timer,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -92,6 +94,21 @@ const filters: Array<{ value: DeviceType | "all"; label: string }> = [
   })),
 ];
 
+/** Intervalos disponibles para la monitorización automática (en segundos). */
+const autoOptions: Array<{ value: number; label: string }> = [
+  { value: 120, label: "Cada 2 min" },
+  { value: 300, label: "Cada 5 min" },
+  { value: 0, label: "Desactivado" },
+];
+
+const AUTO_KEY = "nethub.autoscan.v1";
+
+function formatCountdown(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 function Dashboard() {
   const [items, setItems] = useState<Device[]>([]);
   const [filter, setFilter] = useState<DeviceType | "all">("all");
@@ -108,7 +125,14 @@ function Dashboard() {
   const [runtime, setRuntime] = useState<Runtime>("web");
   const [dbPath, setDbPath] = useState("Almacenamiento del navegador (localStorage)");
   const [updateOpen, setUpdateOpen] = useState(false);
-
+  /** Monitorización automática: intervalo en segundos (0 = desactivada). */
+  const [autoInterval, setAutoInterval] = useState(120);
+  const [countdown, setCountdown] = useState(120);
+  const [autoScanning, setAutoScanning] = useState(false);
+  /** Evita escaneos solapados (manual + automático). */
+  const busyRef = useRef(false);
+  const itemsRef = useRef<Device[]>([]);
+  itemsRef.current = items;
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -135,10 +159,38 @@ function Dashboard() {
     if (hydrated) void saveDevicesAnywhere(items);
   }, [items, hydrated]);
 
-  /** Fusiona el escaneo con la lista conocida y devuelve cuántos son nuevos. */
+  /** Marca un dispositivo como reconocido (quita la insignia «Nuevo»). */
+  const markKnown = (id: string) =>
+    setItems((prev) =>
+      prev.map((d) => (d.id === id ? { ...d, isNew: false, trusted: true } : d)),
+    );
+
+  /** Avisa de los dispositivos recién detectados con acceso directo a su ficha. */
+  const announceNew = (fresh: Device[]) => {
+    for (const device of fresh.slice(0, 3)) {
+      toast.warning(`Nuevo dispositivo detectado: ${device.name}`, {
+        description: `${device.ip} · ${device.vendor}`,
+        duration: 12000,
+        action: {
+          label: "Ver ficha",
+          onClick: () => setSelectedId(device.id),
+        },
+        cancel: {
+          label: "Reconocer",
+          onClick: () => markKnown(device.id),
+        },
+      });
+    }
+    if (fresh.length > 3) {
+      toast.warning(`Y ${fresh.length - 3} dispositivos nuevos más en tu red.`);
+    }
+  };
+
+  /** Fusiona el escaneo con la lista conocida y devuelve los dispositivos nuevos. */
   const applyScan = async (devices: Device[], source: NonNullable<ScanMeta["source"]>) => {
     const resolved = await enrichDevicesWithResolvedVendors(devices);
-    const merged = mergeScan(items, resolved);
+    const known = new Set(itemsRef.current.map((d) => d.id));
+    const merged = mergeScan(itemsRef.current, resolved);
     setItems(merged);
     void saveDevicesAnywhere(merged);
     const next: ScanMeta = { lastScanAt: new Date().toISOString(), source };
@@ -156,43 +208,110 @@ function Dashboard() {
         return updated;
       });
     });
-    return newDevices(merged).length;
+    // Nuevos de este escaneo: no estaban registrados antes de fusionar.
+    const justFound = merged.filter((d) => !known.has(d.id) && d.isNew && !d.trusted);
+    if (justFound.length > 0) announceNew(justFound);
+    return justFound.length;
   };
 
   const trustAll = () =>
     setItems((prev) => prev.map((d) => (d.isNew ? { ...d, isNew: false, trusted: true } : d)));
 
-  const scan = async () => {
-    setScanning(true);
-    setStatus("checking");
-    setNotice(null);
+  /**
+   * Escaneo de red. En modo silencioso (auto-escaneo) no toca los avisos de la
+   * interfaz ni los filtros: solo actualiza estados y registra los nuevos.
+   */
+  const runScan = async (silent = false) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    if (silent) setAutoScanning(true);
+    else {
+      setScanning(true);
+      setStatus("checking");
+      setNotice(null);
+    }
     try {
       // 1) En escritorio (Tauri/Electron): escaneo ARP nativo del sistema.
       const native = await nativeScan();
       if (native && native.length > 0) {
         setStatus("connected");
         const fresh = await applyScan(native, "native");
-        setNotice(
-          `Escaneo nativo completado: ${native.length} dispositivos detectados` +
-            (fresh > 0 ? ` · ${fresh} nuevos.` : "."),
-        );
+        if (!silent)
+          setNotice(
+            `Escaneo nativo completado: ${native.length} dispositivos detectados` +
+              (fresh > 0 ? ` · ${fresh} nuevos.` : "."),
+          );
         return;
       }
       // 2) Fallback: agente local en http://localhost:8765/scan.
       const devices = await fetchFromAgent();
       setStatus("connected");
       const fresh = await applyScan(devices, "agent");
-      setNotice(
-        `Escaneo completado: ${devices.length} dispositivos detectados` +
-          (fresh > 0 ? ` · ${fresh} nuevos.` : "."),
-      );
+      if (!silent)
+        setNotice(
+          `Escaneo completado: ${devices.length} dispositivos detectados` +
+            (fresh > 0 ? ` · ${fresh} nuevos.` : "."),
+        );
     } catch {
       setStatus("disconnected");
-      setNotice(
-        "No se ha podido escanear la red. Inicia el agente local (http://localhost:8765/scan), usa la app portable o importa los datos manualmente.",
-      );
+      if (!silent)
+        setNotice(
+          "No se ha podido escanear la red. Inicia el agente local (http://localhost:8765/scan), usa la app portable o importa los datos manualmente.",
+        );
     } finally {
+      busyRef.current = false;
       setScanning(false);
+      setAutoScanning(false);
+    }
+  };
+
+  const scan = () => void runScan(false);
+
+  const scanRef = useRef(runScan);
+  scanRef.current = runScan;
+
+  // Recupera el intervalo guardado de monitorización automática.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(AUTO_KEY);
+      if (raw !== null) {
+        const value = Number(raw);
+        if (autoOptions.some((o) => o.value === value)) {
+          setAutoInterval(value);
+          setCountdown(value);
+        }
+      }
+    } catch {
+      /* sin almacenamiento */
+    }
+  }, []);
+
+  // Cuenta atrás y disparo del escaneo periódico en segundo plano.
+  useEffect(() => {
+    if (!hydrated || autoInterval === 0) {
+      setCountdown(0);
+      return;
+    }
+    setCountdown(autoInterval);
+    const id = window.setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          void scanRef.current(true);
+          return autoInterval;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [autoInterval, hydrated]);
+
+  const changeAutoInterval = (value: number) => {
+    setAutoInterval(value);
+    setCountdown(value);
+    try {
+      window.localStorage.setItem(AUTO_KEY, String(value));
+    } catch {
+      /* sin almacenamiento */
     }
   };
 
@@ -308,7 +427,41 @@ function Dashboard() {
           <span className="min-w-0 max-w-full truncate text-muted-foreground" title={dbPath}>
             Datos en <span className="font-mono text-foreground">{dbPath}</span>
           </span>
-          <div className="ml-auto flex flex-wrap gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-muted-foreground">
+              {autoInterval > 0 ? (
+                <span className="relative flex size-2">
+                  <span
+                    className={cn(
+                      "absolute inline-flex size-2 rounded-full bg-brand opacity-75",
+                      autoScanning ? "animate-ping" : "animate-pulse",
+                    )}
+                  />
+                  <span className="relative inline-flex size-2 rounded-full bg-brand" />
+                </span>
+              ) : (
+                <Timer className="size-3.5" />
+              )}
+              <span className="font-mono">
+                {autoInterval === 0
+                  ? "Auto-escaneo en pausa"
+                  : autoScanning
+                    ? "Escaneando en segundo plano…"
+                    : `Próximo escaneo en ${formatCountdown(countdown)}`}
+              </span>
+              <select
+                value={autoInterval}
+                onChange={(e) => changeAutoInterval(Number(e.target.value))}
+                aria-label="Intervalo de monitorización automática"
+                className="rounded border border-input bg-popover px-1.5 py-0.5 text-xs text-popover-foreground outline-none focus:border-brand"
+              >
+                {autoOptions.map((o) => (
+                  <option key={o.value} value={o.value} className="bg-popover text-popover-foreground">
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </span>
             <button
               onClick={() => {
                 exportInventoryCsv(items);

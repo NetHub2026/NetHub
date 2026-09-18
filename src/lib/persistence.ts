@@ -1,5 +1,5 @@
 import type { Device } from "./devices";
-import { loadStoredDevices, saveDevices as saveToLocalStorage } from "./scanner";
+import { loadStoredDevices, sanitizeDevices, saveDevices as saveToLocalStorage } from "./scanner";
 import { isDesktop, readDevicesFile, writeDevicesFile } from "./desktop";
 
 /**
@@ -10,12 +10,13 @@ import { isDesktop, readDevicesFile, writeDevicesFile } from "./desktop";
 export async function loadDevicesAnywhere(): Promise<Device[] | null> {
   if (isDesktop()) {
     const fromFile = await readDevicesFile();
-    if (fromFile && fromFile.length > 0) return fromFile;
+    if (fromFile && fromFile.length > 0) return sanitizeDevices(fromFile);
   }
   return loadStoredDevices();
 }
 
 export async function saveDevicesAnywhere(devices: Device[]): Promise<void> {
-  saveToLocalStorage(devices);
-  if (isDesktop()) await writeDevicesFile(devices);
+  const clean = sanitizeDevices(devices);
+  saveToLocalStorage(clean);
+  if (isDesktop()) await writeDevicesFile(clean);
 }

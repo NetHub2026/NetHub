@@ -25,6 +25,11 @@
 ## Pendiente
 - Ninguna tarea abierta.
 
+## Completado (18/9, segunda ronda)
+- Etiqueta "Escaneado" eliminada: no se añade en los escaneos y se limpia al cargar, guardar y fusionar dispositivos ya guardados.
+- Monitorización automática: selector Cada 2 min / Cada 5 min / Desactivado (persistente), escaneo silencioso en segundo plano y cuenta atrás con pulso discreto.
+- Avisos de dispositivos nuevos: insignia "Nuevo", aviso flotante con nombre/IP/fabricante y acciones "Ver ficha" y "Reconocer".
+
 ## Completado (18/9)
 - Test de velocidad de ~20 s (descarga/subida continuas, velocímetro en vivo, pico, barra de progreso) verificado en navegador.
 - Icono con fondo 100% transparente (sin recuadro blanco en Windows): app-icon.png, favicon.png y favicon.ico multiresolución; empaquetado apunta a public/favicon.ico.
