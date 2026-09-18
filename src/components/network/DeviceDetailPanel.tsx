@@ -30,11 +30,13 @@ import { detectServices, likelyServices, type ServiceHit } from "@/lib/services"
 import { VendorIcon } from "./VendorIcon";
 import { cn } from "@/lib/utils";
 
+const connectionTags = ["Cableado / Ethernet", "Wi-Fi", "Wi-Fi 2.4GHz", "Wi-Fi 5GHz", "Wi-Fi 6"];
+
 const quickTagGroups: Array<{ label: string; tags: string[] }> = [
   { label: "Ubicaciones", tags: ["Salón", "Dormitorio", "Cocina", "Despacho", "Entrada"] },
   {
     label: "Conexión",
-    tags: ["Cableado / Ethernet", "Wi-Fi 2.4GHz", "Wi-Fi 5GHz", "Wi-Fi 6"],
+    tags: connectionTags,
   },
   {
     label: "Uso / Prioridad",
@@ -142,9 +144,14 @@ export function DeviceDetailPanel({
 
   const toggleTag = (tag: string) => {
     const active = device.tags.includes(tag);
+    const isConnection = connectionTags.includes(tag);
     onUpdate({
       ...device,
-      tags: active ? device.tags.filter((t) => t !== tag) : [...device.tags, tag],
+      tags: active
+        ? device.tags.filter((t) => t !== tag)
+        : isConnection
+          ? [...device.tags.filter((t) => !connectionTags.includes(t)), tag]
+          : [...device.tags, tag],
     });
   };
 

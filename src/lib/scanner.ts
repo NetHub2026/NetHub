@@ -86,6 +86,33 @@ function guessType(name: string, vendor: string): DeviceType {
   return "iot";
 }
 
+const WIFI_ONLY_TYPES = new Set<DeviceType>([
+  "smartphone",
+  "tablet",
+  "smart-plug",
+  "smart-bulb",
+  "led-strip",
+  "speaker",
+]);
+
+const CONNECTION_TAGS = [
+  "Wi-Fi",
+  "Wi-Fi 2.4GHz",
+  "Wi-Fi 5GHz",
+  "Wi-Fi 6",
+  "Cableado / Ethernet",
+];
+
+function hasConnectionTag(tags: string[]): boolean {
+  return tags.some((tag) => CONNECTION_TAGS.includes(tag));
+}
+
+function defaultTagsForType(type: DeviceType, tags: string[]): string[] {
+  if (hasConnectionTag(tags)) return tags;
+  if (WIFI_ONLY_TYPES.has(type)) return [...tags, "Wi-Fi"];
+  return tags;
+}
+
 function makeDevice(ip: string, mac: string, extra: Partial<Device> = {}): Device {
   const normalizedMac = normalizeMac(mac);
   const name = extra.name || suggestedName(normalizedMac, ip);
@@ -94,10 +121,12 @@ function makeDevice(ip: string, mac: string, extra: Partial<Device> = {}): Devic
   const vendor = extra.vendor || byHostname?.vendor || oui.vendor;
   const vendorBrand = brandFromVendorName(vendor);
   const brand = extra.brand ?? (vendorBrand !== "unknown" ? vendorBrand : byHostname?.brand ?? oui.brand);
+  const type = extra.type ? normalizeDeviceType(extra.type) : guessType(name, vendor);
+  const tags = defaultTagsForType(type, sanitizeTags(extra.tags));
   return {
     id: normalizedMac || ip,
     name,
-    type: extra.type ? normalizeDeviceType(extra.type) : guessType(name, vendor),
+    type,
     ip,
     mac: normalizedMac,
     status: extra.status ?? "online",
@@ -106,7 +135,7 @@ function makeDevice(ip: string, mac: string, extra: Partial<Device> = {}): Devic
     lastSeen: extra.lastSeen ?? "Detectado en el último escaneo",
     downstream: extra.downstream ?? 0,
     upstream: extra.upstream ?? 0,
-    tags: sanitizeTags(extra.tags),
+    tags,
   };
 }
 
@@ -116,16 +145,22 @@ const REMOVED_TAGS = ["escaneado"];
 /** Quita etiquetas obsoletas (p. ej. "Escaneado") de una lista de etiquetas. */
 export function sanitizeTags(tags?: string[]): string[] {
   if (!Array.isArray(tags)) return [];
-  return tags.filter((tag) => !REMOVED_TAGS.includes(String(tag).trim().toLowerCase()));
+  const clean = tags
+    .map((tag) => String(tag).trim())
+    .filter((tag) => tag.length > 0 && !REMOVED_TAGS.includes(tag.toLowerCase()));
+  return [...new Set(clean)];
 }
 
 /** Limpia las etiquetas obsoletas de una lista de dispositivos guardada. */
 export function sanitizeDevices(devices: Device[]): Device[] {
-  return devices.map((device) => ({
-    ...device,
-    type: normalizeDeviceType(device.type),
-    tags: sanitizeTags(device.tags),
-  }));
+  return devices.map((device) => {
+    const type = normalizeDeviceType(device.type);
+    return {
+      ...device,
+      type,
+      tags: defaultTagsForType(type, sanitizeTags(device.tags)),
+    };
+  });
 }
 
 export async function enrichDevicesWithResolvedVendors(devices: Device[]): Promise<Device[]> {
@@ -225,7 +260,7 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
     if (!old) {
       return {
         ...fresh,
-        tags: sanitizeTags(fresh.tags),
+        tags: defaultTagsForType(fresh.type, sanitizeTags(fresh.tags)),
         firstSeenAt: now,
         isNew: true,
         trusted: false,
@@ -240,7 +275,7 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
         : old.brand;
     const result: Device = {
       ...old,
-      tags: sanitizeTags(old.tags),
+      tags: defaultTagsForType(old.type, sanitizeTags(old.tags)),
       ip: fresh.ip,
       status: fresh.status,
       lastSeen: fresh.lastSeen,
@@ -259,7 +294,7 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
     .filter((d) => !seen.has(d.id))
     .map((d) => ({
       ...d,
-      tags: sanitizeTags(d.tags),
+      tags: defaultTagsForType(d.type, sanitizeTags(d.tags)),
       status: "offline" as const,
       downstream: 0,
       upstream: 0,
@@ -367,6 +402,25 @@ IP_RE = re.compile(r"(\\d{1,3}(?:\\.\\d{1,3}){3})")
 MAC_RE = re.compile(r"([0-9a-fA-F]{2}(?:[:-][0-9a-fA-F]{2}){5})")
 
 
+def connection_tag_for_windows():
+    try:
+        ps = (
+            "Get-NetIPConfiguration | "
+            "Where-Object {$_.IPv4Address -and $_.NetAdapter.Status -eq 'Up' -and $_.NetAdapter.HardwareInterface} | "
+            "Sort-Object { if ($_.IPv4DefaultGateway) { 0 } else { 1 } } | Select-Object -First 1 | "
+            "ForEach-Object { $a=Get-NetAdapter -InterfaceIndex $_.InterfaceIndex; "
+            "($a.Name + ' ' + $a.InterfaceDescription + ' ' + $a.MediaType + ' ' + $a.NdisPhysicalMedium) }"
+        )
+        out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, timeout=2).stdout.lower()
+        if re.search(r"wi-?fi|wireless|wlan|802\.11|inal[aá]mbrica|inalambrica", out):
+            return "Wi-Fi"
+        if re.search(r"ethernet|cable|gbe|lan|802\.3|realtek|intel|killer|marvell", out):
+            return "Cableado / Ethernet"
+    except Exception:
+        pass
+    return "Cableado / Ethernet"
+
+
 def local_device():
     hostname = socket.gethostname()
     ip = "127.0.0.1"
@@ -389,7 +443,7 @@ def local_device():
         "name": hostname,
         "type": "pc",
         "online": True,
-        "tags": ["Este equipo", "Local"],
+        "tags": ["Este equipo", "Local", connection_tag_for_windows()],
     }
 
 
@@ -654,6 +708,13 @@ function Get-NetBiosNameMap {
   return $names
 }
 
+function Get-ConnectionTag($adapter) {
+  $text = "$(if ($adapter) { $adapter.Name }) $(if ($adapter) { $adapter.InterfaceDescription }) $(if ($adapter) { $adapter.MediaType }) $(if ($adapter) { $adapter.NdisPhysicalMedium })"
+  if ($text -match '(?i)wi-?fi|wireless|wlan|802\.11|inal[aá]mbrica|inalambrica') { return 'Wi-Fi' }
+  if ($text -match '(?i)ethernet|cable|gbe|lan|802\.3|realtek|intel|killer|marvell') { return 'Cableado / Ethernet' }
+  return 'Cableado / Ethernet'
+}
+
 function Get-LocalDevice {
   $computerName = $env:COMPUTERNAME
   try {
@@ -665,7 +726,7 @@ function Get-LocalDevice {
       $ip = $config.IPv4Address.IPAddress
       $adapter = Get-NetAdapter -InterfaceIndex $config.InterfaceIndex -ErrorAction Stop
       $mac = ($adapter.MacAddress -replace '-', ':').ToUpper()
-      return @{ ip = $ip; mac = $mac; name = $computerName; type = 'pc'; online = $true; tags = @('Este equipo', 'Local') }
+      return @{ ip = $ip; mac = $mac; name = $computerName; type = 'pc'; online = $true; tags = @('Este equipo', 'Local', (Get-ConnectionTag $adapter)) }
     }
   } catch {}
 
@@ -678,7 +739,7 @@ function Get-LocalDevice {
       Select-Object -First 1
     if ($adapter -and $ip) {
       $mac = ($adapter.MacAddress -replace '-', ':').ToUpper()
-      return @{ ip = $ip.IPAddressToString; mac = $mac; name = $computerName; type = 'pc'; online = $true; tags = @('Este equipo', 'Local') }
+      return @{ ip = $ip.IPAddressToString; mac = $mac; name = $computerName; type = 'pc'; online = $true; tags = @('Este equipo', 'Local', (Get-ConnectionTag $adapter)) }
     }
   } catch {}
   return $null
