@@ -24,3 +24,7 @@
 
 ## Pendiente
 - Ninguna tarea abierta.
+
+## Completado (18/9)
+- Test de velocidad de ~20 s (descarga/subida continuas, velocímetro en vivo, pico, barra de progreso) verificado en navegador.
+- Icono con fondo 100% transparente (sin recuadro blanco en Windows): app-icon.png, favicon.png y favicon.ico multiresolución; empaquetado apunta a public/favicon.ico.
