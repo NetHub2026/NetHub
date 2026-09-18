@@ -184,29 +184,50 @@ async function optionalImport(spec: string): Promise<any> {
   return import(/* @vite-ignore */ spec);
 }
 
-export async function readDevicesFile(): Promise<Device[] | null> {
+/** Contenido de devices-db.json: inventario + listas de personas y ubicaciones. */
+export interface DbPayload {
+  devices: Device[];
+  people: string[];
+  locations: string[];
+}
+
+async function readDbRaw(): Promise<string | null> {
   const runtime = getRuntime();
-  try {
-    if (runtime === "electron" && window.nethub?.readDevices) {
-      const raw = await window.nethub.readDevices();
-      return raw ? (JSON.parse(raw) as Device[]) : null;
-    }
-    if (runtime === "tauri") {
-      const fs = await optionalImport("@tauri-apps/plugin-fs");
-      const exists = await fs.exists(DB_FILE, { baseDir: fs.BaseDirectory.AppData });
-      if (!exists) return null;
-      const raw = await fs.readTextFile(DB_FILE, { baseDir: fs.BaseDirectory.AppData });
-      return JSON.parse(raw) as Device[];
-    }
-  } catch {
-    return null;
+  if (runtime === "electron" && window.nethub?.readDevices) {
+    return (await window.nethub.readDevices()) ?? null;
+  }
+  if (runtime === "tauri") {
+    const fs = await optionalImport("@tauri-apps/plugin-fs");
+    const exists = await fs.exists(DB_FILE, { baseDir: fs.BaseDirectory.AppData });
+    if (!exists) return null;
+    return (await fs.readTextFile(DB_FILE, { baseDir: fs.BaseDirectory.AppData })) as string;
   }
   return null;
 }
 
-export async function writeDevicesFile(devices: Device[]): Promise<boolean> {
+/** Lee el archivo local aceptando el formato antiguo (solo array de dispositivos). */
+export async function readDbFile(): Promise<DbPayload | null> {
+  try {
+    const raw = await readDbRaw();
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) {
+      return { devices: parsed as Device[], people: [], locations: [] };
+    }
+    const obj = (parsed ?? {}) as Partial<DbPayload>;
+    return {
+      devices: Array.isArray(obj.devices) ? obj.devices : [],
+      people: Array.isArray(obj.people) ? obj.people : [],
+      locations: Array.isArray(obj.locations) ? obj.locations : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function writeDbFile(payload: DbPayload): Promise<boolean> {
   const runtime = getRuntime();
-  const json = JSON.stringify(devices, null, 2);
+  const json = JSON.stringify({ app: "NetHub", savedAt: new Date().toISOString(), ...payload }, null, 2);
   try {
     if (runtime === "electron" && window.nethub?.writeDevices) {
       await window.nethub.writeDevices(json);
@@ -221,6 +242,15 @@ export async function writeDevicesFile(devices: Device[]): Promise<boolean> {
     return false;
   }
   return false;
+}
+
+export async function readDevicesFile(): Promise<Device[] | null> {
+  const payload = await readDbFile();
+  return payload ? payload.devices : null;
+}
+
+export async function writeDevicesFile(devices: Device[]): Promise<boolean> {
+  return writeDbFile({ devices, people: [], locations: [] });
 }
 
 /* ------------------------------------------------------------------ */
