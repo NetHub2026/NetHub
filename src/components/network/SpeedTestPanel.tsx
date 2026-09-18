@@ -64,9 +64,9 @@ function Speedometer({ value, unit, label }: { value: number; unit: string; labe
         />
         <circle cx="100" cy="110" r="6" className="fill-current text-foreground" />
       </svg>
-      <div className="-mt-6 text-center">
+      <div className="pt-3 text-center">
         <p className="font-mono text-3xl font-semibold">{value.toFixed(1)}</p>
-        <p className="text-xs uppercase tracking-wider text-muted-foreground">
+        <p className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">
           {unit} · {label}
         </p>
       </div>
