@@ -338,11 +338,31 @@ function Dashboard() {
   /** Vacía el inventario por completo (borra escaneos guardados y dispositivos). */
   const resetData = () => {
     clearStoredData();
+    clearStoredDirectory();
     setItems([]);
+    setDirectory(emptyDirectory);
+    setPersonFilter("all");
+    setLocationFilter("all");
     setMeta({ lastScanAt: null, source: null });
+    void saveDirectoryAnywhere(emptyDirectory);
     void saveDevicesAnywhere([]);
     setNotice("Datos borrados: el inventario está vacío. Escanea tu red para empezar.");
   };
+
+  /** Crea una persona o ubicación reutilizable y la guarda. */
+  const createPerson = (name: string) =>
+    setDirectory((prev) => {
+      const next = { ...prev, people: withEntry(prev.people, name) };
+      void saveDirectoryAnywhere(next);
+      return next;
+    });
+
+  const createLocation = (name: string) =>
+    setDirectory((prev) => {
+      const next = { ...prev, locations: withEntry(prev.locations, name) };
+      void saveDirectoryAnywhere(next);
+      return next;
+    });
 
   const online = items.filter((d) => d.status === "online");
   const totalDown = online.reduce((sum, d) => sum + d.downstream, 0);
@@ -355,19 +375,24 @@ function Dashboard() {
   const networkCounts = useMemo(() => countByNetwork(items), [items]);
   const detectedNetworks = useMemo(() => detectNetworks(items), [items]);
 
+  /** Personas y ubicaciones disponibles: las creadas más las ya asignadas. */
+  const options = useMemo(() => directoryFromDevices(items, directory), [items, directory]);
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return items.filter((d) => {
       if (filter !== "all" && d.type !== filter) return false;
       if (network !== ALL_NETWORKS && (networkOf(d) ?? "unknown") !== network) return false;
       if (onlyOnline && d.status !== "online") return false;
+      if (personFilter !== "all" && (d.person ?? "") !== personFilter) return false;
+      if (locationFilter !== "all" && (d.location ?? "") !== locationFilter) return false;
       if (!q) return true;
-      return [d.name, d.ip, d.mac, d.vendor, ...d.tags]
+      return [d.name, d.ip, d.mac, d.vendor, d.person ?? "", d.location ?? "", ...d.tags]
         .join(" ")
         .toLowerCase()
         .includes(q);
     });
-  }, [items, filter, network, onlyOnline, query]);
+  }, [items, filter, network, onlyOnline, personFilter, locationFilter, query]);
 
   const selected = items.find((d) => d.id === selectedId) ?? null;
 
