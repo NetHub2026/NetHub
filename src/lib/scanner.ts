@@ -206,6 +206,7 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
         : old.brand;
     const result: Device = {
       ...old,
+      tags: sanitizeTags(old.tags),
       ip: fresh.ip,
       status: fresh.status,
       lastSeen: fresh.lastSeen,
@@ -222,7 +223,13 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
 
   const missing = previous
     .filter((d) => !seen.has(d.id))
-    .map((d) => ({ ...d, status: "offline" as const, downstream: 0, upstream: 0 }));
+    .map((d) => ({
+      ...d,
+      tags: sanitizeTags(d.tags),
+      status: "offline" as const,
+      downstream: 0,
+      upstream: 0,
+    }));
 
   return [...merged, ...missing].sort((a, b) =>
     a.ip.localeCompare(b.ip, undefined, { numeric: true }),
