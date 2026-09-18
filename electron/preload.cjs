@@ -11,6 +11,12 @@ contextBridge.exposeInMainWorld("nethub", {
   wol: (mac) => ipcRenderer.invoke("nethub:wol", mac),
   traffic: () => ipcRenderer.invoke("nethub:traffic"),
   checkUpdate: () => ipcRenderer.invoke("nethub:check-update"),
+  // Petición de escaneo desde el menú del área de notificación.
+  onScanNow: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on("nethub:scan-now", listener);
+    return () => ipcRenderer.removeListener("nethub:scan-now", listener);
+  },
   installUpdate: (onProgress) => {
     const listener = (_event, payload) => {
       if (typeof onProgress === "function") onProgress(payload);
