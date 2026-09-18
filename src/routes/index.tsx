@@ -52,6 +52,7 @@ import {
   getDbPath,
   getRuntime,
   nativeScan,
+  onDesktopScanRequest,
   runtimeLabels,
   type Runtime,
 } from "@/lib/desktop";
@@ -289,6 +290,9 @@ function Dashboard() {
 
   const scanRef = useRef(runScan);
   scanRef.current = runScan;
+
+  // «Escanear ahora» desde el icono del área de notificación (app de escritorio).
+  useEffect(() => onDesktopScanRequest(() => void scanRef.current(false)), []);
 
   // Recupera el intervalo guardado de monitorización automática.
   useEffect(() => {
