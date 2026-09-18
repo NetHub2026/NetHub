@@ -399,9 +399,21 @@ function compareVersions(a, b) {
 async function checkUpdate() {
   const version = currentVersion();
   try {
-    const raw = await httpsText(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
+    let raw = null;
+    let lastError = null;
+    for (const repo of GITHUB_REPOS) {
+      try {
+        raw = await httpsText(`https://api.github.com/repos/${repo}/releases/latest`);
+        break;
+      } catch (error) {
+        lastError = error;
+        raw = null;
+      }
+    }
+    if (!raw) throw lastError || new Error("No se pudo consultar GitHub");
     const release = JSON.parse(raw);
     const latest = normalizeVersion(release.tag_name || release.name);
+
     const asset = (release.assets || []).find(
       (a) => String(a.name || "").toLowerCase() === UPDATE_ASSET.toLowerCase(),
     );
