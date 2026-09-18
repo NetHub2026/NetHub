@@ -427,7 +427,41 @@ function Dashboard() {
           <span className="min-w-0 max-w-full truncate text-muted-foreground" title={dbPath}>
             Datos en <span className="font-mono text-foreground">{dbPath}</span>
           </span>
-          <div className="ml-auto flex flex-wrap gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-muted-foreground">
+              {autoInterval > 0 ? (
+                <span className="relative flex size-2">
+                  <span
+                    className={cn(
+                      "absolute inline-flex size-2 rounded-full bg-brand opacity-75",
+                      autoScanning ? "animate-ping" : "animate-pulse",
+                    )}
+                  />
+                  <span className="relative inline-flex size-2 rounded-full bg-brand" />
+                </span>
+              ) : (
+                <Timer className="size-3.5" />
+              )}
+              <span className="font-mono">
+                {autoInterval === 0
+                  ? "Auto-escaneo en pausa"
+                  : autoScanning
+                    ? "Escaneando en segundo plano…"
+                    : `Próximo escaneo en ${formatCountdown(countdown)}`}
+              </span>
+              <select
+                value={autoInterval}
+                onChange={(e) => changeAutoInterval(Number(e.target.value))}
+                aria-label="Intervalo de monitorización automática"
+                className="rounded border border-input bg-popover px-1.5 py-0.5 text-xs text-popover-foreground outline-none focus:border-brand"
+              >
+                {autoOptions.map((o) => (
+                  <option key={o.value} value={o.value} className="bg-popover text-popover-foreground">
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </span>
             <button
               onClick={() => {
                 exportInventoryCsv(items);
