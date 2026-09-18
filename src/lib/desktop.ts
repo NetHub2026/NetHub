@@ -35,7 +35,9 @@ export interface TrafficSample {
 /** Versión de NetHub que se muestra en la interfaz (coincide con package.json). */
 export const APP_VERSION = "1.0.0";
 
-const GITHUB_REPO = "oyogor1985/connected-clan";
+/** Se prueba el nombre nuevo del repositorio y, si no existe, el anterior. */
+const GITHUB_REPOS = ["oyogor1985/nethub", "oyogor1985/connected-clan"];
+
 
 export interface UpdateInfo {
   ok: boolean;
@@ -95,8 +97,18 @@ export async function checkUpdate(): Promise<UpdateInfo> {
     size: 0,
   };
   try {
-    const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
-    if (!response.ok) return { ...base, error: `GitHub respondió ${response.status}` };
+    let response: Response | null = null;
+    for (const repo of GITHUB_REPOS) {
+      const attempt = await fetch(`https://api.github.com/repos/${repo}/releases/latest`);
+      if (attempt.ok) {
+        response = attempt;
+        break;
+      }
+      response = attempt;
+    }
+    if (!response || !response.ok) {
+      return { ...base, error: `GitHub respondió ${response?.status ?? "sin respuesta"}` };
+    }
     const release = (await response.json()) as {
       tag_name?: string;
       name?: string;
@@ -104,6 +116,7 @@ export async function checkUpdate(): Promise<UpdateInfo> {
       published_at?: string;
       assets?: Array<{ name?: string; browser_download_url?: string; size?: number }>;
     };
+
     const latest = normalizeVersion(release.tag_name || release.name);
     const asset = (release.assets || []).find((a) => a.name?.toLowerCase() === "nethub.exe");
     return {
