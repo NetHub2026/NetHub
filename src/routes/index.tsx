@@ -125,7 +125,14 @@ function Dashboard() {
   const [runtime, setRuntime] = useState<Runtime>("web");
   const [dbPath, setDbPath] = useState("Almacenamiento del navegador (localStorage)");
   const [updateOpen, setUpdateOpen] = useState(false);
-
+  /** Monitorización automática: intervalo en segundos (0 = desactivada). */
+  const [autoInterval, setAutoInterval] = useState(120);
+  const [countdown, setCountdown] = useState(120);
+  const [autoScanning, setAutoScanning] = useState(false);
+  /** Evita escaneos solapados (manual + automático). */
+  const busyRef = useRef(false);
+  const itemsRef = useRef<Device[]>([]);
+  itemsRef.current = items;
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
