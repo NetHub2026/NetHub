@@ -22,7 +22,7 @@
     "productName": "NetHub",
     "forceCodeSigning": false,
     "directories": { "output": "dist-electron" },
-    "files": ["dist/**/*", ".output/**/*", "electron/**/*", "package.json"],
+    "files": ["dist/**/*", ".output/**/*", "electron/**/*", "public/**/*", "package.json"],
     "win": {
       "target": "portable",
       "icon": "public/favicon.ico",
