@@ -16,6 +16,7 @@ export async function loadDevicesAnywhere(): Promise<Device[] | null> {
 }
 
 export async function saveDevicesAnywhere(devices: Device[]): Promise<void> {
-  saveToLocalStorage(devices);
-  if (isDesktop()) await writeDevicesFile(devices);
+  const clean = sanitizeDevices(devices);
+  saveToLocalStorage(clean);
+  if (isDesktop()) await writeDevicesFile(clean);
 }
