@@ -14,9 +14,11 @@ import {
   RefreshCw,
   RotateCcw,
 
+  MapPin,
   Search,
   Sun,
   Timer,
+  Users,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -25,6 +27,13 @@ import {
   type Device,
   type DeviceType,
 } from "@/lib/devices";
+import {
+  clearStoredDirectory,
+  directoryFromDevices,
+  emptyDirectory,
+  withEntry,
+  type Directory,
+} from "@/lib/directory";
 import {
   clearStoredData,
   fetchFromAgent,
@@ -43,10 +52,16 @@ import {
   getDbPath,
   getRuntime,
   nativeScan,
+  onDesktopScanRequest,
   runtimeLabels,
   type Runtime,
 } from "@/lib/desktop";
-import { loadDevicesAnywhere, saveDevicesAnywhere } from "@/lib/persistence";
+import {
+  loadDevicesAnywhere,
+  loadDirectoryAnywhere,
+  saveDevicesAnywhere,
+  saveDirectoryAnywhere,
+} from "@/lib/persistence";
 import { exportInventoryCsv } from "@/lib/backup";
 import {
   ALL_NETWORKS,
@@ -115,6 +130,10 @@ function Dashboard() {
   const [query, setQuery] = useState("");
   const [network, setNetwork] = useState<string>(ALL_NETWORKS);
   const [onlyOnline, setOnlyOnline] = useState(false);
+  /** Listas de personas y ubicaciones creadas por el usuario. */
+  const [directory, setDirectory] = useState<Directory>(emptyDirectory);
+  const [personFilter, setPersonFilter] = useState("all");
+  const [locationFilter, setLocationFilter] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dark, setDark] = useState(true);
   const [status, setStatus] = useState<ScannerStatus>("unknown");
@@ -145,6 +164,8 @@ function Dashboard() {
       const stored = await loadDevicesAnywhere();
       if (cancelled) return;
       if (stored && stored.length > 0) setItems(stored);
+      setDirectory(await loadDirectoryAnywhere(stored ?? []));
+      if (cancelled) return;
       setMeta(loadScanMeta());
       setRuntime(getRuntime());
       setDbPath(await getDbPath());
@@ -270,6 +291,9 @@ function Dashboard() {
   const scanRef = useRef(runScan);
   scanRef.current = runScan;
 
+  // «Escanear ahora» desde el icono del área de notificación (app de escritorio).
+  useEffect(() => onDesktopScanRequest(() => void scanRef.current(false)), []);
+
   // Recupera el intervalo guardado de monitorización automática.
   useEffect(() => {
     try {
@@ -318,11 +342,31 @@ function Dashboard() {
   /** Vacía el inventario por completo (borra escaneos guardados y dispositivos). */
   const resetData = () => {
     clearStoredData();
+    clearStoredDirectory();
     setItems([]);
+    setDirectory(emptyDirectory);
+    setPersonFilter("all");
+    setLocationFilter("all");
     setMeta({ lastScanAt: null, source: null });
+    void saveDirectoryAnywhere(emptyDirectory);
     void saveDevicesAnywhere([]);
     setNotice("Datos borrados: el inventario está vacío. Escanea tu red para empezar.");
   };
+
+  /** Crea una persona o ubicación reutilizable y la guarda. */
+  const createPerson = (name: string) =>
+    setDirectory((prev) => {
+      const next = { ...prev, people: withEntry(prev.people, name) };
+      void saveDirectoryAnywhere(next);
+      return next;
+    });
+
+  const createLocation = (name: string) =>
+    setDirectory((prev) => {
+      const next = { ...prev, locations: withEntry(prev.locations, name) };
+      void saveDirectoryAnywhere(next);
+      return next;
+    });
 
   const online = items.filter((d) => d.status === "online");
   const totalDown = online.reduce((sum, d) => sum + d.downstream, 0);
@@ -335,19 +379,24 @@ function Dashboard() {
   const networkCounts = useMemo(() => countByNetwork(items), [items]);
   const detectedNetworks = useMemo(() => detectNetworks(items), [items]);
 
+  /** Personas y ubicaciones disponibles: las creadas más las ya asignadas. */
+  const options = useMemo(() => directoryFromDevices(items, directory), [items, directory]);
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return items.filter((d) => {
       if (filter !== "all" && d.type !== filter) return false;
       if (network !== ALL_NETWORKS && (networkOf(d) ?? "unknown") !== network) return false;
       if (onlyOnline && d.status !== "online") return false;
+      if (personFilter !== "all" && (d.person ?? "") !== personFilter) return false;
+      if (locationFilter !== "all" && (d.location ?? "") !== locationFilter) return false;
       if (!q) return true;
-      return [d.name, d.ip, d.mac, d.vendor, ...d.tags]
+      return [d.name, d.ip, d.mac, d.vendor, d.person ?? "", d.location ?? "", ...d.tags]
         .join(" ")
         .toLowerCase()
         .includes(q);
     });
-  }, [items, filter, network, onlyOnline, query]);
+  }, [items, filter, network, onlyOnline, personFilter, locationFilter, query]);
 
   const selected = items.find((d) => d.id === selectedId) ?? null;
 
@@ -368,7 +417,7 @@ function Dashboard() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-4">
+        <div className="mx-auto flex max-w-[1720px] items-center gap-4 px-5 py-4 xl:px-8">
           <img
             src="/app-icon.png"
             alt="NetHub"
@@ -413,7 +462,7 @@ function Dashboard() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-5 py-8">
+      <main className="mx-auto max-w-[1720px] px-5 py-8 xl:px-8">
         <section className="mb-6 flex flex-wrap items-center gap-x-5 gap-y-3 rounded-2xl border border-border bg-card px-5 py-4 text-xs">
           <span className="text-muted-foreground">
             Último escaneo:{" "}
@@ -633,6 +682,48 @@ function Dashboard() {
                 className="w-56 rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm outline-none focus:border-brand"
               />
             </label>
+            <span className="flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm focus-within:border-brand">
+              <Users className="size-4 shrink-0 text-muted-foreground" />
+              <select
+                value={personFilter}
+                onChange={(e) => setPersonFilter(e.target.value)}
+                aria-label="Filtrar por persona"
+                className="bg-popover text-sm text-popover-foreground outline-none"
+              >
+                <option value="all" className="bg-popover text-popover-foreground">
+                  Todas las personas
+                </option>
+                {options.people.map((name) => (
+                  <option key={name} value={name} className="bg-popover text-popover-foreground">
+                    {name}
+                  </option>
+                ))}
+                <option value="" className="bg-popover text-popover-foreground">
+                  Sin persona
+                </option>
+              </select>
+            </span>
+            <span className="flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm focus-within:border-brand">
+              <MapPin className="size-4 shrink-0 text-muted-foreground" />
+              <select
+                value={locationFilter}
+                onChange={(e) => setLocationFilter(e.target.value)}
+                aria-label="Filtrar por ubicación"
+                className="bg-popover text-sm text-popover-foreground outline-none"
+              >
+                <option value="all" className="bg-popover text-popover-foreground">
+                  Todas las ubicaciones
+                </option>
+                {options.locations.map((name) => (
+                  <option key={name} value={name} className="bg-popover text-popover-foreground">
+                    {name}
+                  </option>
+                ))}
+                <option value="" className="bg-popover text-popover-foreground">
+                  Sin ubicación
+                </option>
+              </select>
+            </span>
             <button
               onClick={() => setOnlyOnline((v) => !v)}
               className={cn(
@@ -664,7 +755,7 @@ function Dashboard() {
             ))}
           </div>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {visible.map((d) => (
               <button
                 key={d.id}
@@ -697,6 +788,22 @@ function Dashboard() {
                       {d.ip} · {d.vendor}
                     </span>
                   </span>
+                  {(d.person || d.location) && (
+                    <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                      {d.person && (
+                        <span className="inline-flex min-w-0 items-center gap-1">
+                          <Users className="size-3 shrink-0" />
+                          <span className="truncate">{d.person}</span>
+                        </span>
+                      )}
+                      {d.location && (
+                        <span className="inline-flex min-w-0 items-center gap-1">
+                          <MapPin className="size-3 shrink-0" />
+                          <span className="truncate">{d.location}</span>
+                        </span>
+                      )}
+                    </span>
+                  )}
                   <span className="mt-1.5 flex flex-wrap gap-1.5">
                     {d.isNew && !d.trusted && (
                       <Badge className="bg-warning/15 text-warning">Nuevo</Badge>
@@ -745,6 +852,10 @@ function Dashboard() {
         onUpdate={update}
         onDelete={remove}
         networks={detectedNetworks}
+        people={options.people}
+        locations={options.locations}
+        onCreatePerson={createPerson}
+        onCreateLocation={createLocation}
       />
 
       <UpdateModal open={updateOpen} onClose={() => setUpdateOpen(false)} />

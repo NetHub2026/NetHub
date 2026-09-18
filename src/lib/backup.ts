@@ -11,6 +11,8 @@ const CSV_COLUMNS = [
   "vendor",
   "brand",
   "networkId",
+  "person",
+  "location",
   "tags",
   "notes",
   "trusted",
@@ -35,6 +37,8 @@ export function devicesToCsv(devices: Device[]): string {
       d.vendor,
       d.brand ?? "",
       d.networkId ?? "",
+      d.person ?? "",
+      d.location ?? "",
       d.tags.join(" | "),
       d.notes ?? "",
       d.trusted ? "sí" : "",
@@ -143,6 +147,10 @@ export function parseBackupCsv(text: string): Device[] {
     };
     const brand = at("brand");
     if (brand) device.brand = brand as NonNullable<Device["brand"]>;
+    const person = at("person");
+    if (person) device.person = person;
+    const location = at("location");
+    if (location) device.location = location;
     const networkId = at("networkid");
     if (networkId) device.networkId = networkId;
     const notes = at("notes");
