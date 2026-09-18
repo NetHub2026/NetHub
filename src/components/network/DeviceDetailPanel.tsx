@@ -47,6 +47,11 @@ interface DeviceDetailPanelProps {
   onDelete: (device: Device) => void;
   /** Subredes detectadas dinámicamente en el inventario. */
   networks?: NetworkDef[];
+  /** Personas y ubicaciones ya creadas, reutilizables en cualquier dispositivo. */
+  people?: string[];
+  locations?: string[];
+  onCreatePerson?: (name: string) => void;
+  onCreateLocation?: (name: string) => void;
 }
 
 export function DeviceDetailPanel({
@@ -55,8 +60,14 @@ export function DeviceDetailPanel({
   onUpdate,
   onDelete,
   networks = [],
+  people = [],
+  locations = [],
+  onCreatePerson,
+  onCreateLocation,
 }: DeviceDetailPanelProps) {
   const [tagDraft, setTagDraft] = useState("");
+  const [personDraft, setPersonDraft] = useState("");
+  const [locationDraft, setLocationDraft] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [probing, setProbing] = useState(false);
   const [probeNote, setProbeNote] = useState<string | null>(null);
