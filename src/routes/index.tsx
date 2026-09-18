@@ -129,6 +129,10 @@ function Dashboard() {
   const [query, setQuery] = useState("");
   const [network, setNetwork] = useState<string>(ALL_NETWORKS);
   const [onlyOnline, setOnlyOnline] = useState(false);
+  /** Listas de personas y ubicaciones creadas por el usuario. */
+  const [directory, setDirectory] = useState<Directory>(emptyDirectory);
+  const [personFilter, setPersonFilter] = useState("all");
+  const [locationFilter, setLocationFilter] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dark, setDark] = useState(true);
   const [status, setStatus] = useState<ScannerStatus>("unknown");
@@ -159,6 +163,8 @@ function Dashboard() {
       const stored = await loadDevicesAnywhere();
       if (cancelled) return;
       if (stored && stored.length > 0) setItems(stored);
+      setDirectory(await loadDirectoryAnywhere(stored ?? []));
+      if (cancelled) return;
       setMeta(loadScanMeta());
       setRuntime(getRuntime());
       setDbPath(await getDbPath());
