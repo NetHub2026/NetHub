@@ -159,10 +159,38 @@ function Dashboard() {
     if (hydrated) void saveDevicesAnywhere(items);
   }, [items, hydrated]);
 
-  /** Fusiona el escaneo con la lista conocida y devuelve cuántos son nuevos. */
+  /** Marca un dispositivo como reconocido (quita la insignia «Nuevo»). */
+  const markKnown = (id: string) =>
+    setItems((prev) =>
+      prev.map((d) => (d.id === id ? { ...d, isNew: false, trusted: true } : d)),
+    );
+
+  /** Avisa de los dispositivos recién detectados con acceso directo a su ficha. */
+  const announceNew = (fresh: Device[]) => {
+    for (const device of fresh.slice(0, 3)) {
+      toast.warning(`Nuevo dispositivo detectado: ${device.name}`, {
+        description: `${device.ip} · ${device.vendor}`,
+        duration: 12000,
+        action: {
+          label: "Ver ficha",
+          onClick: () => setSelectedId(device.id),
+        },
+        cancel: {
+          label: "Reconocer",
+          onClick: () => markKnown(device.id),
+        },
+      });
+    }
+    if (fresh.length > 3) {
+      toast.warning(`Y ${fresh.length - 3} dispositivos nuevos más en tu red.`);
+    }
+  };
+
+  /** Fusiona el escaneo con la lista conocida y devuelve los dispositivos nuevos. */
   const applyScan = async (devices: Device[], source: NonNullable<ScanMeta["source"]>) => {
     const resolved = await enrichDevicesWithResolvedVendors(devices);
-    const merged = mergeScan(items, resolved);
+    const known = new Set(itemsRef.current.map((d) => d.id));
+    const merged = mergeScan(itemsRef.current, resolved);
     setItems(merged);
     void saveDevicesAnywhere(merged);
     const next: ScanMeta = { lastScanAt: new Date().toISOString(), source };
@@ -180,43 +208,110 @@ function Dashboard() {
         return updated;
       });
     });
-    return newDevices(merged).length;
+    // Nuevos de este escaneo: no estaban registrados antes de fusionar.
+    const justFound = merged.filter((d) => !known.has(d.id) && d.isNew && !d.trusted);
+    if (justFound.length > 0) announceNew(justFound);
+    return justFound.length;
   };
 
   const trustAll = () =>
     setItems((prev) => prev.map((d) => (d.isNew ? { ...d, isNew: false, trusted: true } : d)));
 
-  const scan = async () => {
-    setScanning(true);
-    setStatus("checking");
-    setNotice(null);
+  /**
+   * Escaneo de red. En modo silencioso (auto-escaneo) no toca los avisos de la
+   * interfaz ni los filtros: solo actualiza estados y registra los nuevos.
+   */
+  const runScan = async (silent = false) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    if (silent) setAutoScanning(true);
+    else {
+      setScanning(true);
+      setStatus("checking");
+      setNotice(null);
+    }
     try {
       // 1) En escritorio (Tauri/Electron): escaneo ARP nativo del sistema.
       const native = await nativeScan();
       if (native && native.length > 0) {
         setStatus("connected");
         const fresh = await applyScan(native, "native");
-        setNotice(
-          `Escaneo nativo completado: ${native.length} dispositivos detectados` +
-            (fresh > 0 ? ` · ${fresh} nuevos.` : "."),
-        );
+        if (!silent)
+          setNotice(
+            `Escaneo nativo completado: ${native.length} dispositivos detectados` +
+              (fresh > 0 ? ` · ${fresh} nuevos.` : "."),
+          );
         return;
       }
       // 2) Fallback: agente local en http://localhost:8765/scan.
       const devices = await fetchFromAgent();
       setStatus("connected");
       const fresh = await applyScan(devices, "agent");
-      setNotice(
-        `Escaneo completado: ${devices.length} dispositivos detectados` +
-          (fresh > 0 ? ` · ${fresh} nuevos.` : "."),
-      );
+      if (!silent)
+        setNotice(
+          `Escaneo completado: ${devices.length} dispositivos detectados` +
+            (fresh > 0 ? ` · ${fresh} nuevos.` : "."),
+        );
     } catch {
       setStatus("disconnected");
-      setNotice(
-        "No se ha podido escanear la red. Inicia el agente local (http://localhost:8765/scan), usa la app portable o importa los datos manualmente.",
-      );
+      if (!silent)
+        setNotice(
+          "No se ha podido escanear la red. Inicia el agente local (http://localhost:8765/scan), usa la app portable o importa los datos manualmente.",
+        );
     } finally {
+      busyRef.current = false;
       setScanning(false);
+      setAutoScanning(false);
+    }
+  };
+
+  const scan = () => void runScan(false);
+
+  const scanRef = useRef(runScan);
+  scanRef.current = runScan;
+
+  // Recupera el intervalo guardado de monitorización automática.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(AUTO_KEY);
+      if (raw !== null) {
+        const value = Number(raw);
+        if (autoOptions.some((o) => o.value === value)) {
+          setAutoInterval(value);
+          setCountdown(value);
+        }
+      }
+    } catch {
+      /* sin almacenamiento */
+    }
+  }, []);
+
+  // Cuenta atrás y disparo del escaneo periódico en segundo plano.
+  useEffect(() => {
+    if (!hydrated || autoInterval === 0) {
+      setCountdown(0);
+      return;
+    }
+    setCountdown(autoInterval);
+    const id = window.setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          void scanRef.current(true);
+          return autoInterval;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [autoInterval, hydrated]);
+
+  const changeAutoInterval = (value: number) => {
+    setAutoInterval(value);
+    setCountdown(value);
+    try {
+      window.localStorage.setItem(AUTO_KEY, String(value));
+    } catch {
+      /* sin almacenamiento */
     }
   };
 
