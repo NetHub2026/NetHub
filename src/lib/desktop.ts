@@ -23,6 +23,13 @@ interface ElectronBridge {
   traffic?: () => Promise<TrafficSample>;
   checkUpdate?: () => Promise<UpdateInfo>;
   installUpdate?: (onProgress: (p: UpdateProgress) => void) => Promise<InstallResult>;
+  onScanNow?: (callback: () => void) => () => void;
+}
+
+/** Escucha la orden «Escanear ahora» del icono de la bandeja del sistema. */
+export function onDesktopScanRequest(callback: () => void): () => void {
+  if (typeof window === "undefined" || !window.nethub?.onScanNow) return () => {};
+  return window.nethub.onScanNow(callback);
 }
 
 /** Muestra instantánea de tráfico de red en Mbps. */
