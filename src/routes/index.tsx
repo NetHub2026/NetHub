@@ -784,6 +784,22 @@ function Dashboard() {
                       {d.ip} · {d.vendor}
                     </span>
                   </span>
+                  {(d.person || d.location) && (
+                    <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                      {d.person && (
+                        <span className="inline-flex min-w-0 items-center gap-1">
+                          <Users className="size-3 shrink-0" />
+                          <span className="truncate">{d.person}</span>
+                        </span>
+                      )}
+                      {d.location && (
+                        <span className="inline-flex min-w-0 items-center gap-1">
+                          <MapPin className="size-3 shrink-0" />
+                          <span className="truncate">{d.location}</span>
+                        </span>
+                      )}
+                    </span>
+                  )}
                   <span className="mt-1.5 flex flex-wrap gap-1.5">
                     {d.isNew && !d.trusted && (
                       <Badge className="bg-warning/15 text-warning">Nuevo</Badge>
@@ -832,6 +848,10 @@ function Dashboard() {
         onUpdate={update}
         onDelete={remove}
         networks={detectedNetworks}
+        people={options.people}
+        locations={options.locations}
+        onCreatePerson={createPerson}
+        onCreateLocation={createLocation}
       />
 
       <UpdateModal open={updateOpen} onClose={() => setUpdateOpen(false)} />
