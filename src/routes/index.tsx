@@ -94,6 +94,21 @@ const filters: Array<{ value: DeviceType | "all"; label: string }> = [
   })),
 ];
 
+/** Intervalos disponibles para la monitorización automática (en segundos). */
+const autoOptions: Array<{ value: number; label: string }> = [
+  { value: 120, label: "Cada 2 min" },
+  { value: 300, label: "Cada 5 min" },
+  { value: 0, label: "Desactivado" },
+];
+
+const AUTO_KEY = "nethub.autoscan.v1";
+
+function formatCountdown(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 function Dashboard() {
   const [items, setItems] = useState<Device[]>([]);
   const [filter, setFilter] = useState<DeviceType | "all">("all");
