@@ -35,7 +35,9 @@ export interface TrafficSample {
 /** Versión de NetHub que se muestra en la interfaz (coincide con package.json). */
 export const APP_VERSION = "1.0.0";
 
-const GITHUB_REPO = "oyogor1985/connected-clan";
+/** Se prueba el nombre nuevo del repositorio y, si no existe, el anterior. */
+const GITHUB_REPOS = ["oyogor1985/nethub", "oyogor1985/connected-clan"];
+
 
 export interface UpdateInfo {
   ok: boolean;
