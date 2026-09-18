@@ -607,6 +607,7 @@ function createWindow() {
     minHeight: 640,
     backgroundColor: "#0b1120",
     title: "NetHub",
+    icon: path.join(__dirname, "..", "public", "app-icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
