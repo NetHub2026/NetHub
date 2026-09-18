@@ -250,9 +250,13 @@ function Dashboard() {
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-4">
-          <div className="flex size-9 items-center justify-center rounded-lg bg-brand text-brand-foreground">
-            <Wifi className="size-5" />
-          </div>
+          <img
+            src={appIcon}
+            alt="NetHub"
+            width={36}
+            height={36}
+            className="size-9 rounded-lg"
+          />
           <div className="flex-1">
             <h1 className="text-lg font-semibold leading-none">NetHub</h1>
             <p className="mt-1 text-xs text-muted-foreground">
