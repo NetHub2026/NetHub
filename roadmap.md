@@ -25,6 +25,7 @@
 ## Pendiente
 - Quitar la etiqueta "Escaneado" (nuevos escaneos y datos ya guardados).
 - Monitorización automática: auto-escaneo en segundo plano con selector de intervalo (2/5 min/desactivado), cuenta atrás discreta y actualización silenciosa de estado y nuevos dispositivos.
+- Aviso de dispositivos nuevos: insignia "Nuevo", toast con nombre/IP/fabricante que abre su ficha y acción rápida "Marcar como reconocido".
 
 ## Completado (18/9)
 - Test de velocidad de ~20 s (descarga/subida continuas, velocímetro en vivo, pico, barra de progreso) verificado en navegador.
