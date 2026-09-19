@@ -24,6 +24,58 @@ interface ElectronBridge {
   checkUpdate?: () => Promise<UpdateInfo>;
   installUpdate?: (onProgress: (p: UpdateProgress) => void) => Promise<InstallResult>;
   onScanNow?: (callback: () => void) => () => void;
+  applySettings?: (settings: unknown) => Promise<{ ok: boolean }>;
+  openDataFolder?: () => Promise<{ ok: boolean; path?: string; error?: string }>;
+  notify?: (payload: { title: string; body: string }) => Promise<{ ok: boolean }>;
+  backupDb?: () => Promise<{ ok: boolean; path?: string; error?: string }>;
+}
+
+/** Aplica al sistema las preferencias nativas (autoinicio, cierre, bandeja). */
+export async function applyNativeSettings(settings: {
+  startWithWindows: boolean;
+  closeAction: "tray" | "quit";
+  minimizeToTray: boolean;
+  wolPort: number;
+  wolBroadcast: string;
+}): Promise<boolean> {
+  try {
+    if (typeof window !== "undefined" && window.nethub?.applySettings) {
+      const result = await window.nethub.applySettings(settings);
+      return Boolean(result?.ok);
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+/** Abre en el Explorador la carpeta donde vive devices-db.json. */
+export async function openDataFolder(): Promise<{ ok: boolean; path?: string; error?: string }> {
+  if (typeof window !== "undefined" && window.nethub?.openDataFolder) {
+    return window.nethub.openDataFolder();
+  }
+  return { ok: false, error: "Solo disponible en la app de escritorio de NetHub." };
+}
+
+/** Copia de seguridad manual de devices-db.json junto al ejecutable. */
+export async function backupDataFile(): Promise<{ ok: boolean; path?: string; error?: string }> {
+  if (typeof window !== "undefined" && window.nethub?.backupDb) {
+    return window.nethub.backupDb();
+  }
+  return { ok: false, error: "Solo disponible en la app de escritorio de NetHub." };
+}
+
+/** Notificación nativa de Windows (si la app corre en escritorio). */
+export async function notifyNative(title: string, body: string): Promise<boolean> {
+  try {
+    if (typeof window !== "undefined" && window.nethub?.notify) {
+      const result = await window.nethub.notify({ title, body });
+      return Boolean(result?.ok);
+    }
+  } catch {
+    return false;
+  }
+  return false;
 }
 
 /** Escucha la orden «Escanear ahora» del icono de la bandeja del sistema. */
