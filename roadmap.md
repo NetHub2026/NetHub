@@ -41,3 +41,7 @@
 ## Completado (18/9)
 - Test de velocidad de ~20 s (descarga/subida continuas, velocímetro en vivo, pico, barra de progreso) verificado en navegador.
 - Icono con fondo 100% transparente (sin recuadro blanco en Windows): app-icon.png, favicon.png y favicon.ico multiresolución; empaquetado apunta a public/favicon.ico.
+
+- [x] Tarjetas de descarga y uso del enlace conectadas al tráfico real del adaptador
+- [x] Tarjetas de dispositivo limpias (icono de conexión, ubicación con su badge, sin icono de fabricante)
+- [x] Menú de Configuración completo (sistema, apariencia, red, alertas, datos)
