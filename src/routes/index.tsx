@@ -89,7 +89,6 @@ import { DeviceDetailPanel } from "@/components/network/DeviceDetailPanel";
 import { NetworkTabs } from "@/components/network/NetworkTabs";
 import { SpeedTestPanel } from "@/components/network/SpeedTestPanel";
 import { UpdateModal } from "@/components/network/UpdateModal";
-import { VendorIcon } from "@/components/network/VendorIcon";
 import { DeviceTypeIcon } from "@/components/network/DeviceTypeIcon";
 
 import { cn } from "@/lib/utils";
@@ -440,9 +439,12 @@ function Dashboard() {
     });
 
   const online = items.filter((d) => d.status === "online");
-  const totalDown = online.reduce((sum, d) => sum + d.downstream, 0);
-  const totalUp = online.reduce((sum, d) => sum + d.upstream, 0);
   const intruders = newDevices(items);
+  /** Uso del enlace: descarga real medida sobre la velocidad contratada. */
+  const linkUsage = Math.min(
+    100,
+    Math.round((traffic.rxMbps / Math.max(1, settings.linkSpeedMbps)) * 100),
+  );
 
   /** Sin inventario y ya cargado el almacenamiento: pantalla de bienvenida. */
   const showEmpty = hydrated && items.length === 0;
@@ -524,7 +526,15 @@ function Dashboard() {
             {scanning ? "Escaneando…" : "Escanear red"}
           </button>
           <button
-            onClick={() => setDark((v) => !v)}
+            onClick={() => setSettingsOpen(true)}
+            className="rounded-md border border-border p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            aria-label="Abrir configuración"
+            title="Configuración"
+          >
+            <SettingsIcon className="size-4" />
+          </button>
+          <button
+            onClick={() => updateSettings({ theme: dark ? "light" : "dark" })}
             className="rounded-md border border-border p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
           >
