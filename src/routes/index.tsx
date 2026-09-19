@@ -376,22 +376,6 @@ function Dashboard() {
   // «Escanear ahora» desde el icono del área de notificación (app de escritorio).
   useEffect(() => onDesktopScanRequest(() => void scanRef.current(false)), []);
 
-  // Recupera el intervalo guardado de monitorización automática.
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(AUTO_KEY);
-      if (raw !== null) {
-        const value = Number(raw);
-        if (autoOptions.some((o) => o.value === value)) {
-          setAutoInterval(value);
-          setCountdown(value);
-        }
-      }
-    } catch {
-      /* sin almacenamiento */
-    }
-  }, []);
-
   // Cuenta atrás y disparo del escaneo periódico en segundo plano.
   useEffect(() => {
     if (!hydrated || autoInterval === 0) {
