@@ -2,7 +2,16 @@
 // - Guarda y lee devices-db.json junto al ejecutable.
 // - Escaneo ARP nativo, ping ICMP real y Wake-on-LAN por UDP.
 // - Servidor HTTP de respaldo en el puerto 8765 (/scan, /ping, /wol).
-const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  ipcMain,
+  Menu,
+  Notification,
+  Tray,
+  nativeImage,
+  shell,
+} = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -309,7 +318,7 @@ function sendWol(mac) {
     });
     socket.bind(() => {
       socket.setBroadcast(true);
-      socket.send(packet, 0, packet.length, 9, "255.255.255.255", (err) => {
+      socket.send(packet, 0, packet.length, nativeSettings.wolPort, nativeSettings.wolBroadcast, (err) => {
         socket.close();
         resolve(!err);
       });
