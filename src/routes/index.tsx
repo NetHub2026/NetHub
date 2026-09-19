@@ -157,7 +157,16 @@ function Dashboard() {
   const [personFilter, setPersonFilter] = useState("all");
   const [locationFilter, setLocationFilter] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [dark, setDark] = useState(true);
+  /** Preferencias del usuario (tema, velocidad contratada, alertas…). */
+  const [settings, setSettings] = useState<Settings>(defaultSettings);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [systemDark, setSystemDark] = useState(true);
+  /** Tráfico real del adaptador de red de este equipo. */
+  const [traffic, setTraffic] = useState<TrafficSample>({
+    rxMbps: 0,
+    txMbps: 0,
+    totalMbps: 0,
+  });
   const [status, setStatus] = useState<ScannerStatus>("unknown");
   const [scanning, setScanning] = useState(false);
   const [meta, setMeta] = useState<ScanMeta>({ lastScanAt: null, source: null });
@@ -166,18 +175,69 @@ function Dashboard() {
   const [runtime, setRuntime] = useState<Runtime>("web");
   const [dbPath, setDbPath] = useState("Almacenamiento del navegador (localStorage)");
   const [updateOpen, setUpdateOpen] = useState(false);
-  /** Monitorización automática: intervalo en segundos (0 = desactivada). */
-  const [autoInterval, setAutoInterval] = useState(120);
   const [countdown, setCountdown] = useState(120);
   const [autoScanning, setAutoScanning] = useState(false);
   /** Evita escaneos solapados (manual + automático). */
   const busyRef = useRef(false);
   const itemsRef = useRef<Device[]>([]);
   itemsRef.current = items;
+  const settingsRef = useRef<Settings>(settings);
+  settingsRef.current = settings;
+
+  /** Intervalo del auto-escaneo, tomado de la configuración. */
+  const autoInterval = settings.scanIntervalSeconds;
+  const dark = settings.theme === "auto" ? systemDark : settings.theme === "dark";
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
+
+  // Sigue el tema del sistema para la opción «Automático».
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    setSystemDark(media.matches);
+    const listener = (event: MediaQueryListEvent) => setSystemDark(event.matches);
+    media.addEventListener("change", listener);
+    return () => media.removeEventListener("change", listener);
+  }, []);
+
+  // Carga las preferencias guardadas y las aplica al sistema (escritorio).
+  useEffect(() => {
+    const stored = loadSettings();
+    setSettings(stored);
+    setSystemDark(resolveDark("auto"));
+    setCountdown(stored.scanIntervalSeconds);
+    void applyNativeSettings(stored);
+  }, []);
+
+  /** Guarda un cambio de preferencias y lo aplica al sistema. */
+  const updateSettings = (patch: Partial<Settings>) => {
+    setSettings((prev) => {
+      const next = { ...prev, ...patch };
+      saveSettings(next);
+      void applyNativeSettings(next);
+      return next;
+    });
+  };
+
+  // Telemetría real del adaptador de red: una muestra por segundo.
+  useEffect(() => {
+    let cancelled = false;
+    let last: TrafficSample = { rxMbps: 0, txMbps: 0, totalMbps: 0 };
+    const tick = async () => {
+      const sample = await readLiveTraffic(last);
+      if (cancelled) return;
+      last = sample;
+      setTraffic(sample);
+    };
+    void tick();
+    const id = window.setInterval(() => void tick(), 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
 
   // Restaura la última lista guardada (archivo local en escritorio, localStorage en web).
   useEffect(() => {
