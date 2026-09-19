@@ -896,11 +896,14 @@ function Dashboard() {
                       ))}
                   </span>
                 </span>
-                <span className="shrink-0 text-right">
-                  <span className="block font-mono text-sm">
-                    {d.downstream.toFixed(1)}
+                <span className="flex shrink-0 flex-col items-end gap-1.5 self-stretch">
+                  <ConnectionIcon device={d} />
+                  <span className="mt-auto text-right">
+                    <span className="block font-mono text-sm">
+                      {d.downstream.toFixed(1)}
+                    </span>
+                    <span className="block text-[11px] text-muted-foreground">Mbps</span>
                   </span>
-                  <span className="block text-[11px] text-muted-foreground">Mbps</span>
                 </span>
               </button>
             ))}
