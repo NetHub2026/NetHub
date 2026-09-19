@@ -396,13 +396,8 @@ function Dashboard() {
   }, [autoInterval, hydrated]);
 
   const changeAutoInterval = (value: number) => {
-    setAutoInterval(value);
+    updateSettings({ scanIntervalSeconds: value });
     setCountdown(value);
-    try {
-      window.localStorage.setItem(AUTO_KEY, String(value));
-    } catch {
-      /* sin almacenamiento */
-    }
   };
 
   /** Vacía el inventario por completo (borra escaneos guardados y dispositivos). */
