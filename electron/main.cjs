@@ -552,6 +552,76 @@ async function downloadAndInstall(sender) {
 /* IPC                                                                 */
 /* ------------------------------------------------------------------ */
 
+/** Preferencias nativas aplicadas desde la interfaz (Configuración). */
+const nativeSettings = {
+  closeAction: "tray",
+  minimizeToTray: true,
+  wolPort: 9,
+  wolBroadcast: "255.255.255.255",
+};
+
+function applySettings(settings) {
+  const data = settings && typeof settings === "object" ? settings : {};
+  nativeSettings.closeAction = data.closeAction === "quit" ? "quit" : "tray";
+  nativeSettings.minimizeToTray = data.minimizeToTray !== false;
+  const port = Number(data.wolPort);
+  nativeSettings.wolPort = Number.isFinite(port) && port > 0 ? port : 9;
+  nativeSettings.wolBroadcast = String(data.wolBroadcast || "255.255.255.255");
+  try {
+    app.setLoginItemSettings({
+      openAtLogin: Boolean(data.startWithWindows),
+      path: process.env.PORTABLE_EXECUTABLE_FILE || process.execPath,
+      args: [],
+    });
+  } catch {
+    /* algunas plataformas no lo soportan */
+  }
+  return { ok: true };
+}
+
+function openDataFolder() {
+  const folder = baseDir();
+  return shell
+    .openPath(folder)
+    .then((error) => (error ? { ok: false, error } : { ok: true, path: folder }))
+    .catch((error) => ({ ok: false, error: String(error) }));
+}
+
+function backupDb() {
+  try {
+    if (!fs.existsSync(dbPath())) {
+      return { ok: false, error: "Todavía no hay datos guardados que copiar." };
+    }
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const target = path.join(baseDir(), `devices-db-${stamp}.json`);
+    fs.copyFileSync(dbPath(), target);
+    return { ok: true, path: target };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+}
+
+function notifyNative(payload) {
+  try {
+    if (!Notification.isSupported()) return { ok: false };
+    const notification = new Notification({
+      title: String(payload?.title || "NetHub"),
+      body: String(payload?.body || ""),
+      icon: iconPath(isWindows ? "favicon.ico" : "app-icon.png"),
+    });
+    notification.on("click", () => showWindow());
+    notification.show();
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
+ipcMain.handle("nethub:apply-settings", (_e, settings) => applySettings(settings));
+ipcMain.handle("nethub:open-data-folder", () => openDataFolder());
+ipcMain.handle("nethub:backup-db", () => backupDb());
+ipcMain.handle("nethub:notify", (_e, payload) => notifyNative(payload));
+
 ipcMain.handle("nethub:read", () => readDevices());
 ipcMain.handle("nethub:write", (_e, json) => writeDevices(json));
 ipcMain.handle("nethub:scan", () => scanNetwork());
