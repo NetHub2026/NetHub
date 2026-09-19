@@ -693,14 +693,14 @@ function Dashboard() {
           <Stat
             icon={<ArrowDownUp className="size-4" />}
             label="Descarga total"
-            value={`${totalDown.toFixed(0)} Mbps`}
-            hint={`subida ${totalUp.toFixed(0)} Mbps`}
+            value={`${traffic.rxMbps.toFixed(1)} Mbps`}
+            hint={`subida ${traffic.txMbps.toFixed(1)} Mbps · en tiempo real`}
           />
           <Stat
             icon={<Activity className="size-4" />}
             label="Uso del enlace"
-            value={`${Math.min(100, Math.round((totalDown / 600) * 100))}%`}
-            hint="sobre 600 Mbps contratados"
+            value={`${linkUsage}%`}
+            hint={`sobre ${settings.linkSpeedMbps} Mbps contratados`}
           />
         </section>
 
@@ -853,24 +853,21 @@ function Dashboard() {
                       )}
                     />
                   </span>
-                  <span className="mt-0.5 flex items-center gap-1.5 truncate font-mono text-xs text-muted-foreground">
-                    <VendorIcon brand={d.brand} className="size-3.5 shrink-0" />
-                    <span className="truncate">
-                      {d.ip} · {d.vendor}
-                    </span>
+                  <span className="mt-0.5 block truncate font-mono text-xs text-muted-foreground">
+                    {d.ip} · {d.vendor}
                   </span>
                   {(d.person || d.location) && (
-                    <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-                      {d.person && (
-                        <span className="inline-flex min-w-0 items-center gap-1">
-                          <Users className="size-3 shrink-0" />
-                          <span className="truncate">{d.person}</span>
-                        </span>
-                      )}
+                    <span className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
                       {d.location && (
-                        <span className="inline-flex min-w-0 items-center gap-1">
+                        <span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-muted-foreground">
                           <MapPin className="size-3 shrink-0" />
                           <span className="truncate">{d.location}</span>
+                        </span>
+                      )}
+                      {d.person && (
+                        <span className="inline-flex min-w-0 items-center gap-1 text-muted-foreground">
+                          <Users className="size-3 shrink-0" />
+                          <span className="truncate">{d.person}</span>
                         </span>
                       )}
                     </span>
@@ -890,11 +887,13 @@ function Dashboard() {
                     {d.prioritized && (
                       <Badge className="bg-warning/15 text-warning">QoS</Badge>
                     )}
-                    {d.tags.slice(0, 2).map((t) => (
-                      <Badge key={t} className="bg-muted text-muted-foreground">
-                        {t}
-                      </Badge>
-                    ))}
+                    {visibleTags(d)
+                      .slice(0, 2)
+                      .map((t) => (
+                        <Badge key={t} className="bg-muted text-muted-foreground">
+                          {t}
+                        </Badge>
+                      ))}
                   </span>
                 </span>
                 <span className="shrink-0 text-right">
