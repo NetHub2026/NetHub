@@ -942,13 +942,13 @@ function createWindow() {
 
   // Minimizar o cerrar deja NetHub en la bandeja: el auto-escaneo y los avisos siguen activos.
   win.on("minimize", (event) => {
-    if (!tray) return;
+    if (!tray || !nativeSettings.minimizeToTray) return;
     event.preventDefault();
     win.hide();
   });
 
   win.on("close", (event) => {
-    if (quitting || !tray) return;
+    if (quitting || !tray || nativeSettings.closeAction === "quit") return;
     event.preventDefault();
     win.hide();
   });
