@@ -43,6 +43,7 @@ import {
   enrichDevicesWithResolvedVendors,
   loadScanMeta,
   mergeScan,
+  isRandomizedMac,
   newDevices,
   resolveVendorsInBackground,
   saveScanMeta,
@@ -609,7 +610,7 @@ function Dashboard() {
                 aria-label="Intervalo de monitorización automática"
                 className="rounded border border-input bg-popover px-1.5 py-0.5 text-xs text-popover-foreground outline-none focus:border-brand"
               >
-                {autoOptions.map((o) => (
+                {scanIntervalOptions.map((o) => (
                   <option key={o.value} value={o.value} className="bg-popover text-popover-foreground">
                     {o.label}
                   </option>
