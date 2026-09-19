@@ -15,7 +15,9 @@ import {
   RotateCcw,
 
   MapPin,
+  Cable,
   Search,
+  Settings as SettingsIcon,
   Sun,
   Timer,
   Users,
@@ -41,6 +43,7 @@ import {
   enrichDevicesWithResolvedVendors,
   loadScanMeta,
   mergeScan,
+  isRandomizedMac,
   newDevices,
   resolveVendorsInBackground,
   saveScanMeta,
@@ -49,13 +52,26 @@ import {
 } from "@/lib/scanner";
 import {
   APP_VERSION,
+  applyNativeSettings,
   getDbPath,
   getRuntime,
   nativeScan,
+  notifyNative,
   onDesktopScanRequest,
+  readLiveTraffic,
   runtimeLabels,
   type Runtime,
+  type TrafficSample,
 } from "@/lib/desktop";
+import {
+  defaultSettings,
+  loadSettings,
+  resolveDark,
+  saveSettings,
+  scanIntervalOptions,
+  type Settings,
+} from "@/lib/settings";
+import { SettingsModal } from "@/components/network/SettingsModal";
 import {
   loadDevicesAnywhere,
   loadDirectoryAnywhere,
@@ -74,7 +90,6 @@ import { DeviceDetailPanel } from "@/components/network/DeviceDetailPanel";
 import { NetworkTabs } from "@/components/network/NetworkTabs";
 import { SpeedTestPanel } from "@/components/network/SpeedTestPanel";
 import { UpdateModal } from "@/components/network/UpdateModal";
-import { VendorIcon } from "@/components/network/VendorIcon";
 import { DeviceTypeIcon } from "@/components/network/DeviceTypeIcon";
 
 import { cn } from "@/lib/utils";
@@ -109,14 +124,21 @@ const filters: Array<{ value: DeviceType | "all"; label: string }> = [
   })),
 ];
 
-/** Intervalos disponibles para la monitorización automática (en segundos). */
-const autoOptions: Array<{ value: number; label: string }> = [
-  { value: 120, label: "Cada 2 min" },
-  { value: 300, label: "Cada 5 min" },
-  { value: 0, label: "Desactivado" },
-];
+/** Etiquetas de conexión: se muestran como icono, no como etiqueta de texto. */
+const WIFI_TAGS = ["Wi-Fi", "Wi-Fi 2.4GHz", "Wi-Fi 5GHz", "Wi-Fi 6"];
+const WIRED_TAG = "Cableado / Ethernet";
 
-const AUTO_KEY = "nethub.autoscan.v1";
+function connectionOf(device: Device): "wifi" | "wired" | null {
+  if (device.tags.some((t) => WIFI_TAGS.includes(t))) return "wifi";
+  if (device.tags.includes(WIRED_TAG)) return "wired";
+  return null;
+}
+
+/** Etiquetas visibles: sin las de conexión (ya representadas con su icono). */
+function visibleTags(device: Device): string[] {
+  return device.tags.filter((t) => !WIFI_TAGS.includes(t) && t !== WIRED_TAG);
+}
+
 
 function formatCountdown(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -135,7 +157,16 @@ function Dashboard() {
   const [personFilter, setPersonFilter] = useState("all");
   const [locationFilter, setLocationFilter] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [dark, setDark] = useState(true);
+  /** Preferencias del usuario (tema, velocidad contratada, alertas…). */
+  const [settings, setSettings] = useState<Settings>(defaultSettings);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [systemDark, setSystemDark] = useState(true);
+  /** Tráfico real del adaptador de red de este equipo. */
+  const [traffic, setTraffic] = useState<TrafficSample>({
+    rxMbps: 0,
+    txMbps: 0,
+    totalMbps: 0,
+  });
   const [status, setStatus] = useState<ScannerStatus>("unknown");
   const [scanning, setScanning] = useState(false);
   const [meta, setMeta] = useState<ScanMeta>({ lastScanAt: null, source: null });
@@ -144,18 +175,69 @@ function Dashboard() {
   const [runtime, setRuntime] = useState<Runtime>("web");
   const [dbPath, setDbPath] = useState("Almacenamiento del navegador (localStorage)");
   const [updateOpen, setUpdateOpen] = useState(false);
-  /** Monitorización automática: intervalo en segundos (0 = desactivada). */
-  const [autoInterval, setAutoInterval] = useState(120);
   const [countdown, setCountdown] = useState(120);
   const [autoScanning, setAutoScanning] = useState(false);
   /** Evita escaneos solapados (manual + automático). */
   const busyRef = useRef(false);
   const itemsRef = useRef<Device[]>([]);
   itemsRef.current = items;
+  const settingsRef = useRef<Settings>(settings);
+  settingsRef.current = settings;
+
+  /** Intervalo del auto-escaneo, tomado de la configuración. */
+  const autoInterval = settings.scanIntervalSeconds;
+  const dark = settings.theme === "auto" ? systemDark : settings.theme === "dark";
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
+
+  // Sigue el tema del sistema para la opción «Automático».
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    setSystemDark(media.matches);
+    const listener = (event: MediaQueryListEvent) => setSystemDark(event.matches);
+    media.addEventListener("change", listener);
+    return () => media.removeEventListener("change", listener);
+  }, []);
+
+  // Carga las preferencias guardadas y las aplica al sistema (escritorio).
+  useEffect(() => {
+    const stored = loadSettings();
+    setSettings(stored);
+    setSystemDark(resolveDark("auto"));
+    setCountdown(stored.scanIntervalSeconds);
+    void applyNativeSettings(stored);
+  }, []);
+
+  /** Guarda un cambio de preferencias y lo aplica al sistema. */
+  const updateSettings = (patch: Partial<Settings>) => {
+    setSettings((prev) => {
+      const next = { ...prev, ...patch };
+      saveSettings(next);
+      void applyNativeSettings(next);
+      return next;
+    });
+  };
+
+  // Telemetría real del adaptador de red: una muestra por segundo.
+  useEffect(() => {
+    let cancelled = false;
+    let last: TrafficSample = { rxMbps: 0, txMbps: 0, totalMbps: 0 };
+    const tick = async () => {
+      const sample = await readLiveTraffic(last);
+      if (cancelled) return;
+      last = sample;
+      setTraffic(sample);
+    };
+    void tick();
+    const id = window.setInterval(() => void tick(), 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
 
   // Restaura la última lista guardada (archivo local en escritorio, localStorage en web).
   useEffect(() => {
@@ -205,12 +287,30 @@ function Dashboard() {
     if (fresh.length > 3) {
       toast.warning(`Y ${fresh.length - 3} dispositivos nuevos más en tu red.`);
     }
+    // Aviso nativo de Windows (si está activado en Configuración).
+    if (settingsRef.current.notifyNewDevices && fresh[0]) {
+      const first = fresh[0];
+      void notifyNative(
+        fresh.length === 1
+          ? "Nuevo dispositivo en tu red"
+          : `${fresh.length} dispositivos nuevos en tu red`,
+        `${first.name} · ${first.ip} · ${first.vendor}`,
+      );
+    }
   };
 
   /** Fusiona el escaneo con la lista conocida y devuelve los dispositivos nuevos. */
   const applyScan = async (devices: Device[], source: NonNullable<ScanMeta["source"]>) => {
-    const resolved = await enrichDevicesWithResolvedVendors(devices);
+    const filtered = settingsRef.current.skipRandomMac
+      ? devices.filter(
+          (d) => !isRandomizedMac(d.mac) || itemsRef.current.some((k) => k.id === d.id),
+        )
+      : devices;
+    const resolved = await enrichDevicesWithResolvedVendors(filtered);
     const known = new Set(itemsRef.current.map((d) => d.id));
+    const wasOnline = new Set(
+      itemsRef.current.filter((d) => d.status === "online").map((d) => d.id),
+    );
     const merged = mergeScan(itemsRef.current, resolved);
     setItems(merged);
     void saveDevicesAnywhere(merged);
@@ -229,6 +329,22 @@ function Dashboard() {
         return updated;
       });
     });
+    // Equipos críticos (24/7) que han dejado de responder.
+    if (settingsRef.current.alertCriticalOffline) {
+      for (const device of merged) {
+        const critical = device.tags.some((t) => /24\/7|cr[ií]tico/i.test(t));
+        if (critical && device.status !== "online" && wasOnline.has(device.id)) {
+          toast.error(`«${device.name}» ha dejado de responder`, {
+            description: `${device.ip} · marcado como equipo crítico 24/7`,
+            duration: 12000,
+          });
+          void notifyNative(
+            "Equipo crítico sin respuesta",
+            `${device.name} (${device.ip}) ha dejado de responder.`,
+          );
+        }
+      }
+    }
     // Nuevos de este escaneo: no estaban registrados antes de fusionar.
     const justFound = merged.filter((d) => !known.has(d.id) && d.isNew && !d.trusted);
     if (justFound.length > 0) announceNew(justFound);
@@ -294,22 +410,6 @@ function Dashboard() {
   // «Escanear ahora» desde el icono del área de notificación (app de escritorio).
   useEffect(() => onDesktopScanRequest(() => void scanRef.current(false)), []);
 
-  // Recupera el intervalo guardado de monitorización automática.
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(AUTO_KEY);
-      if (raw !== null) {
-        const value = Number(raw);
-        if (autoOptions.some((o) => o.value === value)) {
-          setAutoInterval(value);
-          setCountdown(value);
-        }
-      }
-    } catch {
-      /* sin almacenamiento */
-    }
-  }, []);
-
   // Cuenta atrás y disparo del escaneo periódico en segundo plano.
   useEffect(() => {
     if (!hydrated || autoInterval === 0) {
@@ -330,13 +430,8 @@ function Dashboard() {
   }, [autoInterval, hydrated]);
 
   const changeAutoInterval = (value: number) => {
-    setAutoInterval(value);
+    updateSettings({ scanIntervalSeconds: value });
     setCountdown(value);
-    try {
-      window.localStorage.setItem(AUTO_KEY, String(value));
-    } catch {
-      /* sin almacenamiento */
-    }
   };
 
   /** Vacía el inventario por completo (borra escaneos guardados y dispositivos). */
@@ -369,9 +464,12 @@ function Dashboard() {
     });
 
   const online = items.filter((d) => d.status === "online");
-  const totalDown = online.reduce((sum, d) => sum + d.downstream, 0);
-  const totalUp = online.reduce((sum, d) => sum + d.upstream, 0);
   const intruders = newDevices(items);
+  /** Uso del enlace: descarga real medida sobre la velocidad contratada. */
+  const linkUsage = Math.min(
+    100,
+    Math.round((traffic.rxMbps / Math.max(1, settings.linkSpeedMbps)) * 100),
+  );
 
   /** Sin inventario y ya cargado el almacenamiento: pantalla de bienvenida. */
   const showEmpty = hydrated && items.length === 0;
@@ -453,7 +551,15 @@ function Dashboard() {
             {scanning ? "Escaneando…" : "Escanear red"}
           </button>
           <button
-            onClick={() => setDark((v) => !v)}
+            onClick={() => setSettingsOpen(true)}
+            className="rounded-md border border-border p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            aria-label="Abrir configuración"
+            title="Configuración"
+          >
+            <SettingsIcon className="size-4" />
+          </button>
+          <button
+            onClick={() => updateSettings({ theme: dark ? "light" : "dark" })}
             className="rounded-md border border-border p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
           >
@@ -504,7 +610,7 @@ function Dashboard() {
                 aria-label="Intervalo de monitorización automática"
                 className="rounded border border-input bg-popover px-1.5 py-0.5 text-xs text-popover-foreground outline-none focus:border-brand"
               >
-                {autoOptions.map((o) => (
+                {scanIntervalOptions.map((o) => (
                   <option key={o.value} value={o.value} className="bg-popover text-popover-foreground">
                     {o.label}
                   </option>
@@ -622,14 +728,14 @@ function Dashboard() {
           <Stat
             icon={<ArrowDownUp className="size-4" />}
             label="Descarga total"
-            value={`${totalDown.toFixed(0)} Mbps`}
-            hint={`subida ${totalUp.toFixed(0)} Mbps`}
+            value={`${traffic.rxMbps.toFixed(1)} Mbps`}
+            hint={`subida ${traffic.txMbps.toFixed(1)} Mbps · en tiempo real`}
           />
           <Stat
             icon={<Activity className="size-4" />}
             label="Uso del enlace"
-            value={`${Math.min(100, Math.round((totalDown / 600) * 100))}%`}
-            hint="sobre 600 Mbps contratados"
+            value={`${linkUsage}%`}
+            hint={`sobre ${settings.linkSpeedMbps} Mbps contratados`}
           />
         </section>
 
@@ -782,24 +888,21 @@ function Dashboard() {
                       )}
                     />
                   </span>
-                  <span className="mt-0.5 flex items-center gap-1.5 truncate font-mono text-xs text-muted-foreground">
-                    <VendorIcon brand={d.brand} className="size-3.5 shrink-0" />
-                    <span className="truncate">
-                      {d.ip} · {d.vendor}
-                    </span>
+                  <span className="mt-0.5 block truncate font-mono text-xs text-muted-foreground">
+                    {d.ip} · {d.vendor}
                   </span>
                   {(d.person || d.location) && (
-                    <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-                      {d.person && (
-                        <span className="inline-flex min-w-0 items-center gap-1">
-                          <Users className="size-3 shrink-0" />
-                          <span className="truncate">{d.person}</span>
-                        </span>
-                      )}
+                    <span className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
                       {d.location && (
-                        <span className="inline-flex min-w-0 items-center gap-1">
+                        <span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-muted-foreground">
                           <MapPin className="size-3 shrink-0" />
                           <span className="truncate">{d.location}</span>
+                        </span>
+                      )}
+                      {d.person && (
+                        <span className="inline-flex min-w-0 items-center gap-1 text-muted-foreground">
+                          <Users className="size-3 shrink-0" />
+                          <span className="truncate">{d.person}</span>
                         </span>
                       )}
                     </span>
@@ -819,18 +922,23 @@ function Dashboard() {
                     {d.prioritized && (
                       <Badge className="bg-warning/15 text-warning">QoS</Badge>
                     )}
-                    {d.tags.slice(0, 2).map((t) => (
-                      <Badge key={t} className="bg-muted text-muted-foreground">
-                        {t}
-                      </Badge>
-                    ))}
+                    {visibleTags(d)
+                      .slice(0, 2)
+                      .map((t) => (
+                        <Badge key={t} className="bg-muted text-muted-foreground">
+                          {t}
+                        </Badge>
+                      ))}
                   </span>
                 </span>
-                <span className="shrink-0 text-right">
-                  <span className="block font-mono text-sm">
-                    {d.downstream.toFixed(1)}
+                <span className="flex shrink-0 flex-col items-end gap-1.5 self-stretch">
+                  <ConnectionIcon device={d} />
+                  <span className="mt-auto text-right">
+                    <span className="block font-mono text-sm">
+                      {d.downstream.toFixed(1)}
+                    </span>
+                    <span className="block text-[11px] text-muted-foreground">Mbps</span>
                   </span>
-                  <span className="block text-[11px] text-muted-foreground">Mbps</span>
                 </span>
               </button>
             ))}
@@ -859,6 +967,13 @@ function Dashboard() {
       />
 
       <UpdateModal open={updateOpen} onClose={() => setUpdateOpen(false)} />
+
+      <SettingsModal
+        open={settingsOpen}
+        settings={settings}
+        onClose={() => setSettingsOpen(false)}
+        onChange={updateSettings}
+      />
     </div>
 
   );
@@ -957,5 +1072,16 @@ function Stat({
       <p className="mt-1 text-2xl font-semibold">{value}</p>
       <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
     </div>
+  );
+}
+
+/** Icono del tipo de conexión (Wi-Fi o cable) en la esquina de cada tarjeta. */
+function ConnectionIcon({ device }: { device: Device }) {
+  const kind = connectionOf(device);
+  if (kind === null) return null;
+  return kind === "wifi" ? (
+    <Wifi className="size-4 text-muted-foreground" aria-label="Wi-Fi" />
+  ) : (
+    <Cable className="size-4 text-muted-foreground" aria-label="Cableado / Ethernet" />
   );
 }
