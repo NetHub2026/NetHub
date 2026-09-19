@@ -967,6 +967,13 @@ function Dashboard() {
       />
 
       <UpdateModal open={updateOpen} onClose={() => setUpdateOpen(false)} />
+
+      <SettingsModal
+        open={settingsOpen}
+        settings={settings}
+        onClose={() => setSettingsOpen(false)}
+        onChange={updateSettings}
+      />
     </div>
 
   );
