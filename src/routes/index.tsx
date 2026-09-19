@@ -287,6 +287,16 @@ function Dashboard() {
     if (fresh.length > 3) {
       toast.warning(`Y ${fresh.length - 3} dispositivos nuevos más en tu red.`);
     }
+    // Aviso nativo de Windows (si está activado en Configuración).
+    if (settingsRef.current.notifyNewDevices && fresh[0]) {
+      const first = fresh[0];
+      void notifyNative(
+        fresh.length === 1
+          ? "Nuevo dispositivo en tu red"
+          : `${fresh.length} dispositivos nuevos en tu red`,
+        `${first.name} · ${first.ip} · ${first.vendor}`,
+      );
+    }
   };
 
   /** Fusiona el escaneo con la lista conocida y devuelve los dispositivos nuevos. */
