@@ -95,7 +95,7 @@ const WIFI_ONLY_TYPES = new Set<DeviceType>([
   "speaker",
 ]);
 
-const CONNECTION_TAGS = [
+export const CONNECTION_TAGS = [
   "Wi-Fi",
   "Wi-Fi 2.4GHz",
   "Wi-Fi 5GHz",
