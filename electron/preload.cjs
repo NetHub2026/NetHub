@@ -11,6 +11,10 @@ contextBridge.exposeInMainWorld("nethub", {
   wol: (mac) => ipcRenderer.invoke("nethub:wol", mac),
   traffic: () => ipcRenderer.invoke("nethub:traffic"),
   checkUpdate: () => ipcRenderer.invoke("nethub:check-update"),
+  applySettings: (settings) => ipcRenderer.invoke("nethub:apply-settings", settings),
+  openDataFolder: () => ipcRenderer.invoke("nethub:open-data-folder"),
+  notify: (payload) => ipcRenderer.invoke("nethub:notify", payload),
+  backupDb: () => ipcRenderer.invoke("nethub:backup-db"),
   // Petición de escaneo desde el menú del área de notificación.
   onScanNow: (callback) => {
     const listener = () => callback();
