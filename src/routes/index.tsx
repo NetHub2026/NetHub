@@ -1074,3 +1074,14 @@ function Stat({
     </div>
   );
 }
+
+/** Icono del tipo de conexión (Wi-Fi o cable) en la esquina de cada tarjeta. */
+function ConnectionIcon({ device }: { device: Device }) {
+  const kind = connectionOf(device);
+  if (kind === null) return null;
+  return kind === "wifi" ? (
+    <Wifi className="size-4 text-muted-foreground" aria-label="Wi-Fi" />
+  ) : (
+    <Cable className="size-4 text-muted-foreground" aria-label="Cableado / Ethernet" />
+  );
+}
