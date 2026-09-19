@@ -15,7 +15,9 @@ import {
   RotateCcw,
 
   MapPin,
+  Cable,
   Search,
+  Settings as SettingsIcon,
   Sun,
   Timer,
   Users,
@@ -49,13 +51,26 @@ import {
 } from "@/lib/scanner";
 import {
   APP_VERSION,
+  applyNativeSettings,
   getDbPath,
   getRuntime,
   nativeScan,
+  notifyNative,
   onDesktopScanRequest,
+  readLiveTraffic,
   runtimeLabels,
   type Runtime,
+  type TrafficSample,
 } from "@/lib/desktop";
+import {
+  defaultSettings,
+  loadSettings,
+  resolveDark,
+  saveSettings,
+  scanIntervalOptions,
+  type Settings,
+} from "@/lib/settings";
+import { SettingsModal } from "@/components/network/SettingsModal";
 import {
   loadDevicesAnywhere,
   loadDirectoryAnywhere,
@@ -109,14 +124,21 @@ const filters: Array<{ value: DeviceType | "all"; label: string }> = [
   })),
 ];
 
-/** Intervalos disponibles para la monitorización automática (en segundos). */
-const autoOptions: Array<{ value: number; label: string }> = [
-  { value: 120, label: "Cada 2 min" },
-  { value: 300, label: "Cada 5 min" },
-  { value: 0, label: "Desactivado" },
-];
+/** Etiquetas de conexión: se muestran como icono, no como etiqueta de texto. */
+const WIFI_TAGS = ["Wi-Fi", "Wi-Fi 2.4GHz", "Wi-Fi 5GHz", "Wi-Fi 6"];
+const WIRED_TAG = "Cableado / Ethernet";
 
-const AUTO_KEY = "nethub.autoscan.v1";
+function connectionOf(device: Device): "wifi" | "wired" | null {
+  if (device.tags.some((t) => WIFI_TAGS.includes(t))) return "wifi";
+  if (device.tags.includes(WIRED_TAG)) return "wired";
+  return null;
+}
+
+/** Etiquetas visibles: sin las de conexión (ya representadas con su icono). */
+function visibleTags(device: Device): string[] {
+  return device.tags.filter((t) => !WIFI_TAGS.includes(t) && t !== WIRED_TAG);
+}
+
 
 function formatCountdown(seconds: number): string {
   const m = Math.floor(seconds / 60);
