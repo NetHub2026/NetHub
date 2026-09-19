@@ -300,8 +300,16 @@ function Dashboard() {
 
   /** Fusiona el escaneo con la lista conocida y devuelve los dispositivos nuevos. */
   const applyScan = async (devices: Device[], source: NonNullable<ScanMeta["source"]>) => {
-    const resolved = await enrichDevicesWithResolvedVendors(devices);
+    const filtered = settingsRef.current.skipRandomMac
+      ? devices.filter(
+          (d) => !isRandomizedMac(d.mac) || itemsRef.current.some((k) => k.id === d.id),
+        )
+      : devices;
+    const resolved = await enrichDevicesWithResolvedVendors(filtered);
     const known = new Set(itemsRef.current.map((d) => d.id));
+    const wasOnline = new Set(
+      itemsRef.current.filter((d) => d.status === "online").map((d) => d.id),
+    );
     const merged = mergeScan(itemsRef.current, resolved);
     setItems(merged);
     void saveDevicesAnywhere(merged);
@@ -320,6 +328,22 @@ function Dashboard() {
         return updated;
       });
     });
+    // Equipos críticos (24/7) que han dejado de responder.
+    if (settingsRef.current.alertCriticalOffline) {
+      for (const device of merged) {
+        const critical = device.tags.some((t) => /24\/7|cr[ií]tico/i.test(t));
+        if (critical && device.status !== "online" && wasOnline.has(device.id)) {
+          toast.error(`«${device.name}» ha dejado de responder`, {
+            description: `${device.ip} · marcado como equipo crítico 24/7`,
+            duration: 12000,
+          });
+          void notifyNative(
+            "Equipo crítico sin respuesta",
+            `${device.name} (${device.ip}) ha dejado de responder.`,
+          );
+        }
+      }
+    }
     // Nuevos de este escaneo: no estaban registrados antes de fusionar.
     const justFound = merged.filter((d) => !known.has(d.id) && d.isNew && !d.trusted);
     if (justFound.length > 0) announceNew(justFound);
