@@ -604,6 +604,19 @@ function applySettings(settings) {
   return { ok: true };
 }
 
+/** Al arrancar, aplica lo guardado en settings.json (cierre, bandeja, WoL, autoinicio). */
+function loadNativeSettingsFromDisk() {
+  try {
+    const raw = readSettings();
+    if (raw) applySettings(JSON.parse(raw));
+  } catch {
+    /* archivo inexistente o corrupto: se usan los valores por defecto */
+  }
+}
+
+loadNativeSettingsFromDisk();
+
+
 function openDataFolder() {
   const folder = baseDir();
   return shell
