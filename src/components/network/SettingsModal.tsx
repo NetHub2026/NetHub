@@ -284,6 +284,10 @@ export function SettingsModal({ open, settings, onClose, onChange }: Props) {
                     Crear copia de seguridad
                   </button>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  En esa carpeta se guardan el inventario (devices-db.json) y tus preferencias
+                  (settings.json), junto al ejecutable de NetHub.
+                </p>
                 <Toggle
                   label="Comprobar actualizaciones al iniciar"
                   hint="Busca nuevas versiones publicadas al abrir NetHub."
