@@ -65,9 +65,9 @@ import {
 } from "@/lib/desktop";
 import {
   defaultSettings,
-  loadSettings,
+  loadSettingsAnywhere,
   resolveDark,
-  saveSettings,
+  saveSettingsAnywhere,
   scanIntervalOptions,
   type Settings,
 } from "@/lib/settings";
