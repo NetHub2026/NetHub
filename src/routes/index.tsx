@@ -202,20 +202,22 @@ function Dashboard() {
     return () => media.removeEventListener("change", listener);
   }, []);
 
-  // Carga las preferencias guardadas y las aplica al sistema (escritorio).
+  // Carga las preferencias (settings.json en escritorio, localStorage si no)
+  // y las aplica al sistema.
   useEffect(() => {
-    const stored = loadSettings();
-    setSettings(stored);
     setSystemDark(resolveDark("auto"));
-    setCountdown(stored.scanIntervalSeconds);
-    void applyNativeSettings(stored);
+    void loadSettingsAnywhere().then((stored) => {
+      setSettings(stored);
+      setCountdown(stored.scanIntervalSeconds);
+      void applyNativeSettings(stored);
+    });
   }, []);
 
-  /** Guarda un cambio de preferencias y lo aplica al sistema. */
+  /** Guarda un cambio de preferencias (disco + navegador) y lo aplica al sistema. */
   const updateSettings = (patch: Partial<Settings>) => {
     setSettings((prev) => {
       const next = { ...prev, ...patch };
-      saveSettings(next);
+      void saveSettingsAnywhere(next);
       void applyNativeSettings(next);
       return next;
     });
