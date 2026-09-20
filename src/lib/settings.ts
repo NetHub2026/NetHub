@@ -4,6 +4,8 @@
  * notificaciones de Windows) se aplican a través del puente de Electron.
  */
 
+import { readSettingsFile, writeSettingsFile } from "./desktop";
+
 export type ThemeMode = "light" | "dark" | "auto";
 export type CloseAction = "tray" | "quit";
 export type ScanMode = "fast" | "deep";
@@ -100,6 +102,32 @@ export function saveSettings(settings: Settings) {
   } catch {
     /* sin almacenamiento */
   }
+}
+
+/**
+ * Carga las preferencias dando prioridad al archivo `settings.json` del disco
+ * (app de escritorio) y usando localStorage como respaldo (o en web).
+ */
+export async function loadSettingsAnywhere(): Promise<Settings> {
+  const fromDisk = await readSettingsFile();
+  if (fromDisk && typeof fromDisk === "object") {
+    const raw = fromDisk as Record<string, unknown>;
+    const payload = (raw.settings && typeof raw.settings === "object" ? raw.settings : raw) as
+      Partial<Settings>;
+    const merged = sanitizeSettings({ ...loadSettings(), ...payload });
+    saveSettings(merged);
+    return merged;
+  }
+  const local = loadSettings();
+  // Primer arranque en escritorio: se crea settings.json con lo que haya.
+  void writeSettingsFile(local);
+  return local;
+}
+
+/** Guarda al instante en localStorage y en `settings.json` junto al ejecutable. */
+export async function saveSettingsAnywhere(settings: Settings): Promise<void> {
+  saveSettings(settings);
+  await writeSettingsFile(settings);
 }
 
 /** Resuelve el tema efectivo: en «automático» sigue la preferencia de Windows. */
