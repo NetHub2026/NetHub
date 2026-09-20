@@ -22,6 +22,7 @@ const net = require("node:net");
 const { execFile, spawn } = require("node:child_process");
 
 const DB_FILE = "devices-db.json";
+const SETTINGS_FILE = "settings.json";
 const AGENT_PORT = 8765;
 const isWindows = process.platform === "win32";
 // Repositorios de actualización: se prueba el nuevo nombre y, si no existe,
@@ -42,6 +43,30 @@ function baseDir() {
 
 function dbPath() {
   return path.join(baseDir(), DB_FILE);
+}
+
+/** Ruta de settings.json, junto al ejecutable (misma carpeta que devices-db.json). */
+function settingsPath() {
+  return path.join(baseDir(), SETTINGS_FILE);
+}
+
+/** Lee settings.json; devuelve null si todavía no existe o está corrupto. */
+function readSettings() {
+  try {
+    return fs.existsSync(settingsPath()) ? fs.readFileSync(settingsPath(), "utf8") : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Escribe settings.json creándolo si no existe. */
+function writeSettings(json) {
+  try {
+    fs.writeFileSync(settingsPath(), String(json ?? "{}"), "utf8");
+    return { ok: true, path: settingsPath() };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -579,6 +604,19 @@ function applySettings(settings) {
   return { ok: true };
 }
 
+/** Al arrancar, aplica lo guardado en settings.json (cierre, bandeja, WoL, autoinicio). */
+function loadNativeSettingsFromDisk() {
+  try {
+    const raw = readSettings();
+    if (raw) applySettings(JSON.parse(raw));
+  } catch {
+    /* archivo inexistente o corrupto: se usan los valores por defecto */
+  }
+}
+
+loadNativeSettingsFromDisk();
+
+
 function openDataFolder() {
   const folder = baseDir();
   return shell
@@ -618,6 +656,8 @@ function notifyNative(payload) {
 }
 
 ipcMain.handle("nethub:apply-settings", (_e, settings) => applySettings(settings));
+ipcMain.handle("nethub:read-settings", () => readSettings());
+ipcMain.handle("nethub:write-settings", (_e, json) => writeSettings(json));
 ipcMain.handle("nethub:open-data-folder", () => openDataFolder());
 ipcMain.handle("nethub:backup-db", () => backupDb());
 ipcMain.handle("nethub:notify", (_e, payload) => notifyNative(payload));

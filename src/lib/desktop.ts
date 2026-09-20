@@ -25,6 +25,8 @@ interface ElectronBridge {
   installUpdate?: (onProgress: (p: UpdateProgress) => void) => Promise<InstallResult>;
   onScanNow?: (callback: () => void) => () => void;
   applySettings?: (settings: unknown) => Promise<{ ok: boolean }>;
+  readSettings?: () => Promise<string | null>;
+  writeSettings?: (json: string) => Promise<{ ok: boolean; path?: string; error?: string }>;
   openDataFolder?: () => Promise<{ ok: boolean; path?: string; error?: string }>;
   notify?: (payload: { title: string; body: string }) => Promise<{ ok: boolean }>;
   backupDb?: () => Promise<{ ok: boolean; path?: string; error?: string }>;
@@ -49,7 +51,55 @@ export async function applyNativeSettings(settings: {
   return false;
 }
 
-/** Abre en el Explorador la carpeta donde vive devices-db.json. */
+/** Nombre del archivo de preferencias, junto al ejecutable. */
+export const SETTINGS_FILE = "settings.json";
+
+/** Lee settings.json del disco (escritorio). Devuelve null en web o si no existe. */
+export async function readSettingsFile(): Promise<unknown | null> {
+  try {
+    const runtime = getRuntime();
+    let raw: string | null = null;
+    if (runtime === "electron" && window.nethub?.readSettings) {
+      raw = (await window.nethub.readSettings()) ?? null;
+    } else if (runtime === "tauri") {
+      const fs = await optionalImport("@tauri-apps/plugin-fs");
+      const exists = await fs.exists(SETTINGS_FILE, { baseDir: fs.BaseDirectory.AppData });
+      raw = exists
+        ? ((await fs.readTextFile(SETTINGS_FILE, { baseDir: fs.BaseDirectory.AppData })) as string)
+        : null;
+    }
+    if (!raw) return null;
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+/** Guarda settings.json junto al ejecutable, creándolo si no existe. */
+export async function writeSettingsFile(settings: unknown): Promise<boolean> {
+  const json = JSON.stringify(
+    { app: "NetHub", savedAt: new Date().toISOString(), settings },
+    null,
+    2,
+  );
+  try {
+    const runtime = getRuntime();
+    if (runtime === "electron" && window.nethub?.writeSettings) {
+      const result = await window.nethub.writeSettings(json);
+      return Boolean(result?.ok);
+    }
+    if (runtime === "tauri") {
+      const fs = await optionalImport("@tauri-apps/plugin-fs");
+      await fs.writeTextFile(SETTINGS_FILE, json, { baseDir: fs.BaseDirectory.AppData });
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+/** Abre en el Explorador la carpeta donde viven devices-db.json y settings.json. */
 export async function openDataFolder(): Promise<{ ok: boolean; path?: string; error?: string }> {
   if (typeof window !== "undefined" && window.nethub?.openDataFolder) {
     return window.nethub.openDataFolder();
