@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld("nethub", {
   traffic: () => ipcRenderer.invoke("nethub:traffic"),
   checkUpdate: () => ipcRenderer.invoke("nethub:check-update"),
   applySettings: (settings) => ipcRenderer.invoke("nethub:apply-settings", settings),
+  readSettings: () => ipcRenderer.invoke("nethub:read-settings"),
+  writeSettings: (json) => ipcRenderer.invoke("nethub:write-settings", json),
   openDataFolder: () => ipcRenderer.invoke("nethub:open-data-folder"),
   notify: (payload) => ipcRenderer.invoke("nethub:notify", payload),
   backupDb: () => ipcRenderer.invoke("nethub:backup-db"),
