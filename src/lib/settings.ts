@@ -112,8 +112,8 @@ export async function loadSettingsAnywhere(): Promise<Settings> {
   const fromDisk = await readSettingsFile();
   if (fromDisk && typeof fromDisk === "object") {
     const raw = fromDisk as Record<string, unknown>;
-    const payload = (raw.settings && typeof raw.settings === "object" ? raw.settings : raw) as
-      Partial<Settings>;
+    const inner = raw["settings"];
+    const payload = (inner && typeof inner === "object" ? inner : raw) as Partial<Settings>;
     const merged = sanitizeSettings({ ...loadSettings(), ...payload });
     saveSettings(merged);
     return merged;
