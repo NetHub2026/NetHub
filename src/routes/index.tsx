@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Sparkles,
   Loader2,
+  LayoutGrid,
   Moon,
   Radar,
   RefreshCw,
@@ -23,6 +24,7 @@ import {
   Users,
   Wifi,
   WifiOff,
+  Waypoints,
 } from "lucide-react";
 import {
   deviceTypeLabels,
@@ -88,6 +90,7 @@ import {
 import { BandwidthChart } from "@/components/network/BandwidthChart";
 import { DeviceDetailPanel } from "@/components/network/DeviceDetailPanel";
 import { NetworkTabs } from "@/components/network/NetworkTabs";
+import { NetworkTopology } from "@/components/network/NetworkTopology";
 import { SpeedTestPanel } from "@/components/network/SpeedTestPanel";
 import { UpdateModal } from "@/components/network/UpdateModal";
 import { DeviceTypeIcon } from "@/components/network/DeviceTypeIcon";
@@ -148,6 +151,7 @@ function formatCountdown(seconds: number): string {
 
 function Dashboard() {
   const [items, setItems] = useState<Device[]>([]);
+  const [viewMode, setViewMode] = useState<"inventory" | "topology">("inventory");
   const [filter, setFilter] = useState<DeviceType | "all">("all");
   const [query, setQuery] = useState("");
   const [network, setNetwork] = useState<string>(ALL_NETWORKS);
@@ -585,6 +589,37 @@ function Dashboard() {
             Datos en <span className="font-mono text-foreground">{dbPath}</span>
           </span>
           <div className="ml-auto flex flex-wrap items-center gap-2">
+            <div
+              className="flex items-center rounded-md border border-border bg-muted/40 p-0.5"
+              aria-label="Vista del panel"
+            >
+              <button
+                type="button"
+                onClick={() => setViewMode("inventory")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  viewMode === "inventory"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <LayoutGrid className="size-3.5" />
+                Inventario
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("topology")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  viewMode === "topology"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Waypoints className="size-3.5" />
+                Topología de red
+              </button>
+            </div>
             <span className="inline-flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-muted-foreground">
               {autoInterval > 0 ? (
                 <span className="relative flex size-2">
@@ -711,7 +746,7 @@ function Dashboard() {
           </section>
         )}
 
-        {!showEmpty && (
+        {!showEmpty && viewMode === "inventory" && (
           <>
             <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Stat
@@ -953,6 +988,14 @@ function Dashboard() {
           )}
             </section>
           </>
+        )}
+
+        {!showEmpty && viewMode === "topology" && (
+          <NetworkTopology
+            devices={items}
+            networks={detectedNetworks}
+            onSelectDevice={setSelectedId}
+          />
         )}
       </main>
 
