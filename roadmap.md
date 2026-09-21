@@ -25,6 +25,9 @@
 ## Pendiente
 - Ninguna tarea abierta.
 
+## Completado (21/9)
+- Mapa interactivo de topología: selector Inventario/Topología de red, agrupación automática por subred, ramas plegables, estado y conexión de cada equipo y acceso directo a su ficha.
+
 ## Completado (18/9, tercera ronda)
 - Personas y ubicaciones: modelo y `devices-db.json` con listas reutilizables, selectores con creación al instante en la ficha, indicadores en las tarjetas, filtros por persona y ubicación y columnas nuevas en el CSV.
 - Área de notificación de Windows: icono en la bandeja con menú Abrir NetHub / Escanear ahora / Salir y ocultado al minimizar o cerrar para seguir escaneando en segundo plano.
