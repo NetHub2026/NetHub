@@ -105,9 +105,15 @@ export function SettingsModal({ open, settings, onClose, onChange }: Props) {
               <div className="space-y-5">
                 <Toggle
                   label="Iniciar NetHub automáticamente con Windows"
-                  hint="La app arranca minimizada en la bandeja al encender el equipo."
+                  hint="Abre NetHub al iniciar sesión en Windows."
                   checked={settings.startWithWindows}
                   onChange={(v) => onChange({ startWithWindows: v })}
+                />
+                <Toggle
+                  label="Iniciar minimizado a la bandeja"
+                  hint="Cuando Windows inicie NetHub, funcionará en segundo plano sin mostrar la ventana."
+                  checked={settings.startMinimized}
+                  onChange={(v) => onChange({ startMinimized: v })}
                 />
                 <Field
                   label="Al pulsar el botón cerrar [X]"

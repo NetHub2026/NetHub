@@ -25,6 +25,11 @@
 ## Pendiente
 - Ninguna tarea abierta.
 
+## Completado (22/9)
+- Ficha con acciones reales: abrir panel web y copiar IP/MAC, manteniendo ping y Wake-on-LAN.
+- Arranque opcional de Windows directamente minimizado en la bandeja, persistido en `settings.json`.
+- Icono de aplicación recortado sin baldosa exterior y regenerado para Windows en varias resoluciones.
+
 ## Completado (21/9)
 - Mapa interactivo de topología: selector Inventario/Topología de red, agrupación automática por subred, ramas plegables, estado y conexión de cada equipo y acceso directo a su ficha.
 

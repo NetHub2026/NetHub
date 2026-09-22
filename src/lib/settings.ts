@@ -13,6 +13,7 @@ export type ScanMode = "fast" | "deep";
 export interface Settings {
   /* Sistema y arranque */
   startWithWindows: boolean;
+  startMinimized: boolean;
   closeAction: CloseAction;
   minimizeToTray: boolean;
   /* Apariencia */
@@ -33,6 +34,7 @@ export interface Settings {
 
 export const defaultSettings: Settings = {
   startWithWindows: false,
+  startMinimized: false,
   closeAction: "tray",
   minimizeToTray: true,
   theme: "dark",
@@ -76,6 +78,7 @@ export function sanitizeSettings(value: Partial<Settings>): Settings {
   };
   return {
     startWithWindows: Boolean(value.startWithWindows),
+    startMinimized: Boolean(value.startMinimized),
     closeAction: value.closeAction === "quit" ? "quit" : "tray",
     minimizeToTray: value.minimizeToTray !== false,
     theme:

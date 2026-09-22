@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld("nethub", {
   openDataFolder: () => ipcRenderer.invoke("nethub:open-data-folder"),
   notify: (payload) => ipcRenderer.invoke("nethub:notify", payload),
   backupDb: () => ipcRenderer.invoke("nethub:backup-db"),
+  openExternal: (url) => ipcRenderer.invoke("nethub:open-external", url),
   // Petición de escaneo desde el menú del área de notificación.
   onScanNow: (callback) => {
     const listener = () => callback();
