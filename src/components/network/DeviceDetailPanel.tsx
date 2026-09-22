@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import {
-  Ban,
+  Check,
+  Copy,
   ExternalLink,
-  Gauge,
   Loader2,
   MapPin,
   User,
-  RotateCw,
   Router,
   ShieldCheck,
   Sparkles,
@@ -15,6 +14,7 @@ import {
   Plus,
   Radar,
 } from "lucide-react";
+import { openExternalUrl } from "@/lib/desktop";
 import { deviceTypeLabels, type Device, type DeviceType } from "@/lib/devices";
 import { DeviceTypeIcon } from "./DeviceTypeIcon";
 import { PingCard } from "./PingCard";
@@ -176,6 +176,43 @@ export function DeviceDetailPanel({
   const suggested = !device.services || device.services.length === 0;
 
   const privateMac = isRandomizedMac(device.mac);
+
+  const webService =
+    device.services?.find((service) => service.port === 8123 && service.url) ??
+    device.services?.find((service) => service.port === 80 && service.url) ??
+    device.services?.find((service) => service.port === 443 && service.url) ??
+    device.services?.find((service) => service.url) ??
+    services.find((service) => service.port === 8123 && service.url) ??
+    services.find((service) => service.port === 80 && service.url) ??
+    services.find((service) => service.port === 443 && service.url);
+  const adminUrl = webService?.url ?? `http://${device.ip}`;
+
+  const showFeedback = (message: string) => {
+    setFeedback(message);
+    window.setTimeout(() => setFeedback(null), 2200);
+  };
+
+  const openAdmin = async () => {
+    const opened = await openExternalUrl(adminUrl);
+    showFeedback(opened ? "Panel web abierto en el navegador." : "No se ha podido abrir el panel web.");
+  };
+
+  const copyValue = async (label: "IP" | "MAC", value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      showFeedback(`${label} copiada al portapapeles.`);
+    } catch {
+      const input = document.createElement("textarea");
+      input.value = value;
+      input.style.position = "fixed";
+      input.style.opacity = "0";
+      document.body.appendChild(input);
+      input.select();
+      const copied = document.execCommand("copy");
+      input.remove();
+      showFeedback(copied ? `${label} copiada al portapapeles.` : `No se ha podido copiar la ${label}.`);
+    }
+  };
 
   const findVendorOnline = async () => {
     setVendorLookup(true);
@@ -629,38 +666,41 @@ export function DeviceDetailPanel({
         </div>
 
         <h3 className="mt-8 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Control
+          Acciones rápidas
         </h3>
         <div className="mt-3 space-y-2">
-          <ControlRow
-            icon={<Ban className="size-4" />}
-            label="Bloquear acceso a internet"
-            active={!!device.blocked}
-            onToggle={() => onUpdate({ ...device, blocked: !device.blocked })}
-          />
-          <ControlRow
-            icon={<Gauge className="size-4" />}
-            label="Priorizar ancho de banda (QoS)"
-            active={!!device.prioritized}
-            onToggle={() => onUpdate({ ...device, prioritized: !device.prioritized })}
-          />
           <button
-            onClick={() => setFeedback(`Orden de reinicio enviada a ${device.name}.`)}
+            onClick={() => void openAdmin()}
             className="flex w-full items-center gap-3 rounded-xl border border-border px-4 py-3 text-left text-sm transition-colors hover:bg-accent"
           >
-            <RotateCw className="size-4" />
-            Reiniciar dispositivo
+            <ExternalLink className="size-4" />
+            <span className="min-w-0 flex-1">
+              <span className="block">Abrir interfaz web / panel de administración</span>
+              <span className="block truncate font-mono text-xs text-muted-foreground">{adminUrl}</span>
+            </span>
+          </button>
+          <button
+            onClick={() => void copyValue("IP", device.ip)}
+            className="flex w-full items-center gap-3 rounded-xl border border-border px-4 py-3 text-left text-sm transition-colors hover:bg-accent"
+          >
+            <Copy className="size-4" />
+            <span className="flex-1">Copiar dirección IP</span>
+            <span className="font-mono text-xs text-muted-foreground">{device.ip}</span>
+          </button>
+          <button
+            onClick={() => void copyValue("MAC", device.mac)}
+            className="flex w-full items-center gap-3 rounded-xl border border-border px-4 py-3 text-left text-sm transition-colors hover:bg-accent"
+          >
+            <Copy className="size-4" />
+            <span className="flex-1">Copiar dirección MAC</span>
+            <span className="font-mono text-xs text-muted-foreground">{device.mac}</span>
           </button>
         </div>
         {feedback && (
-          <p className="mt-3 rounded-md bg-success/15 px-3 py-2 text-xs text-success">
-            {feedback}
+          <p className="mt-3 flex items-center gap-2 rounded-md bg-success/15 px-3 py-2 text-xs text-success" role="status">
+            <Check className="size-3.5" /> {feedback}
           </p>
         )}
-        <p className="mt-4 text-xs text-muted-foreground">
-          Las acciones de control se aplican de forma local en esta demo y están
-          preparadas para conectarse al router o a Home Assistant.
-        </p>
 
         <div className="mt-8 rounded-xl border border-destructive/40 bg-destructive/5 p-4">
           {confirmDelete ? (
@@ -696,41 +736,5 @@ export function DeviceDetailPanel({
         </div>
       </aside>
     </div>
-  );
-}
-
-function ControlRow({
-  icon,
-  label,
-  active,
-  onToggle,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  active: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      onClick={onToggle}
-      className="flex w-full items-center gap-3 rounded-xl border border-border px-4 py-3 text-left text-sm transition-colors hover:bg-accent"
-      aria-pressed={active}
-    >
-      {icon}
-      <span className="flex-1">{label}</span>
-      <span
-        className={cn(
-          "relative h-5 w-9 shrink-0 rounded-full transition-colors",
-          active ? "bg-brand" : "bg-muted",
-        )}
-      >
-        <span
-          className={cn(
-            "absolute top-0.5 size-4 rounded-full bg-background transition-all",
-            active ? "left-[1.15rem]" : "left-0.5",
-          )}
-        />
-      </span>
-    </button>
   );
 }
