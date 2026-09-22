@@ -579,6 +579,8 @@ async function downloadAndInstall(sender) {
 
 /** Preferencias nativas aplicadas desde la interfaz (Configuración). */
 const nativeSettings = {
+  startWithWindows: false,
+  startMinimized: false,
   closeAction: "tray",
   minimizeToTray: true,
   wolPort: 9,
@@ -587,6 +589,8 @@ const nativeSettings = {
 
 function applySettings(settings) {
   const data = settings && typeof settings === "object" ? settings : {};
+  nativeSettings.startWithWindows = Boolean(data.startWithWindows);
+  nativeSettings.startMinimized = Boolean(data.startMinimized);
   nativeSettings.closeAction = data.closeAction === "quit" ? "quit" : "tray";
   nativeSettings.minimizeToTray = data.minimizeToTray !== false;
   const port = Number(data.wolPort);
@@ -596,7 +600,7 @@ function applySettings(settings) {
     app.setLoginItemSettings({
       openAtLogin: Boolean(data.startWithWindows),
       path: process.env.PORTABLE_EXECUTABLE_FILE || process.execPath,
-      args: [],
+      args: data.startMinimized ? ["--hidden"] : [],
     });
   } catch {
     /* algunas plataformas no lo soportan */
@@ -608,7 +612,10 @@ function applySettings(settings) {
 function loadNativeSettingsFromDisk() {
   try {
     const raw = readSettings();
-    if (raw) applySettings(JSON.parse(raw));
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      applySettings(parsed?.settings && typeof parsed.settings === "object" ? parsed.settings : parsed);
+    }
   } catch {
     /* archivo inexistente o corrupto: se usan los valores por defecto */
   }
@@ -661,6 +668,18 @@ ipcMain.handle("nethub:write-settings", (_e, json) => writeSettings(json));
 ipcMain.handle("nethub:open-data-folder", () => openDataFolder());
 ipcMain.handle("nethub:backup-db", () => backupDb());
 ipcMain.handle("nethub:notify", (_e, payload) => notifyNative(payload));
+ipcMain.handle("nethub:open-external", async (_e, url) => {
+  const target = String(url || "");
+  if (!/^https?:\/\/\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?(?:\/.*)?$/i.test(target)) {
+    return { ok: false, error: "Dirección no válida." };
+  }
+  try {
+    await shell.openExternal(target);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+});
 
 ipcMain.handle("nethub:read", () => readDevices());
 ipcMain.handle("nethub:write", (_e, json) => writeDevices(json));
@@ -1023,11 +1042,24 @@ async function loadApp(win) {
   }
 }
 
+function shouldStartHidden() {
+  if (!nativeSettings.startMinimized) return false;
+  if (process.argv.includes("--hidden")) return true;
+  try {
+    return Boolean(app.getLoginItemSettings().wasOpenedAtLogin);
+  } catch {
+    return false;
+  }
+}
+
 app.whenReady().then(async () => {
   startAgentServer();
   createTray();
+  const hidden = shouldStartHidden();
   const win = createWindow();
+  if (hidden) win.hide();
   await loadApp(win);
+  if (hidden) win.hide();
   app.on("activate", () => showWindow());
 });
 

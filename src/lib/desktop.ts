@@ -30,11 +30,13 @@ interface ElectronBridge {
   openDataFolder?: () => Promise<{ ok: boolean; path?: string; error?: string }>;
   notify?: (payload: { title: string; body: string }) => Promise<{ ok: boolean }>;
   backupDb?: () => Promise<{ ok: boolean; path?: string; error?: string }>;
+  openExternal?: (url: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
 /** Aplica al sistema las preferencias nativas (autoinicio, cierre, bandeja). */
 export async function applyNativeSettings(settings: {
   startWithWindows: boolean;
+  startMinimized: boolean;
   closeAction: "tray" | "quit";
   minimizeToTray: boolean;
   wolPort: number;
@@ -44,6 +46,23 @@ export async function applyNativeSettings(settings: {
     if (typeof window !== "undefined" && window.nethub?.applySettings) {
       const result = await window.nethub.applySettings(settings);
       return Boolean(result?.ok);
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+/** Abre un panel web del dispositivo en el navegador predeterminado. */
+export async function openExternalUrl(url: string): Promise<boolean> {
+  try {
+    if (typeof window !== "undefined" && window.nethub?.openExternal) {
+      const result = await window.nethub.openExternal(url);
+      return Boolean(result?.ok);
+    }
+    if (typeof window !== "undefined") {
+      window.open(url, "_blank", "noopener,noreferrer");
+      return true;
     }
   } catch {
     return false;
