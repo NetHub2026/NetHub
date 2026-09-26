@@ -18,6 +18,7 @@ import { openExternalUrl } from "@/lib/desktop";
 import { deviceTypeLabels, type Device, type DeviceType } from "@/lib/devices";
 import { DeviceTypeIcon } from "./DeviceTypeIcon";
 import { PingCard } from "./PingCard";
+import { activityLabels, formatDateTime, relativeTime, type ActivityEvent } from "@/lib/activity";
 import { detectNetworkId, type NetworkDef } from "@/lib/networks";
 import {
   PRIVATE_MAC_LABEL,
@@ -56,6 +57,7 @@ interface DeviceDetailPanelProps {
   locations?: string[];
   onCreatePerson?: (name: string) => void;
   onCreateLocation?: (name: string) => void;
+  events?: ActivityEvent[];
 }
 
 export function DeviceDetailPanel({
@@ -68,6 +70,7 @@ export function DeviceDetailPanel({
   locations = [],
   onCreatePerson,
   onCreateLocation,
+  events = [],
 }: DeviceDetailPanelProps) {
   const [tagDraft, setTagDraft] = useState("");
   const [personDraft, setPersonDraft] = useState("");
@@ -512,6 +515,50 @@ export function DeviceDetailPanel({
             </div>
           ))}
         </dl>
+
+        <h3 className="mt-8 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          Historial de presencia
+        </h3>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="rounded-lg border border-border p-3">
+            <p className="text-[11px] text-muted-foreground">Primera detección</p>
+            <p className="mt-1 text-sm font-medium">{formatDateTime(device.firstSeenAt)}</p>
+          </div>
+          <div className="rounded-lg border border-border p-3">
+            <p className="text-[11px] text-muted-foreground">Última actividad online</p>
+            <p className="mt-1 text-sm font-medium">
+              {device.status === "online"
+                ? "Online ahora"
+                : device.lastOnlineAt
+                  ? relativeTime(device.lastOnlineAt)
+                  : "—"}
+            </p>
+            {device.lastOnlineAt && (
+              <p className="text-[11px] text-muted-foreground">{formatDateTime(device.lastOnlineAt)}</p>
+            )}
+          </div>
+        </div>
+        {(() => {
+          const recent = events.filter((e) => e.deviceId === device.id).slice(0, 5);
+          return (
+            <ul className="mt-3 space-y-1.5">
+              {recent.length === 0 && (
+                <li className="text-xs text-muted-foreground">Sin eventos recientes.</li>
+              )}
+              {recent.map((e) => (
+                <li key={e.id} className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-1.5 text-xs">
+                  <span className="font-medium">
+                    {activityLabels[e.kind]}
+                    {e.kind === "ip_changed" && e.previousIp ? ` · ${e.previousIp} → ${e.ip}` : ""}
+                  </span>
+                  <span className="text-muted-foreground" title={formatDateTime(e.at)}>
+                    {relativeTime(e.at)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          );
+        })()}
 
         <h3 className="mt-8 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Latencia y encendido remoto

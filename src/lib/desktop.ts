@@ -317,6 +317,8 @@ export interface DbPayload {
   devices: Device[];
   people: string[];
   locations: string[];
+  /** Historial de actividad (máx. 300 eventos) */
+  events?: unknown[];
 }
 
 async function readDbRaw(): Promise<string | null> {
@@ -347,6 +349,7 @@ export async function readDbFile(): Promise<DbPayload | null> {
       devices: Array.isArray(obj.devices) ? obj.devices : [],
       people: Array.isArray(obj.people) ? obj.people : [],
       locations: Array.isArray(obj.locations) ? obj.locations : [],
+      events: Array.isArray(obj.events) ? obj.events : [],
     };
   } catch {
     return null;

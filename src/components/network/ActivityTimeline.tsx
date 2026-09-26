@@ -11,7 +11,7 @@ import { DeviceTypeIcon } from "./DeviceTypeIcon";
 import { cn } from "@/lib/utils";
 
 const kindStyle: Record<ActivityKind, { icon: typeof Wifi; cls: string }> = {
-  connected: { icon: Wifi, cls: "bg-online/15 text-online" },
+  connected: { icon: Wifi, cls: "bg-success/15 text-success" },
   disconnected: { icon: WifiOff, cls: "bg-destructive/15 text-destructive" },
   new_device: { icon: Sparkles, cls: "bg-brand/15 text-brand" },
   ip_changed: { icon: ArrowLeftRight, cls: "bg-muted text-foreground" },
