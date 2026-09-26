@@ -9,6 +9,7 @@ import {
   saveStoredDirectory,
   type Directory,
 } from "./directory";
+import { loadStoredEvents, saveStoredEvents, sanitizeEvents, type ActivityEvent } from "./activity";
 
 /**
  * Persistencia unificada: en escritorio guarda en `devices-db.json` dentro del
@@ -19,6 +20,23 @@ import {
 /** Último estado conocido, para poder reescribir el archivo completo. */
 let lastDevices: Device[] = [];
 let lastDirectory: Directory = emptyDirectory;
+let lastEvents: ActivityEvent[] = [];
+
+/** Historial de actividad (archivo local en escritorio, localStorage en web). */
+export async function loadEventsAnywhere(): Promise<ActivityEvent[]> {
+  let events = loadStoredEvents();
+  if (isDesktop()) {
+    const payload = await readDbFile();
+    if (payload?.events && payload.events.length > 0) events = sanitizeEvents(payload.events);
+  }
+  lastEvents = events;
+  return events;
+}
+
+export async function saveEventsAnywhere(events: ActivityEvent[]): Promise<void> {
+  lastEvents = sanitizeEvents(events);
+  await flush();
+}
 
 export async function loadDevicesAnywhere(): Promise<Device[] | null> {
   if (isDesktop()) {
@@ -52,11 +70,13 @@ export async function loadDirectoryAnywhere(devices: Device[] = []): Promise<Dir
 async function flush() {
   saveToLocalStorage(lastDevices);
   saveStoredDirectory(lastDirectory);
+  saveStoredEvents(lastEvents);
   if (isDesktop()) {
     await writeDbFile({
       devices: lastDevices,
       people: lastDirectory.people,
       locations: lastDirectory.locations,
+      events: lastEvents,
     });
   }
 }
