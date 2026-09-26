@@ -53,3 +53,5 @@
 - [x] Tarjetas de descarga y uso del enlace conectadas al tráfico real del adaptador
 - [x] Tarjetas de dispositivo limpias (icono de conexión, ubicación con su badge, sin icono de fabricante)
 - [x] Menú de Configuración completo (sistema, apariencia, red, alertas, datos)
+
+- [x] Historial de actividad (Timeline) con presencia en la ficha (26/9)
