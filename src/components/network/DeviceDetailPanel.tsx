@@ -28,7 +28,6 @@ import {
 } from "@/lib/oui";
 import { Globe } from "lucide-react";
 import { detectServices, likelyServices, type PortScanProgress, type ServiceHit } from "@/lib/services";
-import { Copy } from "lucide-react";
 import { VendorIcon } from "./VendorIcon";
 import { cn } from "@/lib/utils";
 
