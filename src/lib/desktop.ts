@@ -19,6 +19,11 @@ interface ElectronBridge {
   scanNetwork?: () => Promise<unknown>;
   dbPath?: () => Promise<string>;
   ping?: (ip: string) => Promise<{ ok: boolean; rtt: number | null }>;
+  scanPorts?: (
+    ip: string,
+    ports: number[],
+    timeout?: number,
+  ) => Promise<Array<{ port: number; open: boolean; rtt: number | null }>>;
   wol?: (mac: string) => Promise<boolean>;
   traffic?: () => Promise<TrafficSample>;
   checkUpdate?: () => Promise<UpdateInfo>;
@@ -542,4 +547,18 @@ export function downloadDevicesJson(devices: Device[]) {
   a.download = DB_FILE;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/** Escaneo TCP nativo (Electron). Devuelve null si no está disponible. */
+export async function nativeScanPorts(
+  ip: string,
+  ports: number[],
+  timeout = 900,
+): Promise<Array<{ port: number; open: boolean; rtt: number | null }> | null> {
+  if (typeof window === "undefined" || !window.nethub?.scanPorts) return null;
+  try {
+    return await window.nethub.scanPorts(ip, ports, timeout);
+  } catch {
+    return null;
+  }
 }
