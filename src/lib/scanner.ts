@@ -262,6 +262,7 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
         ...fresh,
         tags: defaultTagsForType(fresh.type, sanitizeTags(fresh.tags)),
         firstSeenAt: now,
+        ...(fresh.status === "online" ? { lastOnlineAt: now } : {}),
         isNew: true,
         trusted: false,
       };
@@ -284,6 +285,7 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
       type: old.type,
       vendor,
       firstSeenAt: old.firstSeenAt ?? now,
+      ...(fresh.status === "online" ? { lastOnlineAt: now } : {}),
       isNew: old.trusted ? false : (old.isNew ?? false),
       ...(brand ? { brand } : {}),
     };

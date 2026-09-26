@@ -91,6 +91,10 @@ import { BandwidthChart } from "@/components/network/BandwidthChart";
 import { DeviceDetailPanel } from "@/components/network/DeviceDetailPanel";
 import { NetworkTabs } from "@/components/network/NetworkTabs";
 import { NetworkTopology } from "@/components/network/NetworkTopology";
+import { ActivityTimeline } from "@/components/network/ActivityTimeline";
+import { appendEvents, diffActivity, type ActivityEvent } from "@/lib/activity";
+import { loadEventsAnywhere, saveEventsAnywhere } from "@/lib/persistence";
+import { History as HistoryIcon } from "lucide-react";
 import { SpeedTestPanel } from "@/components/network/SpeedTestPanel";
 import { UpdateModal } from "@/components/network/UpdateModal";
 import { DeviceTypeIcon } from "@/components/network/DeviceTypeIcon";
@@ -151,7 +155,16 @@ function formatCountdown(seconds: number): string {
 
 function Dashboard() {
   const [items, setItems] = useState<Device[]>([]);
-  const [viewMode, setViewMode] = useState<"inventory" | "topology">("inventory");
+  const [viewMode, setViewMode] = useState<"inventory" | "topology" | "activity">("inventory");
+  const [events, setEvents] = useState<ActivityEvent[]>([]);
+  const recordEvents = (added: ActivityEvent[]) => {
+    if (added.length === 0) return;
+    setEvents((prev) => {
+      const next = appendEvents(prev, added);
+      void saveEventsAnywhere(next);
+      return next;
+    });
+  };
   const [filter, setFilter] = useState<DeviceType | "all">("all");
   const [query, setQuery] = useState("");
   const [network, setNetwork] = useState<string>(ALL_NETWORKS);
@@ -253,6 +266,7 @@ function Dashboard() {
       if (cancelled) return;
       if (stored && stored.length > 0) setItems(stored);
       setDirectory(await loadDirectoryAnywhere(stored ?? []));
+      setEvents(await loadEventsAnywhere());
       if (cancelled) return;
       setMeta(loadScanMeta());
       setRuntime(getRuntime());
@@ -318,6 +332,7 @@ function Dashboard() {
       itemsRef.current.filter((d) => d.status === "online").map((d) => d.id),
     );
     const merged = mergeScan(itemsRef.current, resolved);
+    recordEvents(diffActivity(itemsRef.current, merged));
     setItems(merged);
     void saveDevicesAnywhere(merged);
     const next: ScanMeta = { lastScanAt: new Date().toISOString(), source };
@@ -451,6 +466,8 @@ function Dashboard() {
     setMeta({ lastScanAt: null, source: null });
     void saveDirectoryAnywhere(emptyDirectory);
     void saveDevicesAnywhere([]);
+    setEvents([]);
+    void saveEventsAnywhere([]);
     setNotice("Datos borrados: el inventario está vacío. Escanea tu red para empezar.");
   };
 
@@ -618,6 +635,19 @@ function Dashboard() {
               >
                 <Waypoints className="size-3.5" />
                 Topología de red
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("activity")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  viewMode === "activity"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <HistoryIcon className="size-3.5" />
+                Actividad
               </button>
             </div>
             <span className="inline-flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-muted-foreground">
@@ -997,9 +1027,22 @@ function Dashboard() {
             onSelectDevice={setSelectedId}
           />
         )}
+        {viewMode === "activity" && (
+          <ActivityTimeline
+            events={events}
+            onSelectDevice={(id) => {
+              if (items.some((d) => d.id === id)) setSelectedId(id);
+            }}
+            onClear={() => {
+              setEvents([]);
+              void saveEventsAnywhere([]);
+            }}
+          />
+        )}
       </main>
 
       <DeviceDetailPanel
+        events={events}
         device={selected}
         onClose={() => setSelectedId(null)}
         onUpdate={update}
