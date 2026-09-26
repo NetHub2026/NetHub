@@ -55,3 +55,4 @@
 - [x] Menú de Configuración completo (sistema, apariencia, red, alertas, datos)
 
 - [x] Historial de actividad (Timeline) con presencia en la ficha (26/9)
+- [x] Escaneo TCP de puertos y servicios en la ficha (26/9)

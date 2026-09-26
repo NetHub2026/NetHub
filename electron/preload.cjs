@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld("nethub", {
   scanNetwork: () => ipcRenderer.invoke("nethub:scan"),
   dbPath: () => ipcRenderer.invoke("nethub:path"),
   ping: (ip) => ipcRenderer.invoke("nethub:ping", ip),
+  scanPorts: (ip, ports, timeout) => ipcRenderer.invoke("nethub:scan-ports", ip, ports, timeout),
   wol: (mac) => ipcRenderer.invoke("nethub:wol", mac),
   traffic: () => ipcRenderer.invoke("nethub:traffic"),
   checkUpdate: () => ipcRenderer.invoke("nethub:check-update"),

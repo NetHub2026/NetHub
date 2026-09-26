@@ -686,6 +686,33 @@ ipcMain.handle("nethub:write", (_e, json) => writeDevices(json));
 ipcMain.handle("nethub:scan", () => scanNetwork());
 ipcMain.handle("nethub:path", () => dbPath());
 ipcMain.handle("nethub:ping", (_e, ip) => pingIp(ip));
+
+// Escaneo TCP real de puertos: abierto solo si el handshake se completa.
+function probeTcpPort(ip, port, timeout) {
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const socket = new net.Socket();
+    let done = false;
+    const finish = (open) => {
+      if (done) return;
+      done = true;
+      socket.destroy();
+      resolve({ port, open, rtt: open ? Math.max(1, Date.now() - started) : null });
+    };
+    socket.setTimeout(timeout);
+    socket.once("connect", () => finish(true));
+    socket.once("timeout", () => finish(false));
+    socket.once("error", () => finish(false));
+    socket.connect(port, ip);
+  });
+}
+
+ipcMain.handle("nethub:scan-ports", async (_e, ip, ports, timeout) => {
+  if (typeof ip !== "string" || !/^[\d.]+$/.test(ip) || !Array.isArray(ports)) return [];
+  const list = ports.map(Number).filter((p) => Number.isInteger(p) && p > 0 && p < 65536).slice(0, 200);
+  const ms = Math.min(Math.max(Number(timeout) || 900, 200), 5000);
+  return Promise.all(list.map((port) => probeTcpPort(ip, port, ms)));
+});
 ipcMain.handle("nethub:wol", (_e, mac) => sendWol(mac));
 ipcMain.handle("nethub:traffic", () => readTraffic());
 ipcMain.handle("nethub:check-update", () => checkUpdate());
