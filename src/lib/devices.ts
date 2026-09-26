@@ -44,6 +44,8 @@ export interface Device {
   brand?: VendorBrand;
   /** ISO de la primera vez que se vio el dispositivo en un escaneo */
   firstSeenAt?: string;
+  /** ISO de la última vez que se vio online */
+  lastOnlineAt?: string;
   /** Detectado por primera vez en el último escaneo */
   isNew?: boolean;
   /** Marcado manualmente como conocido / confiable */
