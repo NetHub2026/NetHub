@@ -79,6 +79,8 @@ import {
   loadDirectoryAnywhere,
   saveDevicesAnywhere,
   saveDirectoryAnywhere,
+  loadEventsAnywhere,
+  saveEventsAnywhere,
 } from "@/lib/persistence";
 import { exportInventoryCsv } from "@/lib/backup";
 import {
@@ -93,7 +95,6 @@ import { NetworkTabs } from "@/components/network/NetworkTabs";
 import { NetworkTopology } from "@/components/network/NetworkTopology";
 import { ActivityTimeline } from "@/components/network/ActivityTimeline";
 import { appendEvents, diffActivity, type ActivityEvent } from "@/lib/activity";
-import { loadEventsAnywhere, saveEventsAnywhere } from "@/lib/persistence";
 import { History as HistoryIcon } from "lucide-react";
 import { SpeedTestPanel } from "@/components/network/SpeedTestPanel";
 import { UpdateModal } from "@/components/network/UpdateModal";
