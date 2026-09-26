@@ -23,6 +23,14 @@ export interface ServiceHit {
   label: string;
   url: string | null;
   hint: string;
+  /** Tiempo de respuesta del puerto (ms), si se midió */
+  rtt?: number | null;
+}
+
+export interface PortScanProgress {
+  done: number;
+  total: number;
+  found: number;
 }
 
 export const commonServices: ServiceDefinition[] = [
@@ -51,6 +59,13 @@ export const commonServices: ServiceDefinition[] = [
   { port: 1883, label: "MQTT", scheme: null, hint: "Bus de mensajes IoT" },
   { port: 445, label: "SMB", scheme: null, hint: "Carpetas compartidas" },
   { port: 631, label: "IPP / Impresora", scheme: "http", hint: "Impresora en red" },
+  { port: 9100, label: "Impresora RAW", scheme: null, hint: "Impresión directa (JetDirect)" },
+  { port: 3389, label: "RDP", scheme: null, hint: "Escritorio remoto de Windows" },
+  { port: 554, label: "RTSP / Cámara", scheme: null, hint: "Vídeo en directo de cámaras IP" },
+  { port: 8443, label: "HTTPS alternativo", scheme: "https", hint: "Panel web cifrado secundario" },
+  { port: 5000, label: "Synology / App web", scheme: "http", hint: "NAS o aplicación web" },
+  { port: 139, label: "NetBIOS", scheme: null, hint: "Compartición de Windows antigua" },
+  { port: 21, label: "FTP", scheme: null, hint: "Transferencia de archivos" },
 ];
 
 export function serviceUrl(ip: string, def: ServiceDefinition): string | null {
@@ -78,22 +93,49 @@ async function probePort(ip: string, def: ServiceDefinition, timeout: number): P
   }
 }
 
-/** Sondea los servicios comunes de una IP y devuelve los que responden. */
-export async function detectServices(ip: string, timeout = 1500): Promise<ServiceHit[]> {
-  const results = await Promise.all(
-    commonServices.map(async (def) => ({
-      def,
-      open: await probePort(ip, def, timeout),
-    })),
-  );
-  return results
-    .filter((r) => r.open)
-    .map(({ def }) => ({
-      port: def.port,
-      label: def.label,
-      url: serviceUrl(ip, def),
-      hint: def.hint,
-    }));
+function toHit(ip: string, def: ServiceDefinition, rtt: number | null): ServiceHit {
+  return { port: def.port, label: def.label, url: serviceUrl(ip, def), hint: def.hint, rtt };
+}
+
+/**
+ * Sondea los servicios comunes de una IP. En escritorio usa sockets TCP reales;
+ * en el navegador, peticiones web con tiempo límite. Informa del progreso.
+ */
+export async function detectServices(
+  ip: string,
+  onProgress?: (p: PortScanProgress) => void,
+  timeout = 1500,
+): Promise<{ hits: ServiceHit[]; native: boolean }> {
+  const { nativeScanPorts } = await import("./desktop");
+  const total = commonServices.length;
+  const hits: ServiceHit[] = [];
+  let done = 0;
+  const chunkSize = 6;
+  let native = true;
+  for (let i = 0; i < total; i += chunkSize) {
+    const chunk = commonServices.slice(i, i + chunkSize);
+    const nativeRes = native ? await nativeScanPorts(ip, chunk.map((d) => d.port), 900) : null;
+    if (nativeRes) {
+      for (const r of nativeRes) {
+        const def = chunk.find((d) => d.port === r.port);
+        if (def && r.open) hits.push(toHit(ip, def, r.rtt));
+      }
+    } else {
+      native = false;
+      await Promise.all(
+        chunk.map(async (def) => {
+          const t0 = performance.now();
+          if (await probePort(ip, def, timeout)) {
+            hits.push(toHit(ip, def, Math.max(1, Math.round(performance.now() - t0))));
+          }
+        }),
+      );
+    }
+    done += chunk.length;
+    onProgress?.({ done, total, found: hits.length });
+  }
+  hits.sort((a, b) => a.port - b.port);
+  return { hits, native };
 }
 
 /** Servicios probables según el tipo de dispositivo, para sugerir enlaces. */
