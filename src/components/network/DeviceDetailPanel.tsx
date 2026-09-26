@@ -27,7 +27,7 @@ import {
   suggestedName,
 } from "@/lib/oui";
 import { Globe } from "lucide-react";
-import { detectServices, likelyServices, type ServiceHit } from "@/lib/services";
+import { detectServices, likelyServices, type PortScanProgress, type ServiceHit } from "@/lib/services";
 import { VendorIcon } from "./VendorIcon";
 import { cn } from "@/lib/utils";
 
@@ -73,6 +73,7 @@ export function DeviceDetailPanel({
   events = [],
 }: DeviceDetailPanelProps) {
   const [tagDraft, setTagDraft] = useState("");
+  const [portProgress, setPortProgress] = useState<PortScanProgress | null>(null);
   const [personDraft, setPersonDraft] = useState("");
   const [locationDraft, setLocationDraft] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -161,13 +162,17 @@ export function DeviceDetailPanel({
   const probe = async () => {
     setProbing(true);
     setProbeNote(null);
-    const hits = await detectServices(device.ip);
+    setPortProgress({ done: 0, total: 1, found: 0 });
+    const { hits, native } = await detectServices(device.ip, setPortProgress);
     onUpdate({ ...device, services: hits, servicesScannedAt: new Date().toISOString() });
     setProbing(false);
+    setPortProgress(null);
     setProbeNote(
       hits.length > 0
-        ? `${hits.length} servicios abiertos detectados.`
-        : "Ningún servicio ha respondido. El navegador solo puede sondear puertos web; usa la app portable para un escaneo completo.",
+        ? `${hits.length} puertos abiertos (${native ? "escaneo TCP nativo" : "sondeo desde el navegador"}).`
+        : native
+          ? "Ningún puerto común está abierto en este equipo."
+          : "Ningún servicio ha respondido. El navegador solo puede sondear puertos web; usa la app portable para un escaneo completo.",
     );
   };
 
@@ -596,12 +601,30 @@ export function DeviceDetailPanel({
             ) : (
               <Radar className="size-3.5" />
             )}
-            {probing ? "Sondeando…" : "Detectar"}
+            {probing ? "Escaneando…" : "Escanear puertos"}
           </button>
         </div>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          {device.servicesScannedAt
+            ? `Último escaneo: ${new Date(device.servicesScannedAt).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" })}`
+            : "Aún no se han escaneado los puertos de este equipo."}
+        </p>
+        {portProgress && (
+          <div className="mt-3">
+            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full bg-brand transition-all"
+                style={{ width: `${Math.round((portProgress.done / portProgress.total) * 100)}%` }}
+              />
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {portProgress.done}/{portProgress.total} puertos comprobados · {portProgress.found} abiertos
+            </p>
+          </div>
+        )}
         {suggested && (
           <p className="mt-2 text-xs text-muted-foreground">
-            Servicios probables según el tipo de dispositivo. Pulsa «Detectar» para
+            Servicios probables según el tipo de dispositivo. Pulsa «Escanear puertos» para
             comprobarlos.
           </p>
         )}
@@ -623,8 +646,20 @@ export function DeviceDetailPanel({
                 <span className="block truncate text-sm font-medium">{s.label}</span>
                 <span className="block truncate text-xs text-muted-foreground">
                   {s.hint}
+                  {typeof s.rtt === "number" ? ` · ${s.rtt} ms` : ""}
                 </span>
               </span>
+              <button
+                type="button"
+                title="Copiar IP:puerto"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(`${device.ip}:${s.port}`);
+                  showFeedback(`Copiado ${device.ip}:${s.port}`);
+                }}
+                className="shrink-0 rounded-md border border-border p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                <Copy className="size-3.5" />
+              </button>
               {s.url ? (
                 <a
                   href={s.url}
@@ -632,7 +667,7 @@ export function DeviceDetailPanel({
                   rel="noreferrer noopener"
                   className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-brand px-2.5 py-1.5 text-xs font-medium text-brand-foreground transition-opacity hover:opacity-90"
                 >
-                  Abrir <ExternalLink className="size-3" />
+                  Abrir panel web <ExternalLink className="size-3" />
                 </a>
               ) : (
                 <span className="shrink-0 text-[11px] text-muted-foreground">
