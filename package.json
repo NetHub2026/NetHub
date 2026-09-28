@@ -1,6 +1,6 @@
 {
   "name": "nethub",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "NetHub - Monitor y control de red doméstica",
   "author": "Gorka",
   "main": "electron/main.cjs",

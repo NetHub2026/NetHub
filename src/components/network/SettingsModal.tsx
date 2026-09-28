@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  healthIntervalOptions,
   linkSpeedOptions,
   scanIntervalOptions,
   type Settings,
@@ -263,6 +264,38 @@ export function SettingsModal({ open, settings, onClose, onChange }: Props) {
                   checked={settings.alertCriticalOffline}
                   onChange={(v) => onChange({ alertCriticalOffline: v })}
                 />
+                <Toggle
+                  label="Guardián de intrusos (Sentinel)"
+                  hint="Alerta de equipos no reconocidos y conflictos de IP en cada escaneo."
+                  checked={settings.intruderAlerts}
+                  onChange={(v) => onChange({ intruderAlerts: v })}
+                />
+                <Toggle
+                  label="Sonido en las alertas"
+                  hint="Pitido corto al detectar un intruso o una alerta crítica."
+                  checked={settings.alertSound}
+                  onChange={(v) => onChange({ alertSound: v })}
+                />
+                <Field label="Health Radar: frecuencia de la prueba de salud" hint="Router local, router secundario/DNS e Internet.">
+                  <select
+                    value={settings.healthIntervalSeconds}
+                    onChange={(e) => onChange({ healthIntervalSeconds: Number(e.target.value) })}
+                    className={selectClass}
+                  >
+                    {healthIntervalOptions.map((o) => (
+                      <option key={o.value} value={o.value} className={optionClass}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Nombre de tu operador" hint="Se usa en el diagnóstico (ej. Vodafone, Movistar, Digi).">
+                  <input
+                    value={settings.ispName}
+                    onChange={(e) => onChange({ ispName: e.target.value })}
+                    className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm outline-none focus:border-brand"
+                  />
+                </Field>
                 <Toggle
                   label="No guardar dispositivos con MAC aleatoria o de invitados"
                   hint="Evita que móviles con MAC privada llenen el inventario."
