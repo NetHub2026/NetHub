@@ -56,3 +56,9 @@
 
 - [x] Historial de actividad (Timeline) con presencia en la ficha (26/9)
 - [x] Escaneo TCP de puertos y servicios en la ficha (26/9)
+
+## Completado v1.1.0 (28/9)
+- [x] Sentinel: De confianza / Por verificar, alertas de intrusos y conflictos de IP, aviso nativo y sonido (configurable)
+- [x] Pestaña Seguridad: puntuación 0-100, semáforo, vulnerabilidades por puerto y recomendaciones paso a paso
+- [x] Health Radar: prueba de 3 puntos, diagnóstico del corte, historial, microcortes y jitter
+- [x] Versión 1.1.0; alertas e historial de salud en devices-db.json, ajustes nuevos en settings.json
