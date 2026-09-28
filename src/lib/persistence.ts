@@ -9,6 +9,8 @@ import {
   saveStoredDirectory,
   type Directory,
 } from "./directory";
+import { loadStoredAlerts, saveStoredAlerts, sanitizeAlerts, type SentinelAlert } from "./sentinel";
+import { loadStoredHealth, saveStoredHealth, sanitizeHealth, type HealthSample } from "./health";
 import { loadStoredEvents, saveStoredEvents, sanitizeEvents, type ActivityEvent } from "./activity";
 
 /**
@@ -21,6 +23,40 @@ import { loadStoredEvents, saveStoredEvents, sanitizeEvents, type ActivityEvent 
 let lastDevices: Device[] = [];
 let lastDirectory: Directory = emptyDirectory;
 let lastEvents: ActivityEvent[] = [];
+let lastAlerts: SentinelAlert[] = [];
+let lastHealth: HealthSample[] = [];
+
+/** Alertas del guardián Sentinel. */
+export async function loadAlertsAnywhere(): Promise<SentinelAlert[]> {
+  let alerts = loadStoredAlerts();
+  if (isDesktop()) {
+    const payload = await readDbFile();
+    if (payload?.alerts && payload.alerts.length > 0) alerts = sanitizeAlerts(payload.alerts);
+  }
+  lastAlerts = alerts;
+  return alerts;
+}
+
+export async function saveAlertsAnywhere(alerts: SentinelAlert[]): Promise<void> {
+  lastAlerts = sanitizeAlerts(alerts);
+  await flush();
+}
+
+/** Historial del Health Radar. */
+export async function loadHealthAnywhere(): Promise<HealthSample[]> {
+  let samples = loadStoredHealth();
+  if (isDesktop()) {
+    const payload = await readDbFile();
+    if (payload?.health && payload.health.length > 0) samples = sanitizeHealth(payload.health);
+  }
+  lastHealth = samples;
+  return samples;
+}
+
+export async function saveHealthAnywhere(samples: HealthSample[]): Promise<void> {
+  lastHealth = sanitizeHealth(samples);
+  await flush();
+}
 
 /** Historial de actividad (archivo local en escritorio, localStorage en web). */
 export async function loadEventsAnywhere(): Promise<ActivityEvent[]> {
@@ -71,12 +107,16 @@ async function flush() {
   saveToLocalStorage(lastDevices);
   saveStoredDirectory(lastDirectory);
   saveStoredEvents(lastEvents);
+  saveStoredAlerts(lastAlerts);
+  saveStoredHealth(lastHealth);
   if (isDesktop()) {
     await writeDbFile({
       devices: lastDevices,
       people: lastDirectory.people,
       locations: lastDirectory.locations,
       events: lastEvents,
+      alerts: lastAlerts,
+      health: lastHealth,
     });
   }
 }

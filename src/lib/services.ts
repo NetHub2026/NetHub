@@ -65,6 +65,7 @@ export const commonServices: ServiceDefinition[] = [
   { port: 8443, label: "HTTPS alternativo", scheme: "https", hint: "Panel web cifrado secundario" },
   { port: 5000, label: "Synology / App web", scheme: "http", hint: "NAS o aplicación web" },
   { port: 139, label: "NetBIOS", scheme: null, hint: "Compartición de Windows antigua" },
+  { port: 23, label: "Telnet", scheme: null, hint: "Acceso remoto sin cifrar (inseguro)" },
   { port: 21, label: "FTP", scheme: null, hint: "Transferencia de archivos" },
 ];
 
