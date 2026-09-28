@@ -28,6 +28,11 @@ export interface Settings {
   notifyNewDevices: boolean;
   alertCriticalOffline: boolean;
   skipRandomMac: boolean;
+  /* Sentinel y Health Radar */
+  intruderAlerts: boolean;
+  alertSound: boolean;
+  healthIntervalSeconds: number;
+  ispName: string;
   /* Mantenimiento */
   checkUpdatesOnStart: boolean;
 }
@@ -46,8 +51,19 @@ export const defaultSettings: Settings = {
   notifyNewDevices: true,
   alertCriticalOffline: true,
   skipRandomMac: false,
+  intruderAlerts: true,
+  alertSound: true,
+  healthIntervalSeconds: 30,
+  ispName: "tu operador",
   checkUpdatesOnStart: true,
 };
+
+export const healthIntervalOptions: Array<{ value: number; label: string }> = [
+  { value: 0, label: "Desactivado" },
+  { value: 15, label: "Cada 15 segundos" },
+  { value: 30, label: "Cada 30 segundos" },
+  { value: 60, label: "Cada minuto" },
+];
 
 export const linkSpeedOptions = [100, 300, 600, 1000];
 export const scanIntervalOptions: Array<{ value: number; label: string }> = [
@@ -95,6 +111,12 @@ export function sanitizeSettings(value: Partial<Settings>): Settings {
     notifyNewDevices: value.notifyNewDevices !== false,
     alertCriticalOffline: value.alertCriticalOffline !== false,
     skipRandomMac: Boolean(value.skipRandomMac),
+    intruderAlerts: value.intruderAlerts !== false,
+    alertSound: value.alertSound !== false,
+    healthIntervalSeconds: [0, 15, 30, 60].includes(Number(value.healthIntervalSeconds))
+      ? Number(value.healthIntervalSeconds)
+      : defaultSettings.healthIntervalSeconds,
+    ispName: String(value.ispName || defaultSettings.ispName).slice(0, 40),
     checkUpdatesOnStart: value.checkUpdatesOnStart !== false,
   };
 }
