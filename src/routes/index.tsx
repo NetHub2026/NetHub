@@ -95,7 +95,23 @@ import { NetworkTabs } from "@/components/network/NetworkTabs";
 import { NetworkTopology } from "@/components/network/NetworkTopology";
 import { ActivityTimeline } from "@/components/network/ActivityTimeline";
 import { appendEvents, diffActivity, type ActivityEvent } from "@/lib/activity";
-import { History as HistoryIcon } from "lucide-react";
+import { History as HistoryIcon, ShieldCheck as ShieldIcon, HeartPulse } from "lucide-react";
+import { SecurityView } from "@/components/network/SecurityView";
+import { HealthRadar } from "@/components/network/HealthRadar";
+import {
+  appendAlerts,
+  intruderAlerts,
+  ipConflictAlerts,
+  playAlertSound,
+  type SentinelAlert,
+} from "@/lib/sentinel";
+import { healthTargets, probeHealth, MAX_HEALTH_SAMPLES, type HealthSample } from "@/lib/health";
+import {
+  loadAlertsAnywhere,
+  saveAlertsAnywhere,
+  loadHealthAnywhere,
+  saveHealthAnywhere,
+} from "@/lib/persistence";
 import { SpeedTestPanel } from "@/components/network/SpeedTestPanel";
 import { UpdateModal } from "@/components/network/UpdateModal";
 import { DeviceTypeIcon } from "@/components/network/DeviceTypeIcon";
@@ -156,7 +172,18 @@ function formatCountdown(seconds: number): string {
 
 function Dashboard() {
   const [items, setItems] = useState<Device[]>([]);
-  const [viewMode, setViewMode] = useState<"inventory" | "topology" | "activity">("inventory");
+  const [viewMode, setViewMode] = useState<
+    "inventory" | "topology" | "activity" | "security" | "health"
+  >("inventory");
+  const [alerts, setAlerts] = useState<SentinelAlert[]>([]);
+  const updateAlerts = (fn: (prev: SentinelAlert[]) => SentinelAlert[]) =>
+    setAlerts((prev) => {
+      const next = fn(prev);
+      void saveAlertsAnywhere(next);
+      return next;
+    });
+  const [healthSamples, setHealthSamples] = useState<HealthSample[]>([]);
+  const [probing, setProbing] = useState(false);
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const recordEvents = (added: ActivityEvent[]) => {
     if (added.length === 0) return;
@@ -268,6 +295,8 @@ function Dashboard() {
       if (stored && stored.length > 0) setItems(stored);
       setDirectory(await loadDirectoryAnywhere(stored ?? []));
       setEvents(await loadEventsAnywhere());
+      setAlerts(await loadAlertsAnywhere());
+      setHealthSamples(await loadHealthAnywhere());
       if (cancelled) return;
       setMeta(loadScanMeta());
       setRuntime(getRuntime());
@@ -369,9 +398,55 @@ function Dashboard() {
     }
     // Nuevos de este escaneo: no estaban registrados antes de fusionar.
     const justFound = merged.filter((d) => !known.has(d.id) && d.isNew && !d.trusted);
+    // Sentinel: intrusos y conflictos de IP.
+    if (settingsRef.current.intruderAlerts) {
+      const conflicts = ipConflictAlerts(itemsRef.current, merged);
+      const sentinel = [...conflicts, ...intruderAlerts(justFound)];
+      if (sentinel.length > 0) {
+        updateAlerts((prev) => appendAlerts(prev, sentinel));
+        const critical = conflicts.filter((a) => a.severity === "critical");
+        for (const a of conflicts.slice(0, 2)) {
+          toast.error(a.title, { description: a.detail, duration: 15000 });
+        }
+        if (critical[0]) void notifyNative(`Alerta de seguridad: ${critical[0].title}`, critical[0].detail);
+        if (settingsRef.current.alertSound) playAlertSound(critical.length > 0);
+      }
+    }
     if (justFound.length > 0) announceNew(justFound);
     return justFound.length;
   };
+
+  /** Health Radar: prueba de 3 puntos. */
+  const targets = useMemo(() => healthTargets(items), [items]);
+  const targetsRef = useRef(targets);
+  targetsRef.current = targets;
+  const lastDownRef = useRef(false);
+  const runHealthProbe = async () => {
+    setProbing(true);
+    try {
+      const sample = await probeHealth(targetsRef.current);
+      const down = sample.gateway === null || sample.internet === null;
+      if (down && !lastDownRef.current && settingsRef.current.intruderAlerts) {
+        const where = sample.gateway === null ? "router local / Wi-Fi" : `salida a Internet (${settingsRef.current.ispName})`;
+        void notifyNative("Corte de conexión detectado", `Fallo en: ${where}`);
+        if (settingsRef.current.alertSound) playAlertSound(true);
+      }
+      lastDownRef.current = down;
+      setHealthSamples((prev) => {
+        const next = [...prev, sample].slice(-MAX_HEALTH_SAMPLES);
+        void saveHealthAnywhere(next);
+        return next;
+      });
+    } finally {
+      setProbing(false);
+    }
+  };
+  useEffect(() => {
+    if (!hydrated || settings.healthIntervalSeconds <= 0) return;
+    const id = window.setInterval(() => void runHealthProbe(), settings.healthIntervalSeconds * 1000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, settings.healthIntervalSeconds]);
 
   const trustAll = () =>
     setItems((prev) => prev.map((d) => (d.isNew ? { ...d, isNew: false, trusted: true } : d)));
@@ -649,6 +724,32 @@ function Dashboard() {
               >
                 <HistoryIcon className="size-3.5" />
                 Actividad
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("security")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  viewMode === "security"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <ShieldIcon className="size-3.5" />
+                Seguridad
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("health")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  viewMode === "health"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <HeartPulse className="size-3.5" />
+                Health Radar
               </button>
             </div>
             <span className="inline-flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-muted-foreground">
@@ -1026,6 +1127,30 @@ function Dashboard() {
             devices={items}
             networks={detectedNetworks}
             onSelectDevice={setSelectedId}
+          />
+        )}
+        {viewMode === "security" && (
+          <SecurityView
+            devices={items}
+            alerts={alerts}
+            onSelectDevice={(id) => {
+              if (items.some((d) => d.id === id)) setSelectedId(id);
+            }}
+            onTrust={markKnown}
+            onResolveAlert={(id) =>
+              updateAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, resolved: true } : a)))
+            }
+            onClearAlerts={() => updateAlerts(() => [])}
+          />
+        )}
+        {viewMode === "health" && (
+          <HealthRadar
+            samples={healthSamples}
+            targets={targets}
+            isp={settings.ispName}
+            probing={probing}
+            intervalSeconds={settings.healthIntervalSeconds}
+            onProbeNow={() => void runHealthProbe()}
           />
         )}
         {viewMode === "activity" && (
