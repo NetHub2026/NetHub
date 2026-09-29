@@ -173,35 +173,48 @@ async function measureUpload(
   return { avg, peak: Math.max(peak, avg) };
 }
 
+/** Candado: solo un test a la vez (el automático del SLA salta si hay uno en marcha). */
+let runningTest = false;
+
+export function speedTestBusy(): boolean {
+  return runningTest;
+}
+
 export async function runSpeedTest(
   onProgress: (p: SpeedProgress) => void = () => {},
 ): Promise<SpeedResult> {
-  // ~2 s de latencia + 10 s de descarga + 10 s de subida ≈ 20 s en total.
-  const totalMs = 2000 + TRANSFER_MS * 2;
-  const { ping, jitter } = await measureLatency(onProgress, totalMs);
-  const elapsedBeforePing = 2000;
-  const download = await measureDownload(onProgress, totalMs, elapsedBeforePing);
-  const elapsedBeforeUpload = elapsedBeforePing + TRANSFER_MS;
-  const upload = await measureUpload(onProgress, totalMs, elapsedBeforeUpload);
-  const result: SpeedResult = {
-    at: new Date().toISOString(),
-    ping,
-    jitter,
-    download: Math.round(download.avg * 10) / 10,
-    upload: Math.round(upload.avg * 10) / 10,
-    peakDownload: Math.round(download.peak * 10) / 10,
-    peakUpload: Math.round(upload.peak * 10) / 10,
-  };
-  onProgress({
-    phase: "done",
-    value: result.download,
-    phaseProgress: 1,
-    totalProgress: 1,
-    secondsLeft: 0,
-    peak: result.peakDownload,
-  });
-  saveResult(result);
-  return result;
+  if (runningTest) throw new Error("speedtest-busy");
+  runningTest = true;
+  try {
+    // ~2 s de latencia + 10 s de descarga + 10 s de subida ≈ 20 s en total.
+    const totalMs = 2000 + TRANSFER_MS * 2;
+    const { ping, jitter } = await measureLatency(onProgress, totalMs);
+    const elapsedBeforePing = 2000;
+    const download = await measureDownload(onProgress, totalMs, elapsedBeforePing);
+    const elapsedBeforeUpload = elapsedBeforePing + TRANSFER_MS;
+    const upload = await measureUpload(onProgress, totalMs, elapsedBeforeUpload);
+    const result: SpeedResult = {
+      at: new Date().toISOString(),
+      ping,
+      jitter,
+      download: Math.round(download.avg * 10) / 10,
+      upload: Math.round(upload.avg * 10) / 10,
+      peakDownload: Math.round(download.peak * 10) / 10,
+      peakUpload: Math.round(upload.peak * 10) / 10,
+    };
+    onProgress({
+      phase: "done",
+      value: result.download,
+      phaseProgress: 1,
+      totalProgress: 1,
+      secondsLeft: 0,
+      peak: result.peakDownload,
+    });
+    saveResult(result);
+    return result;
+  } finally {
+    runningTest = false;
+  }
 }
 
 export function loadSpeedHistory(): SpeedResult[] {

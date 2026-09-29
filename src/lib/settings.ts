@@ -33,6 +33,10 @@ export interface Settings {
   alertSound: boolean;
   healthIntervalSeconds: number;
   ispName: string;
+  /* SLA del operador: test de velocidad automático (minutos; 0 = desactivado) */
+  slaIntervalMinutes: number;
+  /* Modo Ausente: armar automáticamente cuando nadie esté en casa */
+  awayAutoArm: boolean;
   /* Mantenimiento */
   checkUpdatesOnStart: boolean;
 }
@@ -55,8 +59,17 @@ export const defaultSettings: Settings = {
   alertSound: true,
   healthIntervalSeconds: 30,
   ispName: "tu operador",
+  slaIntervalMinutes: 0,
+  awayAutoArm: true,
   checkUpdatesOnStart: true,
 };
+
+export const slaIntervalOptions: Array<{ value: number; label: string }> = [
+  { value: 0, label: "Desactivado" },
+  { value: 120, label: "Cada 2 horas" },
+  { value: 360, label: "Cada 6 horas" },
+  { value: 720, label: "Cada 12 horas" },
+];
 
 export const healthIntervalOptions: Array<{ value: number; label: string }> = [
   { value: 0, label: "Desactivado" },
@@ -117,6 +130,10 @@ export function sanitizeSettings(value: Partial<Settings>): Settings {
       ? Number(value.healthIntervalSeconds)
       : defaultSettings.healthIntervalSeconds,
     ispName: String(value.ispName || defaultSettings.ispName).slice(0, 40),
+    slaIntervalMinutes: [0, 120, 360, 720].includes(Number(value.slaIntervalMinutes))
+      ? Number(value.slaIntervalMinutes)
+      : defaultSettings.slaIntervalMinutes,
+    awayAutoArm: value.awayAutoArm !== false,
     checkUpdatesOnStart: value.checkUpdatesOnStart !== false,
   };
 }
