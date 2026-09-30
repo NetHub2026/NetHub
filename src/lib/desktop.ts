@@ -166,7 +166,7 @@ export interface TrafficSample {
 }
 
 /** Versión de NetHub que se muestra en la interfaz (coincide con package.json). */
-export const APP_VERSION = "1.1.0";
+export const APP_VERSION = "1.2.0";
 
 /** Se prueba el nombre nuevo del repositorio y, si no existe, el anterior. */
 const GITHUB_REPOS = ["oyogor1985/nethub", "oyogor1985/connected-clan"];
@@ -328,6 +328,12 @@ export interface DbPayload {
   alerts?: unknown[];
   /** Historial del Health Radar */
   health?: unknown[];
+  /** Estadísticas de uso por equipo */
+  usage?: unknown;
+  /** Estado del Modo Ausente */
+  away?: unknown;
+  /** Historial del SLA del operador */
+  sla?: unknown[];
 }
 
 async function readDbRaw(): Promise<string | null> {
@@ -361,6 +367,9 @@ export async function readDbFile(): Promise<DbPayload | null> {
       events: Array.isArray(obj.events) ? obj.events : [],
       alerts: Array.isArray(obj.alerts) ? obj.alerts : [],
       health: Array.isArray(obj.health) ? obj.health : [],
+      usage: obj.usage ?? null,
+      away: obj.away ?? null,
+      sla: Array.isArray(obj.sla) ? obj.sla : [],
     };
   } catch {
     return null;
