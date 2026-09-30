@@ -173,7 +173,7 @@ function formatCountdown(seconds: number): string {
 function Dashboard() {
   const [items, setItems] = useState<Device[]>([]);
   const [viewMode, setViewMode] = useState<
-    "inventory" | "topology" | "activity" | "security" | "health"
+    "inventory" | "topology" | "activity" | "security" | "health" | "usage" | "sla"
   >("inventory");
   const [alerts, setAlerts] = useState<SentinelAlert[]>([]);
   const updateAlerts = (fn: (prev: SentinelAlert[]) => SentinelAlert[]) =>
@@ -184,6 +184,13 @@ function Dashboard() {
     });
   const [healthSamples, setHealthSamples] = useState<HealthSample[]>([]);
   const [probing, setProbing] = useState(false);
+  /** Uso por equipo (minutos online por día). */
+  const [usageState, setUsageState] = useState<UsageState>(emptyUsageState());
+  /** Modo Ausente. */
+  const [awayState, setAwayState] = useState<AwayState>(emptyAwayState());
+  /** Historial del SLA del operador. */
+  const [slaSamples, setSlaSamples] = useState<SlaSample[]>([]);
+  const [slaRunning, setSlaRunning] = useState(false);
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const recordEvents = (added: ActivityEvent[]) => {
     if (added.length === 0) return;
@@ -228,6 +235,9 @@ function Dashboard() {
   itemsRef.current = items;
   const settingsRef = useRef<Settings>(settings);
   settingsRef.current = settings;
+  const awayRef = useRef<AwayState>(awayState);
+  awayRef.current = awayState;
+  const slaRunningRef = useRef(false);
 
   /** Intervalo del auto-escaneo, tomado de la configuración. */
   const autoInterval = settings.scanIntervalSeconds;

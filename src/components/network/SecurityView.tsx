@@ -1,14 +1,16 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, ShieldAlert, ShieldCheck, ShieldQuestion, Siren, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Globe, ShieldAlert, ShieldCheck, ShieldQuestion, Siren, Trash2 } from "lucide-react";
 import type { Device } from "@/lib/devices";
 import { auditNetwork, gradeLabels, riskLabels, type RiskLevel } from "@/lib/security";
 import { alertKindLabels, trustLabels, trustOf, type SentinelAlert } from "@/lib/sentinel";
 import { formatDateTime } from "@/lib/activity";
+import { checkDns, type DnsCheckResult } from "@/lib/desktop";
 import { cn } from "@/lib/utils";
 
 interface Props {
   devices: Device[];
   alerts: SentinelAlert[];
+  gatewayIp: string;
   onSelectDevice: (id: string) => void;
   onTrust: (id: string) => void;
   onResolveAlert: (id: string) => void;
@@ -22,10 +24,20 @@ const levelClass: Record<RiskLevel, string> = {
   low: "border-border bg-muted/50 text-muted-foreground",
 };
 
-/** Auditoría de seguridad (0-100) + guardián Sentinel. */
-export function SecurityView({ devices, alerts, onSelectDevice, onTrust, onResolveAlert, onClearAlerts }: Props) {
+/** Auditoría de seguridad (0-100) + guardián Sentinel + DNS. */
+export function SecurityView({ devices, alerts, gatewayIp, onSelectDevice, onTrust, onResolveAlert, onClearAlerts }: Props) {
   const report = useMemo(() => auditNetwork(devices), [devices]);
   const [open, setOpen] = useState<string | null>(null);
+  const [dns, setDns] = useState<DnsCheckResult | null>(null);
+  const [dnsBusy, setDnsBusy] = useState(false);
+  const runDnsCheck = async () => {
+    setDnsBusy(true);
+    try {
+      setDns(await checkDns(gatewayIp));
+    } finally {
+      setDnsBusy(false);
+    }
+  };
   const unverified = devices.filter((d) => trustOf(d) === "unverified");
   const active = alerts.filter((a) => !a.resolved);
   const gradeColor =
@@ -109,6 +121,62 @@ export function SecurityView({ devices, alerts, onSelectDevice, onTrust, onResol
             </ul>
           )}
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card p-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="flex items-center gap-2 text-sm font-semibold">
+            <Globe className="size-4" /> Integridad del DNS
+          </h2>
+          <button
+            onClick={() => void runDnsCheck()}
+            disabled={dnsBusy}
+            className="ml-auto rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
+          >
+            {dnsBusy ? "Comprobando…" : "Comprobar DNS"}
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Compara la respuesta del DNS de tu router con la de 8.8.8.8 para un dominio conocido.
+          Si difieren, alguien está manipulando las direcciones de tu red (phishing o bloqueo).
+        </p>
+        {dns && (
+          <div
+            className={cn(
+              "mt-3 rounded-xl border p-4 text-sm",
+              !dns.available
+                ? "border-border bg-muted/40"
+                : dns.hijacked
+                  ? "border-destructive/50 bg-destructive/10 text-destructive"
+                  : dns.ok
+                    ? "border-success/50 bg-success/10 text-success"
+                    : "border-warning/50 bg-warning/10 text-warning",
+            )}
+          >
+            {!dns.available ? (
+              <p>{dns.error}</p>
+            ) : dns.hijacked ? (
+              <>
+                <p className="font-medium">¡Posible DNS secuestrado!</p>
+                <p className="mt-1 text-xs">
+                  {dns.domain} resuelve en tu router a {dns.gatewayIps.join(", ")} pero en 8.8.8.8
+                  a {dns.publicIps.join(", ")}. Revisa el DNS del router y los equipos con
+                  software sospechoso.
+                </p>
+              </>
+            ) : dns.ok ? (
+              <p>
+                DNS íntegro: tu router y 8.8.8.8 responden lo mismo
+                {dns.gatewayRtt !== null ? ` (${dns.gatewayRtt} ms)` : ""}.
+              </p>
+            ) : (
+              <p className="text-warning">
+                No se ha podido completar la comprobación
+                {dns.error ? `: ${dns.error}` : "."}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-6">
