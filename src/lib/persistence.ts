@@ -12,6 +12,21 @@ import {
 import { loadStoredAlerts, saveStoredAlerts, sanitizeAlerts, type SentinelAlert } from "./sentinel";
 import { loadStoredHealth, saveStoredHealth, sanitizeHealth, type HealthSample } from "./health";
 import { loadStoredEvents, saveStoredEvents, sanitizeEvents, type ActivityEvent } from "./activity";
+import {
+  emptyUsageState,
+  loadStoredUsage,
+  sanitizeUsage,
+  saveStoredUsage,
+  type UsageState,
+} from "./usage";
+import {
+  emptyAwayState,
+  loadStoredAway,
+  sanitizeAway,
+  saveStoredAway,
+  type AwayState,
+} from "./away";
+import { loadStoredSla, sanitizeSla, saveStoredSla, type SlaSample } from "./sla";
 
 /**
  * Persistencia unificada: en escritorio guarda en `devices-db.json` dentro del
@@ -25,6 +40,9 @@ let lastDirectory: Directory = emptyDirectory;
 let lastEvents: ActivityEvent[] = [];
 let lastAlerts: SentinelAlert[] = [];
 let lastHealth: HealthSample[] = [];
+let lastUsage: UsageState = emptyUsageState();
+let lastAway: AwayState = emptyAwayState();
+let lastSla: SlaSample[] = [];
 
 /** Alertas del guardián Sentinel. */
 export async function loadAlertsAnywhere(): Promise<SentinelAlert[]> {
@@ -87,6 +105,54 @@ export async function loadDevicesAnywhere(): Promise<Device[] | null> {
   return stored;
 }
 
+/** Estadísticas de uso por equipo (archivo local + navegador). */
+export async function loadUsageAnywhere(): Promise<UsageState> {
+  let usage = loadStoredUsage();
+  if (isDesktop()) {
+    const payload = await readDbFile();
+    if (payload?.usage) usage = sanitizeUsage(payload.usage);
+  }
+  lastUsage = usage;
+  return usage;
+}
+
+export async function saveUsageAnywhere(usage: UsageState): Promise<void> {
+  lastUsage = sanitizeUsage(usage);
+  await flush();
+}
+
+/** Estado del Modo Ausente (archivo local + navegador). */
+export async function loadAwayAnywhere(): Promise<AwayState> {
+  let away = loadStoredAway();
+  if (isDesktop()) {
+    const payload = await readDbFile();
+    if (payload?.away) away = sanitizeAway(payload.away);
+  }
+  lastAway = away;
+  return away;
+}
+
+export async function saveAwayAnywhere(away: AwayState): Promise<void> {
+  lastAway = sanitizeAway(away);
+  await flush();
+}
+
+/** Historial del SLA del operador (archivo local + navegador). */
+export async function loadSlaAnywhere(): Promise<SlaSample[]> {
+  let sla = loadStoredSla();
+  if (isDesktop()) {
+    const payload = await readDbFile();
+    if (payload?.sla && payload.sla.length > 0) sla = sanitizeSla(payload.sla);
+  }
+  lastSla = sla;
+  return sla;
+}
+
+export async function saveSlaAnywhere(samples: SlaSample[]): Promise<void> {
+  lastSla = sanitizeSla(samples);
+  await flush();
+}
+
 /** Listas de personas y ubicaciones guardadas (archivo local + navegador). */
 export async function loadDirectoryAnywhere(devices: Device[] = []): Promise<Directory> {
   let base = loadStoredDirectory();
@@ -109,6 +175,9 @@ async function flush() {
   saveStoredEvents(lastEvents);
   saveStoredAlerts(lastAlerts);
   saveStoredHealth(lastHealth);
+  saveStoredUsage(lastUsage);
+  saveStoredAway(lastAway);
+  saveStoredSla(lastSla);
   if (isDesktop()) {
     await writeDbFile({
       devices: lastDevices,
@@ -117,6 +186,9 @@ async function flush() {
       events: lastEvents,
       alerts: lastAlerts,
       health: lastHealth,
+      usage: lastUsage,
+      away: lastAway,
+      sla: lastSla,
     });
   }
 }
