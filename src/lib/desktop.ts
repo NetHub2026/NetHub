@@ -478,7 +478,7 @@ export interface DnsCheckResult {
   hijacked: boolean;
   gatewayRtt: number | null;
   domain: string;
-  error?: string;
+  error?: string | undefined;
 }
 
 /**
