@@ -19,6 +19,7 @@ interface ElectronBridge {
   scanNetwork?: () => Promise<unknown>;
   dbPath?: () => Promise<string>;
   ping?: (ip: string) => Promise<{ ok: boolean; rtt: number | null }>;
+  dnsCheck?: (gatewayIp: string, domain: string) => Promise<Record<string, unknown>>;
   scanPorts?: (
     ip: string,
     ports: number[],
@@ -459,6 +460,75 @@ export async function nativePing(
     return null;
   }
   return null;
+}
+
+/* ------------------------------------------------------------------ */
+/* Comprobación de integridad del DNS (solo escritorio)                 */
+/* ------------------------------------------------------------------ */
+
+export interface DnsCheckResult {
+  available: boolean;
+  ok: boolean;
+  /** IP consultada como DNS local (el router) */
+  gateway: string | null;
+  /** Respuestas del DNS local */
+  gatewayIps: string[];
+  /** Respuestas del DNS público (8.8.8.8) */
+  publicIps: string[];
+  hijacked: boolean;
+  gatewayRtt: number | null;
+  domain: string;
+  error?: string;
+}
+
+/**
+ * Compara la respuesta DNS del router con la de 8.8.8.8 para un dominio
+ * conocido: si difieren, alguien está manipulando el DNS de la red.
+ */
+export async function checkDns(
+  gatewayIp: string | null,
+  domain = "www.google.com",
+): Promise<DnsCheckResult> {
+  if (typeof window === "undefined" || !window.nethub?.dnsCheck) {
+    return {
+      available: false,
+      ok: false,
+      gateway: gatewayIp,
+      gatewayIps: [],
+      publicIps: [],
+      hijacked: false,
+      gatewayRtt: null,
+      domain,
+      error:
+        "La comprobación de DNS se hace desde la app de escritorio (NetHub.exe). En el navegador no se puede consultar al router.",
+    };
+  }
+  try {
+    const raw = await window.nethub.dnsCheck(gatewayIp ?? "", domain);
+    return {
+      available: true,
+      ok: Boolean(raw["ok"]),
+      gateway: (raw["gateway"] as string) ?? gatewayIp,
+      gatewayIps: Array.isArray(raw["gatewayIps"]) ? (raw["gatewayIps"] as string[]) : [],
+      publicIps: Array.isArray(raw["publicIps"]) ? (raw["publicIps"] as string[]) : [],
+      hijacked: Boolean(raw["hijacked"]),
+      gatewayRtt: typeof raw["gatewayRtt"] === "number" ? raw["gatewayRtt"] : null,
+      domain: (raw["domain"] as string) ?? domain,
+      error: typeof raw["error"] === "string" ? raw["error"] : undefined,
+    };
+  } catch (error) {
+    return {
+      available: true,
+      ok: false,
+      gateway: gatewayIp,
+      gatewayIps: [],
+      publicIps: [],
+      hijacked: false,
+      gatewayRtt: null,
+      domain,
+      error: String(error),
+    };
+  }
 }
 
 export async function nativeWol(mac: string): Promise<boolean> {
