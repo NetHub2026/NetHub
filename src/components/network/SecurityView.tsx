@@ -1,14 +1,16 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, ShieldAlert, ShieldCheck, ShieldQuestion, Siren, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Globe, ShieldAlert, ShieldCheck, ShieldQuestion, Siren, Trash2 } from "lucide-react";
 import type { Device } from "@/lib/devices";
 import { auditNetwork, gradeLabels, riskLabels, type RiskLevel } from "@/lib/security";
 import { alertKindLabels, trustLabels, trustOf, type SentinelAlert } from "@/lib/sentinel";
 import { formatDateTime } from "@/lib/activity";
+import { checkDns, type DnsCheckResult } from "@/lib/desktop";
 import { cn } from "@/lib/utils";
 
 interface Props {
   devices: Device[];
   alerts: SentinelAlert[];
+  gatewayIp: string;
   onSelectDevice: (id: string) => void;
   onTrust: (id: string) => void;
   onResolveAlert: (id: string) => void;
@@ -22,10 +24,20 @@ const levelClass: Record<RiskLevel, string> = {
   low: "border-border bg-muted/50 text-muted-foreground",
 };
 
-/** Auditoría de seguridad (0-100) + guardián Sentinel. */
-export function SecurityView({ devices, alerts, onSelectDevice, onTrust, onResolveAlert, onClearAlerts }: Props) {
+/** Auditoría de seguridad (0-100) + guardián Sentinel + DNS. */
+export function SecurityView({ devices, alerts, gatewayIp, onSelectDevice, onTrust, onResolveAlert, onClearAlerts }: Props) {
   const report = useMemo(() => auditNetwork(devices), [devices]);
   const [open, setOpen] = useState<string | null>(null);
+  const [dns, setDns] = useState<DnsCheckResult | null>(null);
+  const [dnsBusy, setDnsBusy] = useState(false);
+  const runDnsCheck = async () => {
+    setDnsBusy(true);
+    try {
+      setDns(await checkDns(gatewayIp));
+    } finally {
+      setDnsBusy(false);
+    }
+  };
   const unverified = devices.filter((d) => trustOf(d) === "unverified");
   const active = alerts.filter((a) => !a.resolved);
   const gradeColor =
