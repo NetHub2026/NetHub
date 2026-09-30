@@ -554,6 +554,12 @@ function Dashboard() {
     void saveDevicesAnywhere([]);
     setEvents([]);
     void saveEventsAnywhere([]);
+    setUsageState(emptyUsageState());
+    void saveUsageAnywhere(emptyUsageState());
+    setAwayState(emptyAwayState());
+    void saveAwayAnywhere(emptyAwayState());
+    setSlaSamples([]);
+    void saveSlaAnywhere([]);
     setNotice("Datos borrados: el inventario está vacío. Escanea tu red para empezar.");
   };
 
@@ -761,7 +767,39 @@ function Dashboard() {
                 <HeartPulse className="size-3.5" />
                 Health Radar
               </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("usage")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  viewMode === "usage"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <BarChart3 className="size-3.5" />
+                Uso
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("sla")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  viewMode === "sla"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Gauge className="size-3.5" />
+                Operador
+              </button>
             </div>
+            {awayState.armed && (
+              <span className="inline-flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-2.5 py-1.5 text-xs font-medium text-destructive">
+                <Siren className="size-3.5" />
+                Modo ausente activo
+              </span>
+            )}
             <span className="inline-flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-muted-foreground">
               {autoInterval > 0 ? (
                 <span className="relative flex size-2">
@@ -1140,18 +1178,54 @@ function Dashboard() {
           />
         )}
         {viewMode === "security" && (
-          <SecurityView
-            devices={items}
-            alerts={alerts}
-            onSelectDevice={(id) => {
-              if (items.some((d) => d.id === id)) setSelectedId(id);
-            }}
-            onTrust={markKnown}
-            onResolveAlert={(id) =>
-              updateAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, resolved: true } : a)))
-            }
-            onClearAlerts={() => updateAlerts(() => [])}
-          />
+          <div className="space-y-8">
+            <AwayMode
+              state={awayState}
+              devices={items}
+              autoArm={settings.awayAutoArm}
+              onToggleAutoArm={(v) => updateSettings({ awayAutoArm: v })}
+              onArm={() =>
+                setAwayState((prev) => {
+                  const next = armAway(prev);
+                  void saveAwayAnywhere(next);
+                  return next;
+                })
+              }
+              onDisarm={() =>
+                setAwayState((prev) => {
+                  const next = disarmAway(prev, new Date(), "Desarmado a mano");
+                  void saveAwayAnywhere(next);
+                  return next;
+                })
+              }
+              onToggleWatched={(id) =>
+                setAwayState((prev) => {
+                  const watchedIds = prev.watchedIds.includes(id)
+                    ? prev.watchedIds.filter((x) => x !== id)
+                    : [...prev.watchedIds, id];
+                  const next = { ...prev, watchedIds };
+                  void saveAwayAnywhere(next);
+                  return next;
+                })
+              }
+              onSelectDevice={(id) => {
+                if (items.some((d) => d.id === id)) setSelectedId(id);
+              }}
+            />
+            <SecurityView
+              devices={items}
+              alerts={alerts}
+              gatewayIp={targets[0]?.ip ?? "192.168.1.1"}
+              onSelectDevice={(id) => {
+                if (items.some((d) => d.id === id)) setSelectedId(id);
+              }}
+              onTrust={markKnown}
+              onResolveAlert={(id) =>
+                updateAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, resolved: true } : a)))
+              }
+              onClearAlerts={() => updateAlerts(() => [])}
+            />
+          </div>
         )}
         {viewMode === "health" && (
           <HealthRadar
@@ -1173,6 +1247,27 @@ function Dashboard() {
               setEvents([]);
               void saveEventsAnywhere([]);
             }}
+          />
+        )}
+        {viewMode === "usage" && (
+          <UsageView
+            devices={items}
+            usage={usageState}
+            onSelectDevice={(id) => {
+              if (items.some((d) => d.id === id)) setSelectedId(id);
+            }}
+          />
+        )}
+        {viewMode === "sla" && (
+          <SlaView
+            samples={slaSamples}
+            healthSamples={healthSamples}
+            contracted={settings.linkSpeedMbps}
+            isp={settings.ispName}
+            running={slaRunning}
+            intervalMinutes={settings.slaIntervalMinutes}
+            onTestNow={() => void runSlaTest()}
+            onIntervalChange={(minutes) => updateSettings({ slaIntervalMinutes: minutes })}
           />
         )}
       </main>
