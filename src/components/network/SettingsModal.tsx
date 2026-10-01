@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import {
   healthIntervalOptions,
+  slaIntervalOptions,
   linkSpeedOptions,
   scanIntervalOptions,
   type Settings,
@@ -296,6 +297,25 @@ export function SettingsModal({ open, settings, onClose, onChange }: Props) {
                     className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm outline-none focus:border-brand"
                   />
                 </Field>
+                <Field label="Test de velocidad automático (SLA del operador)" hint="Compara la velocidad real con la contratada.">
+                  <select
+                    value={settings.slaIntervalMinutes}
+                    onChange={(e) => onChange({ slaIntervalMinutes: Number(e.target.value) })}
+                    className={selectClass}
+                  >
+                    {slaIntervalOptions.map((o) => (
+                      <option key={o.value} value={o.value} className={optionClass}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Toggle
+                  label="Modo ausente automático"
+                  hint="Se arma solo cuando tus móviles de confianza salen de casa."
+                  checked={settings.awayAutoArm}
+                  onChange={(v) => onChange({ awayAutoArm: v })}
+                />
                 <Toggle
                   label="No guardar dispositivos con MAC aleatoria o de invitados"
                   hint="Evita que móviles con MAC privada llenen el inventario."
