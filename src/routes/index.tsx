@@ -25,6 +25,9 @@ import {
   Wifi,
   WifiOff,
   Waypoints,
+  BarChart3,
+  Gauge,
+  Siren,
 } from "lucide-react";
 import {
   deviceTypeLabels,
@@ -74,6 +77,21 @@ import {
   type Settings,
 } from "@/lib/settings";
 import { SettingsModal } from "@/components/network/SettingsModal";
+import { UsageView } from "@/components/network/UsageView";
+import { SlaView } from "@/components/network/SlaView";
+import { AwayMode } from "@/components/network/AwayMode";
+import { emptyUsageState, recordUsageScan, type UsageState } from "@/lib/usage";
+import { addAwayActivity, armAway, disarmAway, emptyAwayState, evaluateAway, type AwayState } from "@/lib/away";
+import { appendSlaSample, type SlaSample } from "@/lib/sla";
+import { runSpeedTest, speedTestBusy } from "@/lib/speedtest";
+import {
+  loadUsageAnywhere,
+  saveUsageAnywhere,
+  loadAwayAnywhere,
+  saveAwayAnywhere,
+  loadSlaAnywhere,
+  saveSlaAnywhere,
+} from "@/lib/persistence";
 import {
   loadDevicesAnywhere,
   loadDirectoryAnywhere,
@@ -239,6 +257,38 @@ function Dashboard() {
   awayRef.current = awayState;
   const slaRunningRef = useRef(false);
 
+  /** Test de velocidad para el informe SLA (manual o programado). */
+  const runSlaTest = async () => {
+    if (slaRunningRef.current || speedTestBusy()) {
+      toast.message("Ya hay un test de velocidad en curso");
+      return;
+    }
+    slaRunningRef.current = true;
+    setSlaRunning(true);
+    try {
+      const r = await runSpeedTest();
+      setSlaSamples((prev) => {
+        const next = appendSlaSample(prev, { at: r.at, download: r.download, upload: r.upload, ping: r.ping });
+        void saveSlaAnywhere(next);
+        return next;
+      });
+    } catch {
+      toast.error("No se pudo completar el test de velocidad");
+    } finally {
+      slaRunningRef.current = false;
+      setSlaRunning(false);
+    }
+  };
+
+  // Test SLA programado.
+  useEffect(() => {
+    const minutes = settings.slaIntervalMinutes;
+    if (!minutes) return;
+    const id = window.setInterval(() => void runSlaTest(), minutes * 60_000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.slaIntervalMinutes]);
+
   /** Intervalo del auto-escaneo, tomado de la configuración. */
   const autoInterval = settings.scanIntervalSeconds;
   const dark = settings.theme === "auto" ? systemDark : settings.theme === "dark";
@@ -307,6 +357,9 @@ function Dashboard() {
       setEvents(await loadEventsAnywhere());
       setAlerts(await loadAlertsAnywhere());
       setHealthSamples(await loadHealthAnywhere());
+      setUsageState(await loadUsageAnywhere());
+      setAwayState(await loadAwayAnywhere());
+      setSlaSamples(await loadSlaAnywhere());
       if (cancelled) return;
       setMeta(loadScanMeta());
       setRuntime(getRuntime());
@@ -423,6 +476,40 @@ function Dashboard() {
       }
     }
     if (justFound.length > 0) announceNew(justFound);
+    // Estadísticas de uso por equipo.
+    setUsageState((prev) => {
+      const nextUsage = recordUsageScan(merged, prev);
+      void saveUsageAnywhere(nextUsage);
+      return nextUsage;
+    });
+    // Modo Ausente: armado/desarmado automático y actividad sospechosa.
+    {
+      let away = awayRef.current;
+      const wasArmed = away.armed;
+      const evaluation = evaluateAway(away, merged, settingsRef.current.awayAutoArm);
+      away = evaluation.state;
+      if (evaluation.changed) {
+        if (away.armed) toast.message("Modo ausente activado", { description: "Nadie en casa. NetHub vigila la red." });
+        else toast.success("Modo ausente desactivado", { description: "Bienvenido a casa." });
+      }
+      if (wasArmed && away.armed) {
+        const suspicious = merged.filter(
+          (d) => !d.trusted && d.status === "online" && (!known.has(d.id) || !wasOnline.has(d.id)),
+        );
+        for (const d of suspicious.slice(0, 5)) {
+          const detail = `${d.name} (${d.ip}) se ha conectado mientras no hay nadie en casa`;
+          away = addAwayActivity(away, detail);
+          toast.error("Actividad con la casa vacía", { description: detail, duration: 15000 });
+          void notifyNative("NetHub · Modo ausente", detail);
+        }
+        if (suspicious.length > 0 && settingsRef.current.alertSound) playAlertSound(true);
+      }
+      if (away !== awayRef.current) {
+        awayRef.current = away;
+        setAwayState(away);
+        void saveAwayAnywhere(away);
+      }
+    }
     return justFound.length;
   };
 

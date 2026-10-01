@@ -67,7 +67,7 @@ export function AwayMode({
               state.armed ? "bg-destructive/15 text-destructive" : "bg-muted text-muted-foreground",
             )}
           >
-            {state.armed ? <ArmIcon className="size-6" /> : <ShieldCheck className="size-6" />}
+            {state.armed ? <Siren className="size-6" /> : <ShieldCheck className="size-6" />}
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="flex items-center gap-2 text-base font-semibold">
@@ -107,7 +107,7 @@ export function AwayMode({
               </>
             ) : (
               <>
-                <ArmIcon className="size-4" /> Armar ahora
+                <Siren className="size-4" /> Armar ahora
               </>
             )}
           </button>
