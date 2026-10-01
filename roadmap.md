@@ -62,3 +62,9 @@
 - [x] Pestaña Seguridad: puntuación 0-100, semáforo, vulnerabilidades por puerto y recomendaciones paso a paso
 - [x] Health Radar: prueba de 3 puntos, diagnóstico del corte, historial, microcortes y jitter
 - [x] Versión 1.1.0; alertas e historial de salud en devices-db.json, ajustes nuevos en settings.json
+
+## v1.2.0
+- [x] Modo Ausente (alarma por presencia de móviles)
+- [x] Estadísticas de uso por equipo
+- [x] SLA del operador (tests programados + CSV)
+- [x] Detector de DNS secuestrado (escritorio)
