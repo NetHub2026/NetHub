@@ -26,6 +26,7 @@ import {
   saveStoredAway,
   type AwayState,
 } from "./away";
+import { loadStoredPatterns, sanitizePatterns, saveStoredPatterns, type PatternState, emptyPatternState } from "./patterns";
 import { loadStoredSla, sanitizeSla, saveStoredSla, type SlaSample } from "./sla";
 
 /**
@@ -43,6 +44,7 @@ let lastHealth: HealthSample[] = [];
 let lastUsage: UsageState = emptyUsageState();
 let lastAway: AwayState = emptyAwayState();
 let lastSla: SlaSample[] = [];
+let lastPatterns: PatternState = emptyPatternState();
 
 /** Alertas del guardián Sentinel. */
 export async function loadAlertsAnywhere(): Promise<SentinelAlert[]> {
@@ -178,6 +180,7 @@ async function flush() {
   saveStoredUsage(lastUsage);
   saveStoredAway(lastAway);
   saveStoredSla(lastSla);
+  saveStoredPatterns(lastPatterns);
   if (isDesktop()) {
     await writeDbFile({
       devices: lastDevices,
@@ -189,6 +192,7 @@ async function flush() {
       usage: lastUsage,
       away: lastAway,
       sla: lastSla,
+      patterns: lastPatterns,
     });
   }
 }
@@ -200,5 +204,21 @@ export async function saveDevicesAnywhere(devices: Device[]): Promise<void> {
 
 export async function saveDirectoryAnywhere(directory: Directory): Promise<void> {
   lastDirectory = sanitizeDirectory(directory);
+  await flush();
+}
+
+/** Rutinas aprendidas y anomalías (archivo local + navegador). */
+export async function loadPatternsAnywhere(): Promise<PatternState> {
+  let st = loadStoredPatterns();
+  if (isDesktop()) {
+    const payload = await readDbFile();
+    if (payload?.patterns) st = sanitizePatterns(payload.patterns);
+  }
+  lastPatterns = st;
+  return st;
+}
+
+export async function savePatternsAnywhere(state: PatternState): Promise<void> {
+  lastPatterns = sanitizePatterns(state);
   await flush();
 }
