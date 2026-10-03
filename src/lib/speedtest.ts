@@ -1,5 +1,6 @@
 const HISTORY_KEY = "nethub.speedtest.v1";
-const ENDPOINT = "/api/public/speedtest";
+/** Servidores públicos de Cloudflare (Internet real, no el propio PC). */
+const CF = "https://speed.cloudflare.com";
 
 export interface SpeedResult {
   at: string;
@@ -26,9 +27,9 @@ const DOWNLOAD_CHUNK_BYTES = 4_000_000;
 /** Tamaño de cada bloque de subida (4 MB). */
 const UPLOAD_CHUNK_BYTES = 4_000_000;
 /** Descargas paralelas simultáneas durante la fase de descarga. */
-const DOWNLOAD_PARALLEL = 4;
+const DOWNLOAD_PARALLEL = 6;
 /** Subidas paralelas simultáneas durante la fase de subida. */
-const UPLOAD_PARALLEL = 3;
+const UPLOAD_PARALLEL = 4;
 
 export interface SpeedProgress {
   phase: SpeedPhase;
@@ -56,7 +57,7 @@ async function measureLatency(
   const samples: number[] = [];
   for (let i = 0; i < 6; i++) {
     const started = performance.now();
-    await fetch(`${ENDPOINT}?bytes=1&t=${Date.now()}-${i}`, { cache: "no-store" });
+    await fetch(`${CF}/__down?bytes=0&t=${Date.now()}-${i}`, { cache: "no-store" });
     const elapsed = performance.now() - started;
     if (i > 0) samples.push(elapsed);
     onProgress({
@@ -94,7 +95,7 @@ async function measureDownload(
 
   const worker = async () => {
     while (!stopped && performance.now() < end) {
-      const res = await fetch(`${ENDPOINT}?bytes=${DOWNLOAD_CHUNK_BYTES}&t=${Date.now()}-${Math.random()}`, {
+      const res = await fetch(`${CF}/__down?bytes=${DOWNLOAD_CHUNK_BYTES}&t=${Date.now()}-${Math.random()}`, {
         cache: "no-store",
       });
       const blob = await res.blob();
@@ -140,7 +141,7 @@ async function measureUpload(
 
   const worker = async () => {
     while (!stopped && performance.now() < end) {
-      await fetch(`${ENDPOINT}?t=${Date.now()}-${Math.random()}`, {
+      await fetch(`${CF}/__up?t=${Date.now()}-${Math.random()}`, {
         method: "POST",
         body: payload,
         cache: "no-store",
