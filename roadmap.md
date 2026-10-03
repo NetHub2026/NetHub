@@ -23,7 +23,10 @@
 - Barra de acciones minimalista: solo Escanear red, Exportar inventario (CSV) y Restablecer (sin importar ni descargas JSON).
 
 ## Pendiente
-- Probar en el .exe portable real: ping con fallback TCP, escaneo de puertos, DNS check nativo, gemelo digital y anomalías (requieren el agente nativo).
+- (nada bloqueante) Publicar release en GitHub con el NetHub.exe de la 1.3.0 si se desea.
+
+## Probado en el .exe portable real (3/10)
+- [x] Ping con fallback TCP, escaneo de puertos, comprobación de DNS, gemelo digital y anomalías funcionan correctamente con el agente nativo.
 
 ## Completado v1.3.0 (3/10)
 - [x] Gemelo digital de la casa: pestaña "Mi casa" con plano por habitaciones, punto luminoso por equipo, estado en vivo, intrusos en rojo y tráfico real del PC (En directo).
