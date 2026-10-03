@@ -23,7 +23,12 @@
 - Barra de acciones minimalista: solo Escanear red, Exportar inventario (CSV) y Restablecer (sin importar ni descargas JSON).
 
 ## Pendiente
-- Ninguna tarea abierta.
+- Probar en el .exe portable real: ping con fallback TCP, escaneo de puertos, DNS check nativo, gemelo digital y anomalías (requieren el agente nativo).
+
+## Completado v1.3.0 (3/10)
+- [x] Gemelo digital de la casa: pestaña "Mi casa" con plano por habitaciones, punto luminoso por equipo, estado en vivo, intrusos en rojo y tráfico real del PC (En directo).
+- [x] Detección de anomalías por patrones (src/lib/patterns.ts): aprendizaje hora a hora, aviso de conexiones/desconexiones inusuales, picos de tráfico; panel "Anomalías aprendidas" con barra 0/5 días de aprendizaje; aviso nativo y sonido.
+- [x] Versión 1.3.0 en package.json y APP_VERSION.
 
 ## Completado (22/9)
 - Ficha con acciones reales: abrir panel web y copiar IP/MAC, manteniendo ping y Wake-on-LAN.
