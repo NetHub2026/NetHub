@@ -22,8 +22,8 @@
 - Interfaz universal: sin asistentes de escáner ni empaquetado, redes detectadas automáticamente por subred y OUI ampliado con routers de operadora españoles (Sagemcom, Sercomm, Arcadyan, Technicolor, MitraStar, Askey, Zyxel, Comtrend, Huawei, TP-Link, AVM).
 - Barra de acciones minimalista: solo Escanear red, Exportar inventario (CSV) y Restablecer (sin importar ni descargas JSON).
 
-## Pendiente
-- (nada bloqueante) Publicar release en GitHub con el NetHub.exe de la 1.3.0 si se desea.
+## Listo para publicar (3/10)
+- Flujo de release preparado: .github/workflows/release.yml compila el .exe portable en GitHub Actions y publica el Release con `NetHub.exe` y la etiqueta `v<versión>` tomada de package.json (o la que se indique al lanzarlo). Falta solo: GitHub → Actions → "Release NetHub portable" → Run workflow.
 
 ## Probado en el .exe portable real (3/10)
 - [x] Ping con fallback TCP, escaneo de puertos, comprobación de DNS, gemelo digital y anomalías funcionan correctamente con el agente nativo.

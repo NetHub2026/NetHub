@@ -2,6 +2,11 @@ name: Release NetHub portable
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Versión a publicar (ej. 1.3.0). Vacío = usar la de package.json"
+        required: false
+        default: ""
   push:
     tags:
       - "v*"
@@ -18,6 +23,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      - name: Determinar versión y etiqueta
+        id: ver
+        shell: pwsh
+        run: |
+          $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+          $input_ = "${{ github.event.inputs.version }}"
+          $version = if ($input_.Trim()) { $input_.Trim().TrimStart("v") } else { $pkg.version }
+          $tag = "v$version"
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Version: $version  Tag: $tag"
 
       - name: Instalar dependencias
         run: npm install
@@ -40,7 +57,12 @@ jobs:
       - name: Publicar release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', github.run_number) }}
-          name: NetHub ${{ github.ref_type == 'tag' && github.ref_name || format('build {0}', github.run_number) }}
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: NetHub ${{ steps.ver.outputs.tag }}
+          body: |
+            NetHub ${{ steps.ver.outputs.version }} — ejecutable portable de Windows.
+
+            Descarga **NetHub.exe** y ejecútalo. Desde la propia app puedes comprobar
+            actualizaciones y se instalarán solas.
           files: dist-electron/NetHub.exe
           generate_release_notes: true
