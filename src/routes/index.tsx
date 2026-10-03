@@ -28,6 +28,7 @@ import {
   BarChart3,
   Gauge,
   Siren,
+  Home as HomeIcon,
 } from "lucide-react";
 import {
   deviceTypeLabels,
@@ -78,6 +79,9 @@ import {
 } from "@/lib/settings";
 import { SettingsModal } from "@/components/network/SettingsModal";
 import { UsageView } from "@/components/network/UsageView";
+import { HomeTwin } from "@/components/network/HomeTwin";
+import { emptyPatternState, evaluatePatterns, type PatternState } from "@/lib/patterns";
+import { loadPatternsAnywhere, savePatternsAnywhere } from "@/lib/persistence";
 import { SlaView } from "@/components/network/SlaView";
 import { AwayMode } from "@/components/network/AwayMode";
 import { emptyUsageState, recordUsageScan, type UsageState } from "@/lib/usage";
@@ -191,7 +195,7 @@ function formatCountdown(seconds: number): string {
 function Dashboard() {
   const [items, setItems] = useState<Device[]>([]);
   const [viewMode, setViewMode] = useState<
-    "inventory" | "topology" | "activity" | "security" | "health" | "usage" | "sla"
+    "inventory" | "topology" | "activity" | "security" | "health" | "usage" | "sla" | "home"
   >("inventory");
   const [alerts, setAlerts] = useState<SentinelAlert[]>([]);
   const updateAlerts = (fn: (prev: SentinelAlert[]) => SentinelAlert[]) =>
@@ -204,6 +208,9 @@ function Dashboard() {
   const [probing, setProbing] = useState(false);
   /** Uso por equipo (minutos online por día). */
   const [usageState, setUsageState] = useState<UsageState>(emptyUsageState());
+  const [patterns, setPatterns] = useState<PatternState>(emptyPatternState());
+  const patternsRef = useRef<PatternState>(emptyPatternState());
+  const rxRef = useRef<number | null>(null);
   /** Modo Ausente. */
   const [awayState, setAwayState] = useState<AwayState>(emptyAwayState());
   /** Historial del SLA del operador. */
@@ -337,6 +344,7 @@ function Dashboard() {
       if (cancelled) return;
       last = sample;
       setTraffic(sample);
+      rxRef.current = sample.rxMbps;
     };
     void tick();
     const id = window.setInterval(() => void tick(), 1000);
@@ -358,6 +366,11 @@ function Dashboard() {
       setAlerts(await loadAlertsAnywhere());
       setHealthSamples(await loadHealthAnywhere());
       setUsageState(await loadUsageAnywhere());
+      {
+        const pt = await loadPatternsAnywhere();
+        patternsRef.current = pt;
+        setPatterns(pt);
+      }
       setAwayState(await loadAwayAnywhere());
       setSlaSamples(await loadSlaAnywhere());
       if (cancelled) return;
@@ -482,6 +495,25 @@ function Dashboard() {
       void saveUsageAnywhere(nextUsage);
       return nextUsage;
     });
+    // Rutinas aprendidas: anomalías fuera de lo normal.
+    {
+      const { state: pt, fresh } = evaluatePatterns(patternsRef.current, merged, rxRef.current);
+      patternsRef.current = pt;
+      setPatterns(pt);
+      void savePatternsAnywhere(pt);
+      const top = fresh.sort((a, b) => b.score - a.score)[0];
+      if (top) {
+        toast.warning(`Anomalía: ${top.deviceName}`, {
+          description: top.detail,
+          duration: 12000,
+          action: { label: "Ver casa", onClick: () => setViewMode("home") },
+        });
+        if (top.score >= 85) {
+          void notifyNative(`NetHub · ${top.deviceName}`, top.detail);
+          if (settingsRef.current.alertSound) playAlertSound(false);
+        }
+      }
+    }
     // Modo Ausente: armado/desarmado automático y actividad sospechosa.
     {
       let away = awayRef.current;
@@ -642,6 +674,9 @@ function Dashboard() {
     setEvents([]);
     void saveEventsAnywhere([]);
     setUsageState(emptyUsageState());
+    patternsRef.current = emptyPatternState();
+    setPatterns(patternsRef.current);
+    void savePatternsAnywhere(patternsRef.current);
     void saveUsageAnywhere(emptyUsageState());
     setAwayState(emptyAwayState());
     void saveAwayAnywhere(emptyAwayState());
@@ -853,6 +888,19 @@ function Dashboard() {
               >
                 <HeartPulse className="size-3.5" />
                 Health Radar
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("home")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  viewMode === "home"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <HomeIcon className="size-3.5" />
+                Mi casa
               </button>
               <button
                 type="button"
@@ -1333,6 +1381,16 @@ function Dashboard() {
             onClear={() => {
               setEvents([]);
               void saveEventsAnywhere([]);
+            }}
+          />
+        )}
+        {viewMode === "home" && (
+          <HomeTwin
+            devices={items}
+            patterns={patterns}
+            rxMbps={traffic.rxMbps}
+            onSelectDevice={(id) => {
+              if (items.some((d) => d.id === id)) setSelectedId(id);
             }}
           />
         )}
