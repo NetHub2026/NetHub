@@ -134,6 +134,16 @@ export function UpdateModal({ open, onClose }: Props) {
             )}
           </div>
         )}
+
+        <p className="mt-5 border-t border-border pt-3 text-xs text-muted-foreground">
+          ¿Dudas, avisos o permisos de uso?{" "}
+          <a
+            href="mailto:nethub2026@outlook.es"
+            className="text-brand underline-offset-2 hover:underline"
+          >
+            nethub2026@outlook.es
+          </a>
+        </p>
       </div>
     </div>
   );
