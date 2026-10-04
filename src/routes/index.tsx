@@ -763,7 +763,7 @@ function Dashboard() {
           <div className="flex-1">
             <h1 className="text-lg font-semibold leading-none">NetHub</h1>
             <p className="mt-1 text-xs text-muted-foreground">
-              Red doméstica · {runtimeLabels[runtime]} · v{APP_VERSION}
+              Red doméstica · {runtimeLabels[runtime]} · v{APP_VERSION} · © 2026 oyogor
             </p>
           </div>
           <StatusPill status={status} />

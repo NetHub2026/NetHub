@@ -3,6 +3,7 @@
   "version": "1.3.0",
   "description": "NetHub - Monitor y control de red doméstica",
   "author": "oyogor",
+  "license": "UNLICENSED",
   "main": "electron/main.cjs",
   "private": true,
   "sideEffects": false,
