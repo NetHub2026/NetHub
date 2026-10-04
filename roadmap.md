@@ -76,3 +76,8 @@
 - [x] Estadísticas de uso por equipo
 - [x] SLA del operador (tests programados + CSV)
 - [x] Detector de DNS secuestrado (escritorio)
+
+## Identidad y contacto (4/10)
+- [x] Correo oficial de la app: nethub2026@outlook.es (cuenta exclusiva creada por Usuario)
+- [x] Licencia restrictiva + © 2026 oyogor en LICENSE, panel Acerca de, Ajustes › Mantenimiento y Actualizaciones
+- [x] Menú nativo (File/Edit/View/Window/Help) eliminado de la ventana
