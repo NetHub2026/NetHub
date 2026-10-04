@@ -1145,6 +1145,10 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
+  // Sin barra de menú (File, Edit, View, Window, Help). En desarrollo
+  // se pueden abrir las DevTools con Ctrl+Shift+I.
+  win.setMenuBarVisibility(false);
+  win.setMenu(null);
 
   // Minimizar o cerrar deja NetHub en la bandeja: el auto-escaneo y los avisos siguen activos.
   win.on("minimize", (event) => {
