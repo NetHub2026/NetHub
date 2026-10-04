@@ -1203,6 +1203,13 @@ function shouldStartHidden() {
   }
 }
 
+// Panel "Acerca de" con el aviso de copyright del autor.
+app.setAboutPanelOptions({
+  applicationName: "NetHub",
+  applicationVersion: app.getVersion(),
+  copyright: "© 2026 oyogor. Todos los derechos reservados.",
+});
+
 app.whenReady().then(async () => {
   startAgentServer();
   createTray();
