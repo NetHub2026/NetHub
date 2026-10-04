@@ -1208,6 +1208,8 @@ app.setAboutPanelOptions({
   applicationName: "NetHub",
   applicationVersion: app.getVersion(),
   copyright: "© 2026 oyogor. Todos los derechos reservados.",
+  authors: ["oyogor <nethub2026@outlook.es>"],
+  website: "https://github.com/oyogor1985/nethub",
 });
 
 app.whenReady().then(async () => {

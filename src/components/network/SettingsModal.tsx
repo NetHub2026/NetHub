@@ -347,6 +347,16 @@ export function SettingsModal({ open, settings, onClose, onChange }: Props) {
                   En esa carpeta se guardan el inventario (devices-db.json) y tus preferencias
                   (settings.json), junto al ejecutable de NetHub.
                 </p>
+                <p className="text-xs text-muted-foreground">
+                  ¿Avisos, dudas o permisos de uso? Escríbele a{" "}
+                  <a
+                    href="mailto:nethub2026@outlook.es"
+                    className="text-brand underline-offset-2 hover:underline"
+                  >
+                    nethub2026@outlook.es
+                  </a>
+                  .
+                </p>
                 <Toggle
                   label="Comprobar actualizaciones al iniciar"
                   hint="Busca nuevas versiones publicadas al abrir NetHub."
