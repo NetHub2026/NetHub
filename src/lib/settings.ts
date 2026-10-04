@@ -81,6 +81,8 @@ export const healthIntervalOptions: Array<{ value: number; label: string }> = [
 export const linkSpeedOptions = [100, 300, 600, 1000];
 export const scanIntervalOptions: Array<{ value: number; label: string }> = [
   { value: 0, label: "Desactivado" },
+  { value: 30, label: "Cada 30 segundos" },
+  { value: 60, label: "Cada minuto" },
   { value: 120, label: "Cada 2 minutos" },
   { value: 300, label: "Cada 5 minutos" },
   { value: 600, label: "Cada 10 minutos" },
