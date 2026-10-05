@@ -1299,6 +1299,11 @@ function createWindow() {
 async function loadApp(win) {
   const devUrl = process.env.NETHUB_DEV_URL;
   if (devUrl) {
+    try {
+      allowedAgentOrigins.add(new URL(devUrl).origin);
+    } catch {
+      /* URL de desarrollo no válida */
+    }
     await win.loadURL(devUrl).catch(() => win.loadURL(fallbackPage()));
     return;
   }

@@ -20,8 +20,10 @@ export interface SpeedResult {
 
 export type SpeedPhase = "idle" | "ping" | "download" | "upload" | "done";
 
-/** Duración de cada fase de transferencia, en ms. */
-const TRANSFER_MS = 10_000;
+/** Duración real de medición de cada fase de transferencia, en ms. */
+const DOWNLOAD_MS = 30_000;
+const UPLOAD_MS = 15_000;
+const LATENCY_MS = 2_000;
 /** Tamaño de cada bloque de descarga (4 MB): suficiente para saturar enlaces de 1 Gbps. */
 const DOWNLOAD_CHUNK_BYTES = 4_000_000;
 /** Tamaño de cada bloque de subida (4 MB). */
@@ -37,7 +39,7 @@ export interface SpeedProgress {
   value: number;
   /** Progreso de la fase actual, de 0 a 1. */
   phaseProgress: number;
-  /** Progreso total del test (aprox. 20 s), de 0 a 1. */
+  /** Progreso total del test (aprox. 47 s), de 0 a 1. */
   totalProgress: number;
   /** Segundos restantes aproximados del test completo. */
   secondsLeft: number;
@@ -79,7 +81,7 @@ async function measureLatency(
 }
 
 /**
- * Descarga continua durante TRANSFER_MS con varios flujos paralelos encadenados:
+ * Descarga continua durante DOWNLOAD_MS con varios flujos paralelos encadenados:
  * en cuanto un bloque termina, se pide el siguiente, de forma que el enlace
  * nunca queda ocioso y conexiones rápidas alcanzan su ventana TCP óptima.
  */
@@ -88,7 +90,7 @@ async function measureDownload(
   totalMs: number,
   elapsedBefore: number,
 ) {
-  const end = performance.now() + TRANSFER_MS;
+  const end = performance.now() + DOWNLOAD_MS;
   let bytes = 0;
   let peak = 0;
   let stopped = false;
@@ -104,10 +106,10 @@ async function measureDownload(
   };
 
   const tick = window.setInterval(() => {
-    const elapsed = performance.now() - (end - TRANSFER_MS);
+    const elapsed = performance.now() - (end - DOWNLOAD_MS);
     const current = mbps(bytes, elapsed);
     peak = Math.max(peak, current);
-    const phaseProgress = Math.min(1, elapsed / TRANSFER_MS);
+    const phaseProgress = Math.min(1, elapsed / DOWNLOAD_MS);
     onProgress({
       phase: "download",
       value: current,
@@ -122,18 +124,18 @@ async function measureDownload(
   stopped = true;
   window.clearInterval(tick);
 
-  const elapsed = performance.now() - (end - TRANSFER_MS);
+  const elapsed = performance.now() - (end - DOWNLOAD_MS);
   const avg = mbps(bytes, elapsed);
   return { avg, peak: Math.max(peak, avg) };
 }
 
-/** Subida continua durante TRANSFER_MS con varios flujos paralelos encadenados. */
+/** Subida continua durante DOWNLOAD_MS con varios flujos paralelos encadenados. */
 async function measureUpload(
   onProgress: (p: SpeedProgress) => void,
   totalMs: number,
   elapsedBefore: number,
 ) {
-  const end = performance.now() + TRANSFER_MS;
+  const end = performance.now() + UPLOAD_MS;
   const payload = new Uint8Array(UPLOAD_CHUNK_BYTES).fill(65);
   let bytes = 0;
   let peak = 0;
@@ -151,10 +153,10 @@ async function measureUpload(
   };
 
   const tick = window.setInterval(() => {
-    const elapsed = performance.now() - (end - TRANSFER_MS);
+    const elapsed = performance.now() - (end - UPLOAD_MS);
     const current = mbps(bytes, elapsed);
     peak = Math.max(peak, current);
-    const phaseProgress = Math.min(1, elapsed / TRANSFER_MS);
+    const phaseProgress = Math.min(1, elapsed / UPLOAD_MS);
     onProgress({
       phase: "upload",
       value: current,
@@ -169,7 +171,7 @@ async function measureUpload(
   stopped = true;
   window.clearInterval(tick);
 
-  const elapsed = performance.now() - (end - TRANSFER_MS);
+  const elapsed = performance.now() - (end - UPLOAD_MS);
   const avg = mbps(bytes, elapsed);
   return { avg, peak: Math.max(peak, avg) };
 }
@@ -187,12 +189,12 @@ export async function runSpeedTest(
   if (runningTest) throw new Error("speedtest-busy");
   runningTest = true;
   try {
-    // ~2 s de latencia + 10 s de descarga + 10 s de subida ≈ 20 s en total.
-    const totalMs = 2000 + TRANSFER_MS * 2;
+    // ~2 s de latencia + 30 s de descarga + 15 s de subida ≈ 47 s en total.
+    const totalMs = LATENCY_MS + DOWNLOAD_MS + UPLOAD_MS;
     const { ping, jitter } = await measureLatency(onProgress, totalMs);
-    const elapsedBeforePing = 2000;
+    const elapsedBeforePing = LATENCY_MS;
     const download = await measureDownload(onProgress, totalMs, elapsedBeforePing);
-    const elapsedBeforeUpload = elapsedBeforePing + TRANSFER_MS;
+    const elapsedBeforeUpload = elapsedBeforePing + DOWNLOAD_MS;
     const upload = await measureUpload(onProgress, totalMs, elapsedBeforeUpload);
     const result: SpeedResult = {
       at: new Date().toISOString(),
