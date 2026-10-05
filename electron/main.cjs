@@ -25,12 +25,91 @@ const DB_FILE = "devices-db.json";
 const SETTINGS_FILE = "settings.json";
 const AGENT_PORT = 8765;
 const isWindows = process.platform === "win32";
-// Repositorios de actualización: se prueba el nuevo nombre y, si no existe,
-// el antiguo (por si el repo aún no se ha renombrado).
-const GITHUB_REPOS = ["oyogor1985/nethub", "oyogor1985/connected-clan"];
+// Repositorio oficial de NetHub. Los antiguos solo se consultan como respaldo
+// si el oficial no responde (GitHub redirige los repos transferidos).
+const OFFICIAL_REPO = "NetHub2026/NetHub";
+const GITHUB_REPOS = [OFFICIAL_REPO, "oyogor1985/nethub"];
 
 const UPDATE_ASSET = "NetHub.exe";
 const USER_AGENT = "NetHub-Updater";
+
+/* ------------------------------------------------------------------ */
+/* Validación centralizada de destinos IPv4                            */
+/* ------------------------------------------------------------------ */
+
+/** Devuelve la IPv4 normalizada o null. Exige 4 octetos decimales 0-255 sin ceros a la izquierda. */
+function parseIPv4(value) {
+  const text = String(value ?? "").trim();
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(text);
+  if (!m) return null;
+  const parts = m.slice(1).map((p) => {
+    if (p.length > 1 && p.startsWith("0")) return NaN; // evita ambigüedad octal
+    return Number(p);
+  });
+  if (parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return null;
+  return parts.join(".");
+}
+
+function ipToInt(ip) {
+  return ip.split(".").reduce((acc, o) => ((acc << 8) | Number(o)) >>> 0, 0);
+}
+
+function inCidr(ip, base, bits) {
+  const mask = bits === 0 ? 0 : (0xffffffff << (32 - bits)) >>> 0;
+  return (ipToInt(ip) & mask) === (ipToInt(base) & mask);
+}
+
+/** Rangos privados domésticos (RFC 1918) y link-local. */
+function isPrivateIPv4(ip) {
+  return (
+    inCidr(ip, "10.0.0.0", 8) ||
+    inCidr(ip, "172.16.0.0", 12) ||
+    inCidr(ip, "192.168.0.0", 16) ||
+    inCidr(ip, "169.254.0.0", 16)
+  );
+}
+
+/** Pertenece a la subred de alguna interfaz activa (máscaras > /16 se limitan a /16). */
+function inActiveSubnet(ip) {
+  for (const { address, netmask } of activeIPv4Interfaces()) {
+    const addr = parseIPv4(address);
+    const mask = parseIPv4(netmask);
+    if (!addr || !mask) continue;
+    let bits = ipToInt(mask).toString(2).replace(/0+$/, "").length;
+    if (bits < 16) bits = 16;
+    if (inCidr(ip, addr, bits)) return true;
+  }
+  return false;
+}
+
+/** Direcciones que nunca deben sondearse: 0/8, loopback, multicast, reservadas y broadcast. */
+function isForbiddenIPv4(ip) {
+  return inCidr(ip, "0.0.0.0", 8) || inCidr(ip, "127.0.0.0", 8) || inCidr(ip, "224.0.0.0", 3);
+}
+
+/** Destino LAN válido para descubrimiento/sondeo (ping, TCP, puertos, DNS del router, abrir panel). */
+function lanTarget(value) {
+  const ip = parseIPv4(value);
+  if (!ip || isForbiddenIPv4(ip)) return null;
+  return inActiveSubnet(ip) || isPrivateIPv4(ip) ? ip : null;
+}
+
+/** Destinos públicos fijos que usa el Health Radar (solo ping). */
+const PUBLIC_PING_TARGETS = new Set(["1.1.1.1", "1.0.0.1", "8.8.8.8", "8.8.4.4"]);
+
+function pingTarget(value) {
+  const ip = parseIPv4(value);
+  if (ip && PUBLIC_PING_TARGETS.has(ip)) return ip;
+  return lanTarget(value);
+}
+
+/** Broadcast de Wake-on-LAN: global o dirigido dentro de una red local. */
+function wolBroadcastTarget(value) {
+  const ip = parseIPv4(value);
+  if (!ip) return null;
+  if (ip === "255.255.255.255") return ip;
+  return inActiveSubnet(ip) || isPrivateIPv4(ip) ? ip : null;
+}
 
 
 /** Carpeta del ejecutable portable (o del proyecto en desarrollo). */
