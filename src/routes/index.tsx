@@ -13,7 +13,6 @@ import {
   Moon,
   Radar,
   RefreshCw,
-  RotateCcw,
 
   MapPin,
   Cable,
@@ -981,13 +980,6 @@ function Dashboard() {
               <FileSpreadsheet className="size-3.5" />
               Exportar inventario (CSV)
             </button>
-            <button
-              onClick={resetData}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <RotateCcw className="size-3.5" />
-              Restablecer
-            </button>
           </div>
         </section>
 
@@ -1437,6 +1429,10 @@ function Dashboard() {
         settings={settings}
         onClose={() => setSettingsOpen(false)}
         onChange={updateSettings}
+        onReset={() => {
+          resetData();
+          setSettingsOpen(false);
+        }}
       />
     </div>
 
