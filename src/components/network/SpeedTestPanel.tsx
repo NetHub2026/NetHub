@@ -11,9 +11,9 @@ import { cn } from "@/lib/utils";
 
 const phaseLabels: Record<SpeedPhase, string> = {
   idle: "Listo para medir",
-  ping: "Midiendo latencia…",
-  download: "Midiendo descarga…",
-  upload: "Midiendo subida…",
+  ping: "Fase 1/3 · Midiendo latencia (~2 s)…",
+  download: "Fase 2/3 · Midiendo descarga (30 s)…",
+  upload: "Fase 3/3 · Midiendo subida (15 s)…",
   done: "Test completado",
 };
 
@@ -202,7 +202,7 @@ export function SpeedTestPanel() {
             className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-brand-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
           >
             {running ? <Loader2 className="size-4 animate-spin" /> : <Gauge className="size-4" />}
-            {running ? "Midiendo…" : "Iniciar test de velocidad (~20 s)"}
+            {running ? "Midiendo…" : "Iniciar test de velocidad (~47 s)"}
           </button>
         </div>
       </div>
