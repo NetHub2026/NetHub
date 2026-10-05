@@ -81,7 +81,7 @@ export function SlaView({
               disabled={running}
               className="inline-flex items-center gap-2 rounded-md bg-brand px-3.5 py-2 text-sm font-medium text-brand-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
             >
-              {running ? "Midiendo… (20 s)" : "Hacer una prueba ahora"}
+              {running ? "Midiendo… (~47 s)" : "Hacer una prueba ahora"}
             </button>
             {samples.length > 0 && (
               <button
