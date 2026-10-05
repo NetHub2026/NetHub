@@ -257,7 +257,10 @@ function sweepTargets() {
       if (!(maskParts[0] === 255 && maskParts[1] === 255 && maskParts[2] >= 0)) continue;
     }
     const prefix = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}`;
-    for (let host = 1; host <= 254; host++) targets.add(`${prefix}.${host}`);
+    for (let host = 1; host <= 254; host++) {
+      const ip = lanTarget(`${prefix}.${host}`);
+      if (ip) targets.add(ip);
+    }
   }
   return [...targets];
 }
@@ -358,8 +361,10 @@ async function scanNetwork() {
 /* ------------------------------------------------------------------ */
 
 /** Prueba TCP: muchos equipos bloquean ICMP pero responden (o rechazan) en puertos comunes. */
-function tcpProbe(ip, port, timeout = 800) {
+function tcpProbe(rawIp, port, timeout = 800) {
+  const ip = lanTarget(rawIp) || pingTarget(rawIp);
   return new Promise((resolve) => {
+    if (!ip || !Number.isInteger(port) || port < 1 || port > 65535) return resolve(null);
     const started = Date.now();
     const socket = new net.Socket();
     let done = false;
@@ -381,7 +386,9 @@ function tcpProbe(ip, port, timeout = 800) {
   });
 }
 
-async function tcpPing(ip) {
+async function tcpPing(rawIp) {
+  const ip = pingTarget(rawIp);
+  if (!ip) return { ok: false, rtt: null };
   const ports = [80, 443, 445, 8080, 53, 22];
   const results = await Promise.all(ports.map((port) => tcpProbe(ip, port)));
   const alive = results.filter(Boolean);
@@ -389,8 +396,9 @@ async function tcpPing(ip) {
   return alive.reduce((best, cur) => (cur.rtt < best.rtt ? cur : best));
 }
 
-async function pingIp(ip) {
-  if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(String(ip || ""))) return { ok: false, rtt: null };
+async function pingIp(rawIp) {
+  const ip = pingTarget(rawIp);
+  if (!ip) return { ok: false, rtt: null, error: "Destino no permitido." };
   const args = isWindows ? ["-n", "2", "-w", "1500", ip] : ["-c", "2", "-W", "1", ip];
   const output = await run("ping", args, 6000);
 
@@ -422,7 +430,14 @@ function sendWol(mac) {
     });
     socket.bind(() => {
       socket.setBroadcast(true);
-      socket.send(packet, 0, packet.length, nativeSettings.wolPort, nativeSettings.wolBroadcast, (err) => {
+      const port = Number(nativeSettings.wolPort);
+      const broadcast = wolBroadcastTarget(nativeSettings.wolBroadcast);
+      if (!broadcast || !Number.isInteger(port) || port < 1 || port > 65535) {
+        socket.close();
+        resolve(false);
+        return;
+      }
+      socket.send(packet, 0, packet.length, port, broadcast, (err) => {
         socket.close();
         resolve(!err);
       });
@@ -748,8 +763,15 @@ ipcMain.handle("nethub:open-data-folder", () => openDataFolder());
 ipcMain.handle("nethub:backup-db", () => backupDb());
 ipcMain.handle("nethub:notify", (_e, payload) => notifyNative(payload));
 ipcMain.handle("nethub:open-external", async (_e, url) => {
-  const target = String(url || "");
-  if (!/^https?:\/\/\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?(?:\/.*)?$/i.test(target)) {
+  let target;
+  try {
+    const parsed = new URL(String(url || ""));
+    const okProto = parsed.protocol === "http:" || parsed.protocol === "https:";
+    if (!okProto || parsed.username || parsed.password || !lanTarget(parsed.hostname)) {
+      return { ok: false, error: "Dirección no válida." };
+    }
+    target = parsed.toString();
+  } catch {
     return { ok: false, error: "Dirección no válida." };
   }
   try {
@@ -827,8 +849,12 @@ function parseDnsAnswer(buf) {
 }
 
 /** Consulta DNS UDP directa con timeout. */
-function dnsQuery(serverIp, domain, timeout = 1500) {
+const PUBLIC_DNS = "8.8.8.8";
+
+function dnsQuery(rawServer, domain, timeout = 1500) {
+  const serverIp = rawServer === PUBLIC_DNS ? PUBLIC_DNS : lanTarget(rawServer);
   return new Promise((resolve) => {
+    if (!serverIp) return resolve({ ok: false, ips: [], rtt: null });
     const id = Math.floor(Math.random() * 0xffff);
     const query = buildDnsQuery(id, domain);
     const socket = dgram.createSocket("udp4");
@@ -864,11 +890,11 @@ async function dnsCheck(gatewayIp, domain) {
   if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(clean)) {
     return { ok: false, error: "Dominio no válido." };
   }
-  const gw = String(gatewayIp || "").trim();
-  if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(gw)) {
+  const gw = lanTarget(gatewayIp);
+  if (!gw) {
     return { ok: false, domain: clean, error: "No se conoce la IP del router; escanea la red primero." };
   }
-  const [local, pub] = await Promise.all([dnsQuery(gw, clean), dnsQuery("8.8.8.8", clean)]);
+  const [local, pub] = await Promise.all([dnsQuery(gw, clean), dnsQuery(PUBLIC_DNS, clean)]);
   const common = local.ips.filter((ip) => pub.ips.includes(ip));
   const hijacked =
     local.ok && pub.ok && local.ips.length > 0 && pub.ips.length > 0 && common.length === 0;
@@ -887,8 +913,10 @@ ipcMain.handle("nethub:dns-check", (_e, gatewayIp, domain) => dnsCheck(gatewayIp
 
 
 // Escaneo TCP real de puertos: abierto solo si el handshake se completa.
-function probeTcpPort(ip, port, timeout) {
+function probeTcpPort(rawIp, port, timeout) {
+  const ip = lanTarget(rawIp);
   return new Promise((resolve) => {
+    if (!ip) return resolve({ port, open: false, rtt: null });
     const started = Date.now();
     const socket = new net.Socket();
     let done = false;
@@ -907,10 +935,11 @@ function probeTcpPort(ip, port, timeout) {
 }
 
 ipcMain.handle("nethub:scan-ports", async (_e, ip, ports, timeout) => {
-  if (typeof ip !== "string" || !/^[\d.]+$/.test(ip) || !Array.isArray(ports)) return [];
+  const target = lanTarget(ip);
+  if (!target || !Array.isArray(ports)) return [];
   const list = ports.map(Number).filter((p) => Number.isInteger(p) && p > 0 && p < 65536).slice(0, 200);
   const ms = Math.min(Math.max(Number(timeout) || 900, 200), 5000);
-  return Promise.all(list.map((port) => probeTcpPort(ip, port, ms)));
+  return Promise.all(list.map((port) => probeTcpPort(target, port, ms)));
 });
 ipcMain.handle("nethub:wol", (_e, mac) => sendWol(mac));
 ipcMain.handle("nethub:traffic", () => readTraffic());
@@ -922,16 +951,35 @@ ipcMain.handle("nethub:download-and-install", (event) => downloadAndInstall(even
 /* Servidor HTTP de respaldo (compatibilidad con el agente local)      */
 /* ------------------------------------------------------------------ */
 
+/** Orígenes de la propia interfaz de NetHub (servidor interno + desarrollo local). */
+const allowedAgentOrigins = new Set(["http://localhost:8080", "http://127.0.0.1:8080"]);
+
 function startAgentServer() {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url || "/", `http://localhost:${AGENT_PORT}`);
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Headers", "*");
     res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Vary", "Origin");
+    const deny = (code, msg) => res.writeHead(code).end(JSON.stringify({ error: msg }));
+    // Anti DNS-rebinding: solo se acepta el host local exacto.
+    const host = String(req.headers.host || "").toLowerCase();
+    if (host !== `127.0.0.1:${AGENT_PORT}` && host !== `localhost:${AGENT_PORT}`) return deny(403, "host");
+    // Solo la propia interfaz de NetHub puede usar este servicio desde un navegador.
+    const origin = req.headers.origin;
+    const fetchSite = String(req.headers["sec-fetch-site"] || "");
+    if (origin) {
+      if (!allowedAgentOrigins.has(origin)) return deny(403, "origin");
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Headers", "Accept, Content-Type");
+      res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+    } else if (fetchSite && fetchSite !== "same-origin" && fetchSite !== "none") {
+      // Peticiones del navegador sin Origin (imágenes, no-cors) desde otra web.
+      return deny(403, "origin");
+    }
     if (req.method === "OPTIONS") {
       res.writeHead(204).end();
       return;
     }
+    if (req.method !== "GET") return deny(405, "method");
     try {
       if (url.pathname === "/scan") {
         res.end(JSON.stringify(await scanNetwork()));
@@ -1084,6 +1132,8 @@ function startStaticServer(root) {
     });
     server.listen(0, "127.0.0.1", () => {
       const { port } = server.address();
+      allowedAgentOrigins.add(`http://127.0.0.1:${port}`);
+      allowedAgentOrigins.add(`http://localhost:${port}`);
       resolve(`http://127.0.0.1:${port}/`);
     });
     server.on("error", () => resolve(null));
@@ -1288,7 +1338,7 @@ app.setAboutPanelOptions({
   applicationVersion: app.getVersion(),
   copyright: "© 2026 oyogor. Todos los derechos reservados.",
   authors: ["oyogor <nethub2026@outlook.es>"],
-  website: "https://github.com/oyogor1985/nethub",
+  website: `https://github.com/${OFFICIAL_REPO}`,
 });
 
 app.whenReady().then(async () => {
