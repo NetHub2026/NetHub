@@ -6,7 +6,9 @@ import {
   Monitor,
   Palette,
   Radar,
+  RotateCcw,
   Save,
+  TriangleAlert,
   X,
 } from "lucide-react";
 import {
@@ -24,6 +26,7 @@ interface Props {
   settings: Settings;
   onClose: () => void;
   onChange: (patch: Partial<Settings>) => void;
+  onReset: () => void;
 }
 
 type SectionId = "system" | "appearance" | "network" | "alerts" | "data";
@@ -37,7 +40,9 @@ const sections: Array<{ id: SectionId; label: string; icon: React.ReactNode }> =
 ];
 
 /** Panel de preferencias de NetHub, organizado por secciones. */
-export function SettingsModal({ open, settings, onClose, onChange }: Props) {
+export function SettingsModal({ open, settings, onClose, onChange, onReset }: Props) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
   const [section, setSection] = useState<SectionId>("system");
   const [message, setMessage] = useState<string | null>(null);
   const desktop = isDesktop();
@@ -363,6 +368,25 @@ export function SettingsModal({ open, settings, onClose, onChange }: Props) {
                   checked={settings.checkUpdatesOnStart}
                   onChange={(v) => onChange({ checkUpdatesOnStart: v })}
                 />
+                <div className="rounded-xl border border-destructive/50 bg-destructive/5 p-4">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-destructive">
+                    <TriangleAlert className="size-4" />
+                    Zona de peligro
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Restablecer borra de forma definitiva los datos de NetHub. No se puede deshacer.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setConfirmText("");
+                      setConfirmOpen(true);
+                    }}
+                    className="mt-3 inline-flex items-center gap-2 rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground transition-opacity hover:opacity-90"
+                  >
+                    <RotateCcw className="size-4" />
+                    Restablecer NetHub…
+                  </button>
+                </div>
                 {message && (
                   <p className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
                     {message}
@@ -373,6 +397,56 @@ export function SettingsModal({ open, settings, onClose, onChange }: Props) {
           </div>
         </div>
       </div>
+      {confirmOpen && (
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-black/70 p-4">
+          <div role="alertdialog" aria-modal="true" className="w-full max-w-md rounded-2xl border border-destructive/50 bg-card p-6 shadow-xl">
+            <h3 className="flex items-center gap-2 text-base font-semibold text-destructive">
+              <TriangleAlert className="size-5" />
+              ¿Restablecer NetHub?
+            </h3>
+            <p className="mt-3 text-sm text-muted-foreground">Se eliminarán definitivamente:</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+              <li>Todos los dispositivos del inventario y sus nombres, etiquetas y puertos.</li>
+              <li>Las personas y ubicaciones creadas.</li>
+              <li>El historial de actividad (conexiones y desconexiones).</li>
+              <li>Las estadísticas de uso y los patrones aprendidos.</li>
+              <li>El estado del modo ausente y el historial del SLA del operador.</li>
+            </ul>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Se conservan tus preferencias de Configuración. Si quieres guardar tus datos antes,
+              usa «Crear copia de seguridad».
+            </p>
+            <label className="mt-4 block text-sm">
+              Escribe <span className="font-mono font-semibold">RESTABLECER</span> para confirmar:
+              <input
+                autoFocus
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                className="mt-2 w-full rounded-md border border-input bg-background px-2.5 py-1.5 font-mono text-sm outline-none focus:border-destructive"
+              />
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmOpen(false)}
+                className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                Cancelar
+              </button>
+              <button
+                disabled={confirmText !== "RESTABLECER"}
+                onClick={() => {
+                  setConfirmOpen(false);
+                  setConfirmText("");
+                  onReset();
+                }}
+                className="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Borrar definitivamente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
