@@ -31,6 +31,8 @@ const OFFICIAL_REPO = "NetHub2026/NetHub";
 const GITHUB_REPOS = [OFFICIAL_REPO, "oyogor1985/nethub"];
 
 const UPDATE_ASSET = "NetHub.exe";
+/** Esquema oficial de versiones publicadas: v1.3.1 */
+const SEMVER_TAG = /^v\d+\.\d+\.\d+$/;
 const USER_AGENT = "NetHub-Updater";
 
 /* ------------------------------------------------------------------ */
@@ -563,7 +565,7 @@ async function checkUpdate() {
     let lastError = null;
     for (const repo of GITHUB_REPOS) {
       try {
-        raw = await httpsText(`https://api.github.com/repos/${repo}/releases/latest`);
+        raw = await httpsText(`https://api.github.com/repos/${repo}/releases?per_page=50`);
         break;
       } catch (error) {
         lastError = error;
@@ -571,12 +573,17 @@ async function checkUpdate() {
       }
     }
     if (!raw) throw lastError || new Error("No se pudo consultar GitHub");
-    const release = JSON.parse(raw);
-    const latest = normalizeVersion(release.tag_name || release.name);
-
-    const asset = (release.assets || []).find(
-      (a) => String(a.name || "").toLowerCase() === UPDATE_ASSET.toLowerCase(),
+    // Solo cuentan releases publicadas con tag semver estricto (vX.Y.Z) y asset NetHub.exe.
+    // Así se ignoran etiquetas antiguas tipo "v15" que no siguen el esquema oficial.
+    const findAsset = (r) =>
+      (r.assets || []).find((a) => String(a.name || "") === UPDATE_ASSET);
+    const candidates = (JSON.parse(raw) || []).filter(
+      (r) => r && !r.draft && !r.prerelease && SEMVER_TAG.test(String(r.tag_name || "")) && findAsset(r),
     );
+    candidates.sort((a, b) => compareVersions(b.tag_name, a.tag_name));
+    const release = candidates[0] || {};
+    const latest = release.tag_name ? normalizeVersion(release.tag_name) : "";
+    const asset = release.tag_name ? findAsset(release) : null;
     return {
       ok: true,
       currentVersion: version,
