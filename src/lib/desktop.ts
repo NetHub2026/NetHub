@@ -167,7 +167,7 @@ export interface TrafficSample {
 }
 
 /** Versión de NetHub que se muestra en la interfaz (coincide con package.json). */
-export const APP_VERSION = "1.3.0";
+export const APP_VERSION = "1.3.1";
 
 /** Repositorio oficial; el antiguo solo como respaldo (GitHub redirige el repo transferido). */
 const GITHUB_REPOS = ["NetHub2026/NetHub", "oyogor1985/nethub"];
@@ -233,7 +233,7 @@ export async function checkUpdate(): Promise<UpdateInfo> {
   try {
     let response: Response | null = null;
     for (const repo of GITHUB_REPOS) {
-      const attempt = await fetch(`https://api.github.com/repos/${repo}/releases/latest`);
+      const attempt = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=50`);
       if (attempt.ok) {
         response = attempt;
         break;
@@ -243,16 +243,23 @@ export async function checkUpdate(): Promise<UpdateInfo> {
     if (!response || !response.ok) {
       return { ...base, error: `GitHub respondió ${response?.status ?? "sin respuesta"}` };
     }
-    const release = (await response.json()) as {
+    type Release = {
       tag_name?: string;
-      name?: string;
       body?: string;
+      draft?: boolean;
+      prerelease?: boolean;
       published_at?: string;
       assets?: Array<{ name?: string; browser_download_url?: string; size?: number }>;
     };
-
-    const latest = normalizeVersion(release.tag_name || release.name);
-    const asset = (release.assets || []).find((a) => a.name?.toLowerCase() === "nethub.exe");
+    // Solo releases con tag semver estricto (vX.Y.Z) y asset NetHub.exe; se ignoran tags tipo "v15".
+    const findAsset = (r: Release) => (r.assets || []).find((a) => a.name === "NetHub.exe");
+    const list = ((await response.json()) as Release[]).filter(
+      (r) => !r.draft && !r.prerelease && /^v\d+\.\d+\.\d+$/.test(r.tag_name || "") && findAsset(r),
+    );
+    list.sort((a, b) => compareVersions(b.tag_name || "", a.tag_name || ""));
+    const release: Release = list[0] ?? {};
+    const latest = release.tag_name ? normalizeVersion(release.tag_name) : "";
+    const asset = release.tag_name ? findAsset(release) : undefined;
     return {
       ok: true,
       currentVersion: APP_VERSION,
