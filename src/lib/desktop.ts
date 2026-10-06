@@ -169,8 +169,8 @@ export interface TrafficSample {
 /** Versión de NetHub que se muestra en la interfaz (coincide con package.json). */
 export const APP_VERSION = "1.3.0";
 
-/** Se prueba el nombre nuevo del repositorio y, si no existe, el anterior. */
-const GITHUB_REPOS = ["oyogor1985/nethub", "oyogor1985/connected-clan"];
+/** Repositorio oficial; el antiguo solo como respaldo (GitHub redirige el repo transferido). */
+const GITHUB_REPOS = ["NetHub2026/NetHub", "oyogor1985/nethub"];
 
 
 export interface UpdateInfo {
