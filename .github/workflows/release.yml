@@ -7,6 +7,12 @@ on:
         description: "Versión a publicar (ej. 1.3.2). Debe coincidir con package.json. Vacío = usar la de package.json"
         required: false
         default: ""
+      draft:
+        description: "Crear la release como BORRADOR (Draft). Recomendado: true hasta probar NetHub.exe"
+        type: boolean
+        required: true
+        default: true
+  # Un tag vX.Y.Z también construye, pero SIEMPRE como borrador (nunca publica sola).
   push:
     tags:
       - "v*.*.*"
@@ -46,9 +52,20 @@ jobs:
           gh release view $tag --repo "${{ github.repository }}" *> $null
           if ($LASTEXITCODE -eq 0) { throw "La release $tag ya existe; no se sobrescribe." }
           $global:LASTEXITCODE = 0
+          # En ejecución manual el tag aún no debe existir (si se lanza por tag, ese tag es el propio disparo).
+          if ("${{ github.ref_type }}" -ne "tag") {
+            $remoteTag = git ls-remote --tags origin "refs/tags/$tag"
+            if ($remoteTag) { throw "El tag $tag ya existe; no se reutiliza." }
+          }
+          # Draft: manual -> opción elegida (por defecto true); por tag -> siempre borrador.
+          $draft = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ github.event.inputs.draft }}" } else { "true" }
+          if ($draft -ne "false") { $draft = "true" }
+          $latest = if ($draft -eq "true") { "false" } else { "true" }
+          "draft=$draft" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "latest=$latest" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          Write-Host "Version: $version  Tag: $tag"
+          Write-Host "Version: $version  Tag: $tag  Draft: $draft  Latest: $latest"
 
       - name: Instalar dependencias
         run: npm install
@@ -66,14 +83,16 @@ jobs:
           if ($exe.FullName -ne (Resolve-Path -LiteralPath $target -ErrorAction SilentlyContinue)) {
             Move-Item -LiteralPath $exe.FullName -Destination $target -Force
           }
+          if (-not (Test-Path -LiteralPath $target)) { throw "Falta dist-electron/NetHub.exe" }
           Get-ChildItem dist-electron
 
-      - name: Publicar release
+      - name: Crear release (borrador o pública)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          make_latest: "true"
+          draft: ${{ steps.ver.outputs.draft == 'true' }}
+          make_latest: ${{ steps.ver.outputs.latest }}
           fail_on_unmatched_files: true
           name: NetHub ${{ steps.ver.outputs.tag }}
           body: |
