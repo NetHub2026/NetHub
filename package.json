@@ -1,6 +1,6 @@
 {
   "name": "nethub",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "description": "NetHub - Monitor y control de red doméstica",
   "author": "oyogor",
   "license": "UNLICENSED",
@@ -102,7 +102,7 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.2.0",
-    "electron": "^33.2.0",
+    "electron": "44.5.1",
     "electron-builder": "^25.1.8",
     "eslint": "^9.32.0",
     "eslint-config-prettier": "^10.1.1",
