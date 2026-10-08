@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
+import { Button } from "@/components/ui/button";
 import {
   Bell,
   FolderOpen,
@@ -47,7 +50,57 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset }: Pr
   const [message, setMessage] = useState<string | null>(null);
   const desktop = isDesktop();
 
-  if (!open) return null;
+  const contentRef = useRef<HTMLDivElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const confirmInputRef = useRef<HTMLInputElement>(null);
+  const resetButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Radix traps focus and handles nested dialogs; fixing the body also preserves
+  // the document position when the pointer is over a non-scrollable section.
+  useEffect(() => {
+    if (!open) {
+      setConfirmOpen(false);
+      setConfirmText("");
+      return;
+    }
+    const { body, documentElement } = document;
+    const x = window.scrollX;
+    const y = window.scrollY;
+    const previous = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      width: body.style.width,
+      overflow: body.style.overflow,
+      overscrollBehavior: documentElement.style.overscrollBehavior,
+      scrollBehavior: documentElement.style.scrollBehavior,
+    };
+    Object.assign(body.style, {
+      position: "fixed",
+      top: `-${y}px`,
+      left: `-${x}px`,
+      width: "100%",
+      overflow: "hidden",
+    });
+    documentElement.style.overscrollBehavior = "none";
+    return () => {
+      Object.assign(body.style, {
+        position: previous.position,
+        top: previous.top,
+        left: previous.left,
+        width: previous.width,
+        overflow: previous.overflow,
+      });
+      documentElement.style.overscrollBehavior = previous.overscrollBehavior;
+      documentElement.style.scrollBehavior = "auto";
+      window.scrollTo(x, y);
+      documentElement.style.scrollBehavior = previous.scrollBehavior;
+    };
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  }, [section, open]);
 
   const openFolder = async () => {
     const result = await openDataFolder();
@@ -68,343 +121,417 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset }: Pr
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
-        <div className="flex items-start gap-3 border-b border-border px-6 py-4">
-          <div className="flex-1">
-            <h2 className="text-base font-semibold">Configuración de NetHub</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {desktop
-                ? "Las opciones del sistema se aplican al instante en la app de escritorio."
-                : "Algunas opciones del sistema solo funcionan en la app de escritorio."}
-            </p>
+    <DialogPrimitive.Root
+      open={open}
+      onOpenChange={(value) => {
+        if (!value) onClose();
+      }}
+    >
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-background/80 overscroll-none" />
+        <DialogPrimitive.Content
+          className="fixed left-1/2 top-1/2 z-50 flex h-[min(640px,calc(100dvh-2rem))] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-xl outline-none"
+          onOpenAutoFocus={() => {
+            returnFocusRef.current =
+              document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          }}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            returnFocusRef.current?.focus({ preventScroll: true });
+          }}
+        >
+          <div className="flex shrink-0 items-start gap-3 border-b border-border px-4 py-4 sm:px-6">
+            <div className="flex-1">
+              <DialogPrimitive.Title className="text-base font-semibold">
+                Configuración de NetHub
+              </DialogPrimitive.Title>
+              <DialogPrimitive.Description className="mt-1 text-xs text-muted-foreground">
+                {desktop
+                  ? "Las opciones del sistema se aplican al instante en la app de escritorio."
+                  : "Algunas opciones del sistema solo funcionan en la app de escritorio."}
+              </DialogPrimitive.Description>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              aria-label="Cerrar configuración"
+              className="rounded-md border border-border p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <X className="size-4" />
+            </Button>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Cerrar configuración"
-            className="rounded-md border border-border p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
 
-        <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
-          <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-border p-3 sm:w-60 sm:flex-col sm:border-b-0 sm:border-r">
-            {sections.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setSection(s.id)}
-                className={cn(
-                  "inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
-                  section === s.id
-                    ? "bg-brand/10 text-brand"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                )}
-              >
-                {s.icon}
-                <span className="truncate">{s.label}</span>
-              </button>
-            ))}
-          </nav>
-
-          <div className="min-h-0 flex-1 overflow-auto p-6">
-            {section === "system" && (
-              <div className="space-y-5">
-                <Toggle
-                  label="Iniciar NetHub automáticamente con Windows"
-                  hint="Abre NetHub al iniciar sesión en Windows."
-                  checked={settings.startWithWindows}
-                  onChange={(v) => onChange({ startWithWindows: v })}
-                />
-                <Toggle
-                  label="Iniciar minimizado a la bandeja"
-                  hint="Cuando Windows inicie NetHub, funcionará en segundo plano sin mostrar la ventana."
-                  checked={settings.startMinimized}
-                  onChange={(v) => onChange({ startMinimized: v })}
-                />
-                <Field
-                  label="Al pulsar el botón cerrar [X]"
-                  hint="Puedes mantener NetHub trabajando en segundo plano."
+          <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
+            <nav
+              aria-label="Secciones de configuración"
+              className="grid shrink-0 grid-cols-2 gap-1 border-b border-border p-2 sm:flex sm:w-60 sm:flex-col sm:border-b-0 sm:border-r sm:p-3"
+            >
+              {sections.map((s) => (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  key={s.id}
+                  onClick={() => setSection(s.id)}
+                  aria-current={section === s.id ? "page" : undefined}
+                  className={cn(
+                    "h-auto min-w-0 justify-start whitespace-normal rounded-md px-3 py-2 text-left text-xs sm:text-sm",
+                    section === s.id
+                      ? "bg-brand/10 text-brand"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                  )}
                 >
-                  <select
-                    value={settings.closeAction}
-                    onChange={(e) =>
-                      onChange({ closeAction: e.target.value as Settings["closeAction"] })
-                    }
-                    className={selectClass}
-                  >
-                    <option value="tray" className={optionClass}>
-                      Minimizar a la bandeja del sistema
-                    </option>
-                    <option value="quit" className={optionClass}>
-                      Salir de la aplicación
-                    </option>
-                  </select>
-                </Field>
-                <Toggle
-                  label="Minimizar a la bandeja de notificaciones"
-                  hint="Al minimizar, la ventana desaparece de la barra de tareas."
-                  checked={settings.minimizeToTray}
-                  onChange={(v) => onChange({ minimizeToTray: v })}
-                />
-              </div>
-            )}
+                  {s.icon}
+                  <span>{s.label}</span>
+                </Button>
+              ))}
+            </nav>
 
-            {section === "appearance" && (
-              <div className="space-y-5">
-                <Field label="Tema" hint="«Automático» sigue la preferencia de Windows.">
-                  <select
-                    value={settings.theme}
-                    onChange={(e) => onChange({ theme: e.target.value as Settings["theme"] })}
-                    className={selectClass}
+            <div
+              ref={contentRef}
+              role="region"
+              aria-label={sections.find((s) => s.id === section)?.label}
+              tabIndex={0}
+              className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-none p-4 [scrollbar-gutter:stable] sm:p-6"
+            >
+              {section === "system" && (
+                <div className="space-y-5">
+                  <Toggle
+                    label="Iniciar NetHub automáticamente con Windows"
+                    hint="Abre NetHub al iniciar sesión en Windows."
+                    checked={settings.startWithWindows}
+                    onChange={(v) => onChange({ startWithWindows: v })}
+                  />
+                  <Toggle
+                    label="Iniciar minimizado a la bandeja"
+                    hint="Cuando Windows inicie NetHub, funcionará en segundo plano sin mostrar la ventana."
+                    checked={settings.startMinimized}
+                    onChange={(v) => onChange({ startMinimized: v })}
+                  />
+                  <Field
+                    label="Al pulsar el botón cerrar [X]"
+                    hint="Puedes mantener NetHub trabajando en segundo plano."
                   >
-                    <option value="light" className={optionClass}>
-                      Claro
-                    </option>
-                    <option value="dark" className={optionClass}>
-                      Oscuro
-                    </option>
-                    <option value="auto" className={optionClass}>
-                      Automático (según Windows)
-                    </option>
-                  </select>
-                </Field>
-              </div>
-            )}
-
-            {section === "network" && (
-              <div className="space-y-5">
-                <Field
-                  label="Velocidad de conexión contratada (Mbps)"
-                  hint="Se usa para calcular el porcentaje de uso del enlace."
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    {linkSpeedOptions.map((value) => (
-                      <button
-                        key={value}
-                        onClick={() => onChange({ linkSpeedMbps: value })}
-                        className={cn(
-                          "rounded-full border px-3 py-1.5 text-xs transition-colors",
-                          settings.linkSpeedMbps === value
-                            ? "border-brand bg-brand text-brand-foreground"
-                            : "border-border text-muted-foreground hover:bg-accent",
-                        )}
-                      >
-                        {value} Mbps
-                      </button>
-                    ))}
-                    <input
-                      type="number"
-                      min={1}
-                      value={settings.linkSpeedMbps}
+                    <select
+                      value={settings.closeAction}
                       onChange={(e) =>
-                        onChange({ linkSpeedMbps: Math.max(1, Number(e.target.value) || 1) })
+                        onChange({ closeAction: e.target.value as Settings["closeAction"] })
                       }
-                      aria-label="Velocidad contratada personalizada"
-                      className="w-28 rounded-md border border-input bg-background px-2 py-1.5 text-sm outline-none focus:border-brand"
-                    />
-                  </div>
-                </Field>
-                <Field label="Escaneo automático en segundo plano" hint="Mientras NetHub esté abierto.">
-                  <select
-                    value={settings.scanIntervalSeconds}
-                    onChange={(e) => onChange({ scanIntervalSeconds: Number(e.target.value) })}
-                    className={selectClass}
-                  >
-                    {scanIntervalOptions.map((o) => (
-                      <option key={o.value} value={o.value} className={optionClass}>
-                        {o.label}
+                      className={selectClass}
+                    >
+                      <option value="tray" className={optionClass}>
+                        Minimizar a la bandeja del sistema
                       </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field
-                  label="Modo de escaneo"
-                  hint="El modo profundo comprueba además los puertos y servicios habituales."
-                >
-                  <select
-                    value={settings.scanMode}
-                    onChange={(e) => onChange({ scanMode: e.target.value as Settings["scanMode"] })}
-                    className={selectClass}
+                      <option value="quit" className={optionClass}>
+                        Salir de la aplicación
+                      </option>
+                    </select>
+                  </Field>
+                  <Toggle
+                    label="Minimizar a la bandeja de notificaciones"
+                    hint="Al minimizar, la ventana desaparece de la barra de tareas."
+                    checked={settings.minimizeToTray}
+                    onChange={(v) => onChange({ minimizeToTray: v })}
+                  />
+                </div>
+              )}
+
+              {section === "appearance" && (
+                <div className="space-y-5">
+                  <Field label="Tema" hint="«Automático» sigue la preferencia de Windows.">
+                    <select
+                      value={settings.theme}
+                      onChange={(e) => onChange({ theme: e.target.value as Settings["theme"] })}
+                      className={selectClass}
+                    >
+                      <option value="light" className={optionClass}>
+                        Claro
+                      </option>
+                      <option value="dark" className={optionClass}>
+                        Oscuro
+                      </option>
+                      <option value="auto" className={optionClass}>
+                        Automático (según Windows)
+                      </option>
+                    </select>
+                  </Field>
+                </div>
+              )}
+
+              {section === "network" && (
+                <div className="space-y-5">
+                  <Field
+                    label="Velocidad de conexión contratada (Mbps)"
+                    hint="Se usa para calcular el porcentaje de uso del enlace."
                   >
-                    <option value="fast" className={optionClass}>
-                      Rápido
-                    </option>
-                    <option value="deep" className={optionClass}>
-                      Profundo (comprueba puertos comunes)
-                    </option>
-                  </select>
-                </Field>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Puerto Wake-on-LAN" hint="Por defecto 9.">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {linkSpeedOptions.map((value) => (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          key={value}
+                          onClick={() => onChange({ linkSpeedMbps: value })}
+                          className={cn(
+                            "rounded-full border px-3 py-1.5 text-xs transition-colors",
+                            settings.linkSpeedMbps === value
+                              ? "border-brand bg-brand text-brand-foreground"
+                              : "border-border text-muted-foreground hover:bg-accent",
+                          )}
+                        >
+                          {value} Mbps
+                        </Button>
+                      ))}
+                      <input
+                        type="number"
+                        min={1}
+                        value={settings.linkSpeedMbps}
+                        onChange={(e) =>
+                          onChange({ linkSpeedMbps: Math.max(1, Number(e.target.value) || 1) })
+                        }
+                        aria-label="Velocidad contratada personalizada"
+                        className="w-28 rounded-md border border-input bg-background px-2 py-1.5 text-sm outline-none focus:border-brand"
+                      />
+                    </div>
+                  </Field>
+                  <Field
+                    label="Escaneo automático en segundo plano"
+                    hint="Mientras NetHub esté abierto."
+                  >
+                    <select
+                      aria-label="Escaneo automático en segundo plano"
+                      value={settings.scanIntervalSeconds}
+                      onChange={(e) => onChange({ scanIntervalSeconds: Number(e.target.value) })}
+                      className={selectClass}
+                    >
+                      {scanIntervalOptions.map((o) => (
+                        <option key={o.value} value={o.value} className={optionClass}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field
+                    label="Modo de escaneo"
+                    hint="El modo profundo comprueba además los puertos y servicios habituales."
+                  >
+                    <select
+                      value={settings.scanMode}
+                      onChange={(e) =>
+                        onChange({ scanMode: e.target.value as Settings["scanMode"] })
+                      }
+                      className={selectClass}
+                    >
+                      <option value="fast" className={optionClass}>
+                        Rápido
+                      </option>
+                      <option value="deep" className={optionClass}>
+                        Profundo (comprueba puertos comunes)
+                      </option>
+                    </select>
+                  </Field>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Puerto Wake-on-LAN" hint="Por defecto 9.">
+                      <input
+                        type="number"
+                        min={1}
+                        value={settings.wolPort}
+                        onChange={(e) =>
+                          onChange({ wolPort: Math.max(1, Number(e.target.value) || 9) })
+                        }
+                        className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm outline-none focus:border-brand"
+                      />
+                    </Field>
+                    <Field label="Dirección de broadcast" hint="Normalmente 255.255.255.255.">
+                      <input
+                        value={settings.wolBroadcast}
+                        onChange={(e) => onChange({ wolBroadcast: e.target.value })}
+                        className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 font-mono text-sm outline-none focus:border-brand"
+                      />
+                    </Field>
+                  </div>
+                </div>
+              )}
+
+              {section === "alerts" && (
+                <div className="space-y-5">
+                  <Toggle
+                    label="Avisar en Windows al detectar un dispositivo nuevo"
+                    hint="Notificación nativa además del aviso dentro de la app."
+                    checked={settings.notifyNewDevices}
+                    onChange={(v) => onChange({ notifyNewDevices: v })}
+                  />
+                  <Toggle
+                    label="Alertar si un equipo crítico (24/7) deja de responder"
+                    hint="Se aplica a los dispositivos con la etiqueta «24/7» o «Crítico»."
+                    checked={settings.alertCriticalOffline}
+                    onChange={(v) => onChange({ alertCriticalOffline: v })}
+                  />
+                  <Toggle
+                    label="Guardián de intrusos (Sentinel)"
+                    hint="Alerta de equipos no reconocidos y conflictos de IP en cada escaneo."
+                    checked={settings.intruderAlerts}
+                    onChange={(v) => onChange({ intruderAlerts: v })}
+                  />
+                  <Toggle
+                    label="Sonido en las alertas"
+                    hint="Pitido corto al detectar un intruso o una alerta crítica."
+                    checked={settings.alertSound}
+                    onChange={(v) => onChange({ alertSound: v })}
+                  />
+                  <Field
+                    label="Health Radar: frecuencia de la prueba de salud"
+                    hint="Router local, router secundario/DNS e Internet."
+                  >
+                    <select
+                      value={settings.healthIntervalSeconds}
+                      onChange={(e) => onChange({ healthIntervalSeconds: Number(e.target.value) })}
+                      className={selectClass}
+                    >
+                      {healthIntervalOptions.map((o) => (
+                        <option key={o.value} value={o.value} className={optionClass}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field
+                    label="Nombre de tu operador"
+                    hint="Se usa en el diagnóstico (ej. Vodafone, Movistar, Digi)."
+                  >
                     <input
-                      type="number"
-                      min={1}
-                      value={settings.wolPort}
-                      onChange={(e) => onChange({ wolPort: Math.max(1, Number(e.target.value) || 9) })}
+                      value={settings.ispName}
+                      onChange={(e) => onChange({ ispName: e.target.value })}
                       className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm outline-none focus:border-brand"
                     />
                   </Field>
-                  <Field label="Dirección de broadcast" hint="Normalmente 255.255.255.255.">
-                    <input
-                      value={settings.wolBroadcast}
-                      onChange={(e) => onChange({ wolBroadcast: e.target.value })}
-                      className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 font-mono text-sm outline-none focus:border-brand"
-                    />
+                  <Field
+                    label="Test de velocidad automático (SLA del operador)"
+                    hint="Compara la velocidad real con la contratada."
+                  >
+                    <select
+                      value={settings.slaIntervalMinutes}
+                      onChange={(e) => onChange({ slaIntervalMinutes: Number(e.target.value) })}
+                      className={selectClass}
+                    >
+                      {slaIntervalOptions.map((o) => (
+                        <option key={o.value} value={o.value} className={optionClass}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
                   </Field>
-                </div>
-              </div>
-            )}
-
-            {section === "alerts" && (
-              <div className="space-y-5">
-                <Toggle
-                  label="Avisar en Windows al detectar un dispositivo nuevo"
-                  hint="Notificación nativa además del aviso dentro de la app."
-                  checked={settings.notifyNewDevices}
-                  onChange={(v) => onChange({ notifyNewDevices: v })}
-                />
-                <Toggle
-                  label="Alertar si un equipo crítico (24/7) deja de responder"
-                  hint="Se aplica a los dispositivos con la etiqueta «24/7» o «Crítico»."
-                  checked={settings.alertCriticalOffline}
-                  onChange={(v) => onChange({ alertCriticalOffline: v })}
-                />
-                <Toggle
-                  label="Guardián de intrusos (Sentinel)"
-                  hint="Alerta de equipos no reconocidos y conflictos de IP en cada escaneo."
-                  checked={settings.intruderAlerts}
-                  onChange={(v) => onChange({ intruderAlerts: v })}
-                />
-                <Toggle
-                  label="Sonido en las alertas"
-                  hint="Pitido corto al detectar un intruso o una alerta crítica."
-                  checked={settings.alertSound}
-                  onChange={(v) => onChange({ alertSound: v })}
-                />
-                <Field label="Health Radar: frecuencia de la prueba de salud" hint="Router local, router secundario/DNS e Internet.">
-                  <select
-                    value={settings.healthIntervalSeconds}
-                    onChange={(e) => onChange({ healthIntervalSeconds: Number(e.target.value) })}
-                    className={selectClass}
-                  >
-                    {healthIntervalOptions.map((o) => (
-                      <option key={o.value} value={o.value} className={optionClass}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Nombre de tu operador" hint="Se usa en el diagnóstico (ej. Vodafone, Movistar, Digi).">
-                  <input
-                    value={settings.ispName}
-                    onChange={(e) => onChange({ ispName: e.target.value })}
-                    className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm outline-none focus:border-brand"
+                  <Toggle
+                    label="Modo ausente automático"
+                    hint="Se arma solo cuando tus móviles de confianza salen de casa."
+                    checked={settings.awayAutoArm}
+                    onChange={(v) => onChange({ awayAutoArm: v })}
                   />
-                </Field>
-                <Field label="Test de velocidad automático (SLA del operador)" hint="Compara la velocidad real con la contratada.">
-                  <select
-                    value={settings.slaIntervalMinutes}
-                    onChange={(e) => onChange({ slaIntervalMinutes: Number(e.target.value) })}
-                    className={selectClass}
-                  >
-                    {slaIntervalOptions.map((o) => (
-                      <option key={o.value} value={o.value} className={optionClass}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Toggle
-                  label="Modo ausente automático"
-                  hint="Se arma solo cuando tus móviles de confianza salen de casa."
-                  checked={settings.awayAutoArm}
-                  onChange={(v) => onChange({ awayAutoArm: v })}
-                />
-                <Toggle
-                  label="No guardar dispositivos con MAC aleatoria o de invitados"
-                  hint="Evita que móviles con MAC privada llenen el inventario."
-                  checked={settings.skipRandomMac}
-                  onChange={(v) => onChange({ skipRandomMac: v })}
-                />
-              </div>
-            )}
+                  <Toggle
+                    label="No guardar dispositivos con MAC aleatoria o de invitados"
+                    hint="Evita que móviles con MAC privada llenen el inventario."
+                    checked={settings.skipRandomMac}
+                    onChange={(v) => onChange({ skipRandomMac: v })}
+                  />
+                </div>
+              )}
 
-            {section === "data" && (
-              <div className="space-y-5">
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => void openFolder()}
-                    className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                  >
-                    <FolderOpen className="size-4" />
-                    Abrir carpeta de datos
-                  </button>
-                  <button
-                    onClick={() => void backup()}
-                    className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                  >
-                    <HardDriveDownload className="size-4" />
-                    Crear copia de seguridad
-                  </button>
+              {section === "data" && (
+                <div className="space-y-5">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void openFolder()}
+                      className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    >
+                      <FolderOpen className="size-4" />
+                      Abrir carpeta de datos
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void backup()}
+                      className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    >
+                      <HardDriveDownload className="size-4" />
+                      Crear copia de seguridad
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    En esa carpeta se guardan el inventario (devices-db.json) y tus preferencias
+                    (settings.json), junto al ejecutable de NetHub.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    ¿Avisos, dudas o permisos de uso? Escríbele a{" "}
+                    <a
+                      href="mailto:nethub2026@outlook.es"
+                      className="text-brand underline-offset-2 hover:underline"
+                    >
+                      nethub2026@outlook.es
+                    </a>
+                    .
+                  </p>
+                  <Toggle
+                    label="Comprobar actualizaciones al iniciar"
+                    hint="Busca nuevas versiones publicadas al abrir NetHub."
+                    checked={settings.checkUpdatesOnStart}
+                    onChange={(v) => onChange({ checkUpdatesOnStart: v })}
+                  />
+                  <div className="rounded-xl border border-destructive/50 bg-destructive/5 p-4">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-destructive">
+                      <TriangleAlert className="size-4" />
+                      Zona de peligro
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Restablecer borra de forma definitiva los datos de NetHub. No se puede
+                      deshacer.
+                    </p>
+                    <Button
+                      ref={resetButtonRef}
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setConfirmText("");
+                        setConfirmOpen(true);
+                      }}
+                      className="mt-3 inline-flex items-center gap-2 rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground transition-opacity hover:opacity-90"
+                    >
+                      <RotateCcw className="size-4" />
+                      Restablecer NetHub…
+                    </Button>
+                  </div>
+                  {message && (
+                    <p className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
+                      {message}
+                    </p>
+                  )}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  En esa carpeta se guardan el inventario (devices-db.json) y tus preferencias
-                  (settings.json), junto al ejecutable de NetHub.
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  ¿Avisos, dudas o permisos de uso? Escríbele a{" "}
-                  <a
-                    href="mailto:nethub2026@outlook.es"
-                    className="text-brand underline-offset-2 hover:underline"
-                  >
-                    nethub2026@outlook.es
-                  </a>
-                  .
-                </p>
-                <Toggle
-                  label="Comprobar actualizaciones al iniciar"
-                  hint="Busca nuevas versiones publicadas al abrir NetHub."
-                  checked={settings.checkUpdatesOnStart}
-                  onChange={(v) => onChange({ checkUpdatesOnStart: v })}
-                />
-                <div className="rounded-xl border border-destructive/50 bg-destructive/5 p-4">
-                  <p className="flex items-center gap-2 text-sm font-semibold text-destructive">
-                    <TriangleAlert className="size-4" />
-                    Zona de peligro
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Restablecer borra de forma definitiva los datos de NetHub. No se puede deshacer.
-                  </p>
-                  <button
-                    onClick={() => {
-                      setConfirmText("");
-                      setConfirmOpen(true);
-                    }}
-                    className="mt-3 inline-flex items-center gap-2 rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground transition-opacity hover:opacity-90"
-                  >
-                    <RotateCcw className="size-4" />
-                    Restablecer NetHub…
-                  </button>
-                </div>
-                {message && (
-                  <p className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
-                    {message}
-                  </p>
-                )}
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
-      </div>
-      {confirmOpen && (
-        <div className="fixed inset-0 z-[60] grid place-items-center bg-black/70 p-4">
-          <div role="alertdialog" aria-modal="true" className="w-full max-w-md rounded-2xl border border-destructive/50 bg-card p-6 shadow-xl">
-            <h3 className="flex items-center gap-2 text-base font-semibold text-destructive">
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+      <AlertDialogPrimitive.Root open={confirmOpen && open} onOpenChange={setConfirmOpen}>
+        <AlertDialogPrimitive.Portal>
+          <AlertDialogPrimitive.Overlay className="fixed inset-0 z-[60] bg-background/80 overscroll-none" />
+          <AlertDialogPrimitive.Content
+            className="fixed left-1/2 top-1/2 z-[60] max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-none rounded-lg border border-destructive/50 bg-card p-4 shadow-xl outline-none sm:p-6"
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
+              confirmInputRef.current?.focus();
+            }}
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              if (open) resetButtonRef.current?.focus({ preventScroll: true });
+            }}
+          >
+            <AlertDialogPrimitive.Title className="flex items-center gap-2 text-base font-semibold text-destructive">
               <TriangleAlert className="size-5" />
               ¿Restablecer NetHub?
-            </h3>
-            <p className="mt-3 text-sm text-muted-foreground">Se eliminarán definitivamente:</p>
+            </AlertDialogPrimitive.Title>
+            <AlertDialogPrimitive.Description className="mt-3 text-sm text-muted-foreground">
+              Se eliminarán definitivamente:
+            </AlertDialogPrimitive.Description>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
               <li>Todos los dispositivos del inventario y sus nombres, etiquetas y puertos.</li>
               <li>Las personas y ubicaciones creadas.</li>
@@ -419,20 +546,25 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset }: Pr
             <label className="mt-4 block text-sm">
               Escribe <span className="font-mono font-semibold">RESTABLECER</span> para confirmar:
               <input
-                autoFocus
+                ref={confirmInputRef}
                 value={confirmText}
                 onChange={(e) => setConfirmText(e.target.value)}
                 className="mt-2 w-full rounded-md border border-input bg-background px-2.5 py-1.5 font-mono text-sm outline-none focus:border-destructive"
               />
             </label>
             <div className="mt-5 flex justify-end gap-2">
-              <button
-                onClick={() => setConfirmOpen(false)}
-                className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-              >
-                Cancelar
-              </button>
-              <button
+              <AlertDialogPrimitive.Cancel asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+                >
+                  Cancelar
+                </Button>
+              </AlertDialogPrimitive.Cancel>
+              <Button
+                variant="ghost"
+                size="sm"
                 disabled={confirmText !== "RESTABLECER"}
                 onClick={() => {
                   setConfirmOpen(false);
@@ -442,12 +574,12 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset }: Pr
                 className="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Borrar definitivamente
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
-      )}
-    </div>
+          </AlertDialogPrimitive.Content>
+        </AlertDialogPrimitive.Portal>
+      </AlertDialogPrimitive.Root>
+    </DialogPrimitive.Root>
   );
 }
 
@@ -486,13 +618,15 @@ function Toggle({
 }) {
   return (
     <label className="flex cursor-pointer items-start gap-3">
-      <button
+      <Button
+        variant="ghost"
+        size="sm"
         type="button"
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={cn(
-          "mt-0.5 flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors",
+          "mt-0.5 flex h-5 w-9 shrink-0 justify-start rounded-full border p-0 transition-colors",
           checked ? "border-brand bg-brand" : "border-border bg-muted",
         )}
       >
@@ -502,7 +636,7 @@ function Toggle({
             checked ? "translate-x-4" : "translate-x-0",
           )}
         />
-      </button>
+      </Button>
       <span className="min-w-0">
         <span className="block text-sm font-medium">{label}</span>
         {hint && <span className="mt-0.5 block text-xs text-muted-foreground">{hint}</span>}
