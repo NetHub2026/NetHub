@@ -53,6 +53,7 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset }: Pr
   const contentRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const confirmInputRef = useRef<HTMLInputElement>(null);
+  const resetButtonRef = useRef<HTMLButtonElement>(null);
 
   // Radix traps focus and handles nested dialogs; fixing the body also preserves
   // the document position when the pointer is over a non-scrollable section.
@@ -486,6 +487,7 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset }: Pr
                       deshacer.
                     </p>
                     <Button
+                      ref={resetButtonRef}
                       variant="ghost"
                       size="sm"
                       onClick={() => {
@@ -517,6 +519,10 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset }: Pr
             onOpenAutoFocus={(event) => {
               event.preventDefault();
               confirmInputRef.current?.focus();
+            }}
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              if (open) resetButtonRef.current?.focus({ preventScroll: true });
             }}
           >
             <AlertDialogPrimitive.Title className="flex items-center gap-2 text-base font-semibold text-destructive">
