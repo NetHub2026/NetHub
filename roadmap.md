@@ -1,5 +1,11 @@
 # NetHub — Hoja de ruta
 
+## Pulido UI — primera fase hacia v1.4.0 (sin cambio de versión)
+- [x] Configuración: dimensiones constantes, scroll contenido, bloqueo del fondo, foco y confirmación anidada.
+- [x] Inventario: frecuencia solo en Configuración, sin contador ni banda de éxito; último escaneo simplificado.
+- [x] Compilación automática OK; lint relevante sin errores (dos advertencias existentes); pruebas navegador de dimensiones, foco, Escape, scroll restaurado, persistencia y estado/error de escaneo.
+- [ ] Prueba portable del escaneo real y autoescaneo: requiere Windows y la red del usuario. TypeScript independiente no ejecutado; validación delegada al entorno automático.
+
 ## Hecho
 - Panel de red: métricas, gráfico de ancho de banda, listado con filtros/búsqueda, panel de detalle con etiquetas y controles, modo oscuro.
 - Escáner de red: agente local (http://localhost:8765/scan), importación de `arp -a` y JSON, estado Conectado/Desconectado, última hora de escaneo, modal de configuración (Python y PowerShell).

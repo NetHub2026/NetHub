@@ -1,0 +1,3 @@
+ls: cannot access 'src/routes/index.test.tsx': No such file or directory
+ls: cannot access 'src/routes/__tests__/index.test.tsx': No such file or directory
+ls: cannot access 'src/__tests__/routes/index.test.tsx': No such file or directory
