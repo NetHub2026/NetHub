@@ -13,13 +13,11 @@ import {
   Moon,
   Radar,
   RefreshCw,
-
   MapPin,
   Cable,
   Search,
   Settings as SettingsIcon,
   Sun,
-  Timer,
   Users,
   Wifi,
   WifiOff,
@@ -29,11 +27,7 @@ import {
   Siren,
   Home as HomeIcon,
 } from "lucide-react";
-import {
-  deviceTypeLabels,
-  type Device,
-  type DeviceType,
-} from "@/lib/devices";
+import { deviceTypeLabels, type Device, type DeviceType } from "@/lib/devices";
 import {
   clearStoredDirectory,
   directoryFromDevices,
@@ -73,7 +67,6 @@ import {
   loadSettingsAnywhere,
   resolveDark,
   saveSettingsAnywhere,
-  scanIntervalOptions,
   type Settings,
 } from "@/lib/settings";
 import { SettingsModal } from "@/components/network/SettingsModal";
@@ -84,7 +77,14 @@ import { loadPatternsAnywhere, savePatternsAnywhere } from "@/lib/persistence";
 import { SlaView } from "@/components/network/SlaView";
 import { AwayMode } from "@/components/network/AwayMode";
 import { emptyUsageState, recordUsageScan, type UsageState } from "@/lib/usage";
-import { addAwayActivity, armAway, disarmAway, emptyAwayState, evaluateAway, type AwayState } from "@/lib/away";
+import {
+  addAwayActivity,
+  armAway,
+  disarmAway,
+  emptyAwayState,
+  evaluateAway,
+  type AwayState,
+} from "@/lib/away";
 import { appendSlaSample, type SlaSample } from "@/lib/sla";
 import { runSpeedTest, speedTestBusy } from "@/lib/speedtest";
 import {
@@ -104,12 +104,7 @@ import {
   saveEventsAnywhere,
 } from "@/lib/persistence";
 import { exportInventoryCsv } from "@/lib/backup";
-import {
-  ALL_NETWORKS,
-  countByNetwork,
-  detectNetworks,
-  networkOf,
-} from "@/lib/networks";
+import { ALL_NETWORKS, countByNetwork, detectNetworks, networkOf } from "@/lib/networks";
 import { BandwidthChart } from "@/components/network/BandwidthChart";
 import { DeviceDetailPanel } from "@/components/network/DeviceDetailPanel";
 import { NetworkTabs } from "@/components/network/NetworkTabs";
@@ -138,6 +133,7 @@ import { UpdateModal } from "@/components/network/UpdateModal";
 import { DeviceTypeIcon } from "@/components/network/DeviceTypeIcon";
 
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -182,13 +178,6 @@ function connectionOf(device: Device): "wifi" | "wired" | null {
 /** Etiquetas visibles: sin las de conexión (ya representadas con su icono). */
 function visibleTags(device: Device): string[] {
   return device.tags.filter((t) => !WIFI_TAGS.includes(t) && t !== WIRED_TAG);
-}
-
-
-function formatCountdown(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 function Dashboard() {
@@ -245,13 +234,16 @@ function Dashboard() {
   });
   const [status, setStatus] = useState<ScannerStatus>("unknown");
   const [scanning, setScanning] = useState(false);
-  const [meta, setMeta] = useState<ScanMeta>({ lastScanAt: null, source: null });
+  const [meta, setMeta] = useState<ScanMeta & { detectedCount?: number }>({
+    lastScanAt: null,
+    source: null,
+  });
   const [notice, setNotice] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [runtime, setRuntime] = useState<Runtime>("web");
   const [dbPath, setDbPath] = useState("Almacenamiento del navegador (localStorage)");
   const [updateOpen, setUpdateOpen] = useState(false);
-  const [countdown, setCountdown] = useState(120);
+  const [, setCountdown] = useState(120);
   const [autoScanning, setAutoScanning] = useState(false);
   /** Evita escaneos solapados (manual + automático). */
   const busyRef = useRef(false);
@@ -274,7 +266,12 @@ function Dashboard() {
     try {
       const r = await runSpeedTest();
       setSlaSamples((prev) => {
-        const next = appendSlaSample(prev, { at: r.at, download: r.download, upload: r.upload, ping: r.ping });
+        const next = appendSlaSample(prev, {
+          at: r.at,
+          download: r.download,
+          upload: r.upload,
+          ping: r.ping,
+        });
         void saveSlaAnywhere(next);
         return next;
       });
@@ -389,9 +386,7 @@ function Dashboard() {
 
   /** Marca un dispositivo como reconocido (quita la insignia «Nuevo»). */
   const markKnown = (id: string) =>
-    setItems((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, isNew: false, trusted: true } : d)),
-    );
+    setItems((prev) => prev.map((d) => (d.id === id ? { ...d, isNew: false, trusted: true } : d)));
 
   /** Avisa de los dispositivos recién detectados con acceso directo a su ficha. */
   const announceNew = (fresh: Device[]) => {
@@ -440,7 +435,7 @@ function Dashboard() {
     recordEvents(diffActivity(itemsRef.current, merged));
     setItems(merged);
     void saveDevicesAnywhere(merged);
-    const next: ScanMeta = { lastScanAt: new Date().toISOString(), source };
+    const next = { lastScanAt: new Date().toISOString(), source, detectedCount: devices.length };
     setMeta(next);
     saveScanMeta(next);
     resolveVendorsInBackground(resolved, (external) => {
@@ -448,7 +443,8 @@ function Dashboard() {
       setItems((prev) => {
         const updated = prev.map((device) => {
           const fresh = byId.get(device.id);
-          if (!fresh || device.manualEdit || !fresh.brand || fresh.brand === "unknown") return device;
+          if (!fresh || device.manualEdit || !fresh.brand || fresh.brand === "unknown")
+            return device;
           return { ...device, vendor: fresh.vendor, brand: fresh.brand };
         });
         void saveDevicesAnywhere(updated);
@@ -483,7 +479,8 @@ function Dashboard() {
         for (const a of conflicts.slice(0, 2)) {
           toast.error(a.title, { description: a.detail, duration: 15000 });
         }
-        if (critical[0]) void notifyNative(`Alerta de seguridad: ${critical[0].title}`, critical[0].detail);
+        if (critical[0])
+          void notifyNative(`Alerta de seguridad: ${critical[0].title}`, critical[0].detail);
         if (settingsRef.current.alertSound) playAlertSound(critical.length > 0);
       }
     }
@@ -520,7 +517,10 @@ function Dashboard() {
       const evaluation = evaluateAway(away, merged, settingsRef.current.awayAutoArm);
       away = evaluation.state;
       if (evaluation.changed) {
-        if (away.armed) toast.message("Modo ausente activado", { description: "Nadie en casa. NetHub vigila la red." });
+        if (away.armed)
+          toast.message("Modo ausente activado", {
+            description: "Nadie en casa. NetHub vigila la red.",
+          });
         else toast.success("Modo ausente desactivado", { description: "Bienvenido a casa." });
       }
       if (wasArmed && away.armed) {
@@ -555,7 +555,10 @@ function Dashboard() {
       const sample = await probeHealth(targetsRef.current);
       const down = sample.gateway === null || sample.internet === null;
       if (down && !lastDownRef.current && settingsRef.current.intruderAlerts) {
-        const where = sample.gateway === null ? "router local / Wi-Fi" : `salida a Internet (${settingsRef.current.ispName})`;
+        const where =
+          sample.gateway === null
+            ? "router local / Wi-Fi"
+            : `salida a Internet (${settingsRef.current.ispName})`;
         void notifyNative("Corte de conexión detectado", `Fallo en: ${where}`);
         if (settingsRef.current.alertSound) playAlertSound(true);
       }
@@ -571,7 +574,10 @@ function Dashboard() {
   };
   useEffect(() => {
     if (!hydrated || settings.healthIntervalSeconds <= 0) return;
-    const id = window.setInterval(() => void runHealthProbe(), settings.healthIntervalSeconds * 1000);
+    const id = window.setInterval(
+      () => void runHealthProbe(),
+      settings.healthIntervalSeconds * 1000,
+    );
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, settings.healthIntervalSeconds]);
@@ -597,23 +603,13 @@ function Dashboard() {
       const native = await nativeScan();
       if (native && native.length > 0) {
         setStatus("connected");
-        const fresh = await applyScan(native, "native");
-        if (!silent)
-          setNotice(
-            `Escaneo nativo completado: ${native.length} dispositivos detectados` +
-              (fresh > 0 ? ` · ${fresh} nuevos.` : "."),
-          );
+        await applyScan(native, "native");
         return;
       }
       // 2) Fallback: agente local en http://localhost:8765/scan.
       const devices = await fetchFromAgent();
       setStatus("connected");
-      const fresh = await applyScan(devices, "agent");
-      if (!silent)
-        setNotice(
-          `Escaneo completado: ${devices.length} dispositivos detectados` +
-            (fresh > 0 ? ` · ${fresh} nuevos.` : "."),
-        );
+      await applyScan(devices, "agent");
     } catch {
       setStatus("disconnected");
       if (!silent)
@@ -653,11 +649,6 @@ function Dashboard() {
     }, 1000);
     return () => window.clearInterval(id);
   }, [autoInterval, hydrated]);
-
-  const changeAutoInterval = (value: number) => {
-    updateSettings({ scanIntervalSeconds: value });
-    setCountdown(value);
-  };
 
   /** Vacía el inventario por completo (borra escaneos guardados y dispositivos). */
   const resetData = () => {
@@ -751,7 +742,7 @@ function Dashboard() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-[1720px] items-center gap-4 px-5 py-4 xl:px-8">
+        <div className="mx-auto flex max-w-[1720px] flex-wrap items-center gap-2 sm:gap-4 px-5 py-4 xl:px-8">
           <img
             src="/app-icon.png"
             alt="NetHub"
@@ -759,7 +750,7 @@ function Dashboard() {
             height={36}
             className="size-9 rounded-lg"
           />
-          <div className="flex-1">
+          <div className="min-w-0 flex-1 basis-1/2 sm:basis-auto">
             <h1 className="text-lg font-semibold leading-none">NetHub</h1>
             <p className="mt-1 text-xs text-muted-foreground">
               Red doméstica · {runtimeLabels[runtime]} · v{APP_VERSION} · © 2026 oyogor
@@ -774,18 +765,20 @@ function Dashboard() {
             Actualizaciones
           </button>
 
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={scan}
-            disabled={scanning}
-            className="inline-flex items-center gap-2 rounded-md bg-brand px-3.5 py-2 text-sm font-medium text-brand-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+            disabled={scanning || autoScanning}
+            className="inline-flex items-center gap-2 rounded-md h-9 min-w-36 bg-brand px-3.5 py-2 text-sm font-medium text-brand-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
           >
-            {scanning ? (
+            {scanning || autoScanning ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
               <Radar className="size-4" />
             )}
-            {scanning ? "Escaneando…" : "Escanear red"}
-          </button>
+            {scanning || autoScanning ? "Escaneando…" : "Escanear red"}
+          </Button>
           <button
             onClick={() => setSettingsOpen(true)}
             className="rounded-md border border-border p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -808,11 +801,9 @@ function Dashboard() {
         <section className="mb-6 flex flex-wrap items-center gap-x-5 gap-y-3 rounded-2xl border border-border bg-card px-5 py-4 text-xs">
           <span className="text-muted-foreground">
             Último escaneo:{" "}
-            <span className="font-mono text-foreground">
-              {formatScanTime(meta.lastScanAt)}
-            </span>
-            {meta.source && (
-              <span className="text-muted-foreground"> · origen: {sourceLabels[meta.source]}</span>
+            <span className="font-mono text-foreground">{formatScanTime(meta.lastScanAt)}</span>
+            {meta.lastScanAt && meta.detectedCount !== undefined && (
+              <span> · {meta.detectedCount} dispositivos detectados</span>
             )}
           </span>
           <span className="min-w-0 max-w-full truncate text-muted-foreground" title={dbPath}>
@@ -820,7 +811,7 @@ function Dashboard() {
           </span>
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <div
-              className="flex items-center rounded-md border border-border bg-muted/40 p-0.5"
+              className="flex max-w-full flex-wrap items-center rounded-md border border-border bg-muted/40 p-0.5"
               aria-label="Vista del panel"
             >
               <button
@@ -934,40 +925,6 @@ function Dashboard() {
                 Modo ausente activo
               </span>
             )}
-            <span className="inline-flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-muted-foreground">
-              {autoInterval > 0 ? (
-                <span className="relative flex size-2">
-                  <span
-                    className={cn(
-                      "absolute inline-flex size-2 rounded-full bg-brand opacity-75",
-                      autoScanning ? "animate-ping" : "animate-pulse",
-                    )}
-                  />
-                  <span className="relative inline-flex size-2 rounded-full bg-brand" />
-                </span>
-              ) : (
-                <Timer className="size-3.5" />
-              )}
-              <span className="font-mono">
-                {autoInterval === 0
-                  ? "Auto-escaneo en pausa"
-                  : autoScanning
-                    ? "Escaneando en segundo plano…"
-                    : `Próximo escaneo en ${formatCountdown(countdown)}`}
-              </span>
-              <select
-                value={autoInterval}
-                onChange={(e) => changeAutoInterval(Number(e.target.value))}
-                aria-label="Intervalo de monitorización automática"
-                className="rounded border border-input bg-popover px-1.5 py-0.5 text-xs text-popover-foreground outline-none focus:border-brand"
-              >
-                {scanIntervalOptions.map((o) => (
-                  <option key={o.value} value={o.value} className="bg-popover text-popover-foreground">
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </span>
             <button
               onClick={() => {
                 exportInventoryCsv(items);
@@ -999,8 +956,7 @@ function Dashboard() {
                   {intruders.length > 1 ? "s" : ""} en tu red
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Visto{intruders.length > 1 ? "s" : ""} por primera vez en el último
-                  escaneo:{" "}
+                  Visto{intruders.length > 1 ? "s" : ""} por primera vez en el último escaneo:{" "}
                   {intruders
                     .slice(0, 4)
                     .map((d) => `${d.name} (${d.ip})`)
@@ -1033,22 +989,23 @@ function Dashboard() {
             </div>
             <h2 className="mt-4 text-lg font-semibold">Todavía no hay dispositivos</h2>
             <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-              Escanea tu red para descubrir automáticamente PCs, consolas, Smart TVs,
-              Home Assistant e IoT.
+              Escanea tu red para descubrir automáticamente PCs, consolas, Smart TVs, Home Assistant
+              e IoT.
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-              <button
+              <Button
+                variant="ghost"
                 onClick={scan}
-                disabled={scanning}
+                disabled={scanning || autoScanning}
                 className="inline-flex items-center gap-2 rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-brand-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
               >
-                {scanning ? (
+                {scanning || autoScanning ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
                   <Radar className="size-4" />
                 )}
-                {scanning ? "Escaneando…" : "Escanear red"}
-              </button>
+                {scanning || autoScanning ? "Escaneando…" : "Escanear red"}
+              </Button>
             </div>
           </section>
         )}
@@ -1058,241 +1015,240 @@ function Dashboard() {
             <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Stat
                 icon={<Wifi className="size-4" />}
-            label="Dispositivos activos"
-            value={`${online.length}`}
-            hint={`de ${items.length} conocidos`}
-            accent
-          />
-          <Stat
-            icon={<WifiOff className="size-4" />}
-            label="Inactivos"
-            value={`${items.length - online.length}`}
-            hint="sin conexión reciente"
-          />
-          <Stat
-            icon={<ArrowDownUp className="size-4" />}
-            label="Descarga total"
-            value={`${traffic.rxMbps.toFixed(1)} Mbps`}
-            hint={`subida ${traffic.txMbps.toFixed(1)} Mbps · en tiempo real`}
-          />
-          <Stat
-            icon={<Activity className="size-4" />}
-            label="Uso del enlace"
-            value={`${linkUsage}%`}
-            hint={`sobre ${settings.linkSpeedMbps} Mbps contratados`}
-          />
-        </section>
-
-        <section className="mt-6 rounded-2xl border border-border bg-card p-6">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-base font-semibold">
-              Tráfico en tiempo real (últimos 60 s)
-            </h2>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">
-              <span className="relative flex size-2">
-                <span className="absolute inline-flex size-2 animate-ping rounded-full bg-emerald-500 opacity-75" />
-                <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
-              </span>
-              En vivo
-            </span>
-          </div>
-          <BandwidthChart />
-        </section>
-
-        <SpeedTestPanel />
-
-        <section className="mt-8">
-          <h2 className="text-base font-semibold">Redes detectadas</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Las subredes se detectan solas a partir de las IP encontradas; puedes cambiar
-            la red de un equipo en su ficha de detalle.
-          </p>
-          <div className="mt-3">
-            <NetworkTabs
-              value={network}
-              counts={networkCounts}
-              networks={detectedNetworks}
-              onChange={setNetwork}
-            />
-          </div>
-        </section>
-
-        <section className="mt-8">
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 className="mr-auto text-base font-semibold">
-              Dispositivos{" "}
-              <span className="text-muted-foreground">({visible.length})</span>
-            </h2>
-            <label className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar nombre, IP, MAC…"
-                className="w-56 rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm outline-none focus:border-brand"
+                label="Dispositivos activos"
+                value={`${online.length}`}
+                hint={`de ${items.length} conocidos`}
+                accent
               />
-            </label>
-            <span className="flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm focus-within:border-brand">
-              <Users className="size-4 shrink-0 text-muted-foreground" />
-              <select
-                value={personFilter}
-                onChange={(e) => setPersonFilter(e.target.value)}
-                aria-label="Filtrar por persona"
-                className="bg-popover text-sm text-popover-foreground outline-none"
-              >
-                <option value="all" className="bg-popover text-popover-foreground">
-                  Todas las personas
-                </option>
-                {options.people.map((name) => (
-                  <option key={name} value={name} className="bg-popover text-popover-foreground">
-                    {name}
-                  </option>
-                ))}
-                <option value="" className="bg-popover text-popover-foreground">
-                  Sin persona
-                </option>
-              </select>
-            </span>
-            <span className="flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm focus-within:border-brand">
-              <MapPin className="size-4 shrink-0 text-muted-foreground" />
-              <select
-                value={locationFilter}
-                onChange={(e) => setLocationFilter(e.target.value)}
-                aria-label="Filtrar por ubicación"
-                className="bg-popover text-sm text-popover-foreground outline-none"
-              >
-                <option value="all" className="bg-popover text-popover-foreground">
-                  Todas las ubicaciones
-                </option>
-                {options.locations.map((name) => (
-                  <option key={name} value={name} className="bg-popover text-popover-foreground">
-                    {name}
-                  </option>
-                ))}
-                <option value="" className="bg-popover text-popover-foreground">
-                  Sin ubicación
-                </option>
-              </select>
-            </span>
-            <button
-              onClick={() => setOnlyOnline((v) => !v)}
-              className={cn(
-                "rounded-md border px-3 py-2 text-sm transition-colors",
-                onlyOnline
-                  ? "border-brand bg-brand/10 text-brand"
-                  : "border-border text-muted-foreground hover:bg-accent",
-              )}
-            >
-              Solo activos
-            </button>
-          </div>
+              <Stat
+                icon={<WifiOff className="size-4" />}
+                label="Inactivos"
+                value={`${items.length - online.length}`}
+                hint="sin conexión reciente"
+              />
+              <Stat
+                icon={<ArrowDownUp className="size-4" />}
+                label="Descarga total"
+                value={`${traffic.rxMbps.toFixed(1)} Mbps`}
+                hint={`subida ${traffic.txMbps.toFixed(1)} Mbps · en tiempo real`}
+              />
+              <Stat
+                icon={<Activity className="size-4" />}
+                label="Uso del enlace"
+                value={`${linkUsage}%`}
+                hint={`sobre ${settings.linkSpeedMbps} Mbps contratados`}
+              />
+            </section>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            {filters.map((f) => (
-              <button
-                key={f.value}
-                onClick={() => setFilter(f.value)}
-                className={cn(
-                  "inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm transition-colors",
-                  filter === f.value
-                    ? "border-brand bg-brand text-brand-foreground"
-                    : "border-border text-muted-foreground hover:bg-accent hover:text-foreground",
-                )}
-              >
-                {f.value !== "all" && <DeviceTypeIcon type={f.value} />}
-                {f.label}
-              </button>
-            ))}
-          </div>
+            <section className="mt-6 rounded-2xl border border-border bg-card p-6">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="text-base font-semibold">Tráfico en tiempo real (últimos 60 s)</h2>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">
+                  <span className="relative flex size-2">
+                    <span className="absolute inline-flex size-2 animate-ping rounded-full bg-emerald-500 opacity-75" />
+                    <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                  </span>
+                  En vivo
+                </span>
+              </div>
+              <BandwidthChart />
+            </section>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {visible.map((d) => (
-              <button
-                key={d.id}
-                onClick={() => setSelectedId(d.id)}
-                className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-brand"
-              >
-                <span
+            <SpeedTestPanel />
+
+            <section className="mt-8">
+              <h2 className="text-base font-semibold">Redes detectadas</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Las subredes se detectan solas a partir de las IP encontradas; puedes cambiar la red
+                de un equipo en su ficha de detalle.
+              </p>
+              <div className="mt-3">
+                <NetworkTabs
+                  value={network}
+                  counts={networkCounts}
+                  networks={detectedNetworks}
+                  onChange={setNetwork}
+                />
+              </div>
+            </section>
+
+            <section className="mt-8">
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="mr-auto text-base font-semibold">
+                  Dispositivos <span className="text-muted-foreground">({visible.length})</span>
+                </h2>
+                <label className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Buscar nombre, IP, MAC…"
+                    className="w-56 rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm outline-none focus:border-brand"
+                  />
+                </label>
+                <span className="flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm focus-within:border-brand">
+                  <Users className="size-4 shrink-0 text-muted-foreground" />
+                  <select
+                    value={personFilter}
+                    onChange={(e) => setPersonFilter(e.target.value)}
+                    aria-label="Filtrar por persona"
+                    className="bg-popover text-sm text-popover-foreground outline-none"
+                  >
+                    <option value="all" className="bg-popover text-popover-foreground">
+                      Todas las personas
+                    </option>
+                    {options.people.map((name) => (
+                      <option
+                        key={name}
+                        value={name}
+                        className="bg-popover text-popover-foreground"
+                      >
+                        {name}
+                      </option>
+                    ))}
+                    <option value="" className="bg-popover text-popover-foreground">
+                      Sin persona
+                    </option>
+                  </select>
+                </span>
+                <span className="flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm focus-within:border-brand">
+                  <MapPin className="size-4 shrink-0 text-muted-foreground" />
+                  <select
+                    value={locationFilter}
+                    onChange={(e) => setLocationFilter(e.target.value)}
+                    aria-label="Filtrar por ubicación"
+                    className="bg-popover text-sm text-popover-foreground outline-none"
+                  >
+                    <option value="all" className="bg-popover text-popover-foreground">
+                      Todas las ubicaciones
+                    </option>
+                    {options.locations.map((name) => (
+                      <option
+                        key={name}
+                        value={name}
+                        className="bg-popover text-popover-foreground"
+                      >
+                        {name}
+                      </option>
+                    ))}
+                    <option value="" className="bg-popover text-popover-foreground">
+                      Sin ubicación
+                    </option>
+                  </select>
+                </span>
+                <button
+                  onClick={() => setOnlyOnline((v) => !v)}
                   className={cn(
-                    "flex size-10 shrink-0 items-center justify-center rounded-lg",
-                    d.status === "online"
-                      ? "bg-brand/15 text-brand"
-                      : "bg-muted text-muted-foreground",
+                    "rounded-md border px-3 py-2 text-sm transition-colors",
+                    onlyOnline
+                      ? "border-brand bg-brand/10 text-brand"
+                      : "border-border text-muted-foreground hover:bg-accent",
                   )}
                 >
-                  <DeviceTypeIcon type={d.type} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2">
-                    <span className="truncate font-medium">{d.name}</span>
+                  Solo activos
+                </button>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {filters.map((f) => (
+                  <button
+                    key={f.value}
+                    onClick={() => setFilter(f.value)}
+                    className={cn(
+                      "inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm transition-colors",
+                      filter === f.value
+                        ? "border-brand bg-brand text-brand-foreground"
+                        : "border-border text-muted-foreground hover:bg-accent hover:text-foreground",
+                    )}
+                  >
+                    {f.value !== "all" && <DeviceTypeIcon type={f.value} />}
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                {visible.map((d) => (
+                  <button
+                    key={d.id}
+                    onClick={() => setSelectedId(d.id)}
+                    className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-brand"
+                  >
                     <span
                       className={cn(
-                        "size-1.5 shrink-0 rounded-full",
-                        d.status === "online" ? "bg-success" : "bg-muted-foreground",
+                        "flex size-10 shrink-0 items-center justify-center rounded-lg",
+                        d.status === "online"
+                          ? "bg-brand/15 text-brand"
+                          : "bg-muted text-muted-foreground",
                       )}
-                    />
-                  </span>
-                  <span className="mt-0.5 block truncate font-mono text-xs text-muted-foreground">
-                    {d.ip} · {d.vendor}
-                  </span>
-                  {(d.person || d.location) && (
-                    <span className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-                      {d.location && (
-                        <span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-muted-foreground">
-                          <MapPin className="size-3 shrink-0" />
-                          <span className="truncate">{d.location}</span>
+                    >
+                      <DeviceTypeIcon type={d.type} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2">
+                        <span className="truncate font-medium">{d.name}</span>
+                        <span
+                          className={cn(
+                            "size-1.5 shrink-0 rounded-full",
+                            d.status === "online" ? "bg-success" : "bg-muted-foreground",
+                          )}
+                        />
+                      </span>
+                      <span className="mt-0.5 block truncate font-mono text-xs text-muted-foreground">
+                        {d.ip} · {d.vendor}
+                      </span>
+                      {(d.person || d.location) && (
+                        <span className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                          {d.location && (
+                            <span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-muted-foreground">
+                              <MapPin className="size-3 shrink-0" />
+                              <span className="truncate">{d.location}</span>
+                            </span>
+                          )}
+                          {d.person && (
+                            <span className="inline-flex min-w-0 items-center gap-1 text-muted-foreground">
+                              <Users className="size-3 shrink-0" />
+                              <span className="truncate">{d.person}</span>
+                            </span>
+                          )}
                         </span>
                       )}
-                      {d.person && (
-                        <span className="inline-flex min-w-0 items-center gap-1 text-muted-foreground">
-                          <Users className="size-3 shrink-0" />
-                          <span className="truncate">{d.person}</span>
-                        </span>
-                      )}
+                      <span className="mt-1.5 flex flex-wrap gap-1.5">
+                        {d.isNew && !d.trusted && (
+                          <Badge className="bg-warning/15 text-warning">Nuevo</Badge>
+                        )}
+                        {d.trusted && (
+                          <Badge className="bg-success/15 text-success">Confiable</Badge>
+                        )}
+                        {d.blocked && (
+                          <Badge className="bg-destructive/15 text-destructive">Bloqueado</Badge>
+                        )}
+                        {d.prioritized && <Badge className="bg-warning/15 text-warning">QoS</Badge>}
+                        {visibleTags(d)
+                          .slice(0, 2)
+                          .map((t) => (
+                            <Badge key={t} className="bg-muted text-muted-foreground">
+                              {t}
+                            </Badge>
+                          ))}
+                      </span>
                     </span>
-                  )}
-                  <span className="mt-1.5 flex flex-wrap gap-1.5">
-                    {d.isNew && !d.trusted && (
-                      <Badge className="bg-warning/15 text-warning">Nuevo</Badge>
-                    )}
-                    {d.trusted && (
-                      <Badge className="bg-success/15 text-success">Confiable</Badge>
-                    )}
-                    {d.blocked && (
-                      <Badge className="bg-destructive/15 text-destructive">
-                        Bloqueado
-                      </Badge>
-                    )}
-                    {d.prioritized && (
-                      <Badge className="bg-warning/15 text-warning">QoS</Badge>
-                    )}
-                    {visibleTags(d)
-                      .slice(0, 2)
-                      .map((t) => (
-                        <Badge key={t} className="bg-muted text-muted-foreground">
-                          {t}
-                        </Badge>
-                      ))}
-                  </span>
-                </span>
-                <span className="flex shrink-0 flex-col items-end gap-1.5 self-stretch">
-                  <ConnectionIcon device={d} />
-                  <span className="mt-auto text-right">
-                    <span className="block font-mono text-sm">
-                      {d.downstream.toFixed(1)}
+                    <span className="flex shrink-0 flex-col items-end gap-1.5 self-stretch">
+                      <ConnectionIcon device={d} />
+                      <span className="mt-auto text-right">
+                        <span className="block font-mono text-sm">{d.downstream.toFixed(1)}</span>
+                        <span className="block text-[11px] text-muted-foreground">Mbps</span>
+                      </span>
                     </span>
-                    <span className="block text-[11px] text-muted-foreground">Mbps</span>
-                  </span>
-                </span>
-              </button>
-            ))}
-          </div>
+                  </button>
+                ))}
+              </div>
 
-          {visible.length === 0 && (
-            <p className="mt-8 text-center text-sm text-muted-foreground">
-              Ningún dispositivo coincide con los filtros aplicados.
-            </p>
-          )}
+              {visible.length === 0 && (
+                <p className="mt-8 text-center text-sm text-muted-foreground">
+                  Ningún dispositivo coincide con los filtros aplicados.
+                </p>
+              )}
             </section>
           </>
         )}
@@ -1348,7 +1304,9 @@ function Dashboard() {
               }}
               onTrust={markKnown}
               onResolveAlert={(id) =>
-                updateAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, resolved: true } : a)))
+                updateAlerts((prev) =>
+                  prev.map((a) => (a.id === id ? { ...a, resolved: true } : a)),
+                )
               }
               onClearAlerts={() => updateAlerts(() => [])}
             />
@@ -1435,17 +1393,8 @@ function Dashboard() {
         }}
       />
     </div>
-
   );
 }
-
-const sourceLabels: Record<NonNullable<ScanMeta["source"]>, string> = {
-  agent: "agente local",
-  native: "escaneo nativo",
-  arp: "arp -a importado",
-  json: "archivo JSON",
-  demo: "datos de ejemplo",
-};
 
 function StatusPill({ status }: { status: ScannerStatus }) {
   const map: Record<ScannerStatus, { label: string; className: string; dot: string }> = {
@@ -1484,13 +1433,7 @@ function StatusPill({ status }: { status: ScannerStatus }) {
   );
 }
 
-function Badge({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
+function Badge({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <span
       className={cn(
@@ -1526,9 +1469,7 @@ function Stat({
       >
         {icon}
       </div>
-      <p className="mt-3 text-xs uppercase tracking-wider text-muted-foreground">
-        {label}
-      </p>
+      <p className="mt-3 text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
       <p className="mt-1 text-2xl font-semibold">{value}</p>
       <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
     </div>
