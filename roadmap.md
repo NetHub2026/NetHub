@@ -1,9 +1,10 @@
 # NetHub — Hoja de ruta
 
 ## Pulido UI — primera fase hacia v1.4.0 (sin cambio de versión)
-- [ ] Configuración: dimensiones constantes, scroll contenido, bloqueo del fondo, foco y confirmación anidada.
-- [ ] Inventario: frecuencia solo en Configuración, sin contador ni banda de éxito; último escaneo simplificado.
-- [ ] Validaciones automáticas y pruebas de escritorio/pantalla pequeña; prueba portable pendiente del usuario.
+- [x] Configuración: dimensiones constantes, scroll contenido, bloqueo del fondo, foco y confirmación anidada.
+- [x] Inventario: frecuencia solo en Configuración, sin contador ni banda de éxito; último escaneo simplificado.
+- [x] Compilación automática OK; lint relevante sin errores (dos advertencias existentes); pruebas navegador de dimensiones, foco, Escape, scroll restaurado, persistencia y estado/error de escaneo.
+- [ ] Prueba portable del escaneo real y autoescaneo: requiere Windows y la red del usuario. TypeScript independiente no ejecutado; validación delegada al entorno automático.
 
 ## Hecho
 - Panel de red: métricas, gráfico de ancho de banda, listado con filtros/búsqueda, panel de detalle con etiquetas y controles, modo oscuro.
