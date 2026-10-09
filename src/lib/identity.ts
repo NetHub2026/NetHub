@@ -143,12 +143,13 @@ export function ieeeVendor(mac: string | null | undefined): string | null {
 const GENERIC_NAME =
   /^(dispositivo|device|unknown|desconocido|host|android|localhost|espressif|esp[_-]?[0-9a-f]{4,}|[0-9a-f]{2}([:-][0-9a-f]{2}){5}|\d{1,3}(\.\d{1,3}){3})\b|^(dispositivo|fabricante desconocido|mac privada)/i;
 
-export function isGenericName(name: string | null | undefined): boolean {
+export function isGenericName(name: string | null | undefined, vendor?: string | null): boolean {
   const text = String(name ?? "").trim();
   if (!text) return true;
   if (GENERIC_NAME.test(text)) return true;
-  // "Fabricante 42" generado automáticamente a partir del OUI.
-  return /\s\d{1,3}$/.test(text) && !/[a-z]{2,}[-_]/i.test(text) && text.split(/\s+/).length <= 3 && /^[A-Z]/.test(text) && /\b\d{1,3}$/.test(text) && /(inc|ltd|corp|co\.|gmbh|s\.a\.|technolog|electronic|desconocido)/i.test(text);
+  // "Fabricante 42": nombre generado automáticamente a partir del fabricante y la IP.
+  const m = text.match(/^(.+)\s\d{1,3}$/);
+  return !!(m && vendor && m[1].trim().toLowerCase() === vendor.trim().toLowerCase());
 }
 
 /** Pistas inequívocas o casi en el nombre / hostname. Orden: de más a menos específico. */
@@ -213,13 +214,9 @@ function typeFromServices(device: Pick<Device, "services">): DeviceType | null {
   return null;
 }
 
-const UNKNOWN_VENDOR = /^(fabricante desconocido|mac privada|desconocido|unknown)?/i;
-
 function isMeaningfulVendor(v: string | null | undefined): v is string {
   const text = String(v ?? "").trim();
-  if (!text) return false;
-  const m = text.match(UNKNOWN_VENDOR);
-  return !(m && m[0].length > 0);
+  return text.length > 0 && !/^(fabricante desconocido|mac privada|desconocido|unknown)/i.test(text);
 }
 
 export type IdentityInput = Pick<Device, "name" | "type" | "mac" | "vendor" | "manualEdit" | "services">;
@@ -231,7 +228,7 @@ export type IdentityInput = Pick<Device, "name" | "type" | "mac" | "vendor" | "m
 export function deriveIdentity(device: IdentityInput, adapterName?: string | null): DeviceIdentity {
   const macKind = classifyMac(device.mac);
   const adapter = adapterName !== undefined ? adapterName : ieeeVendor(device.mac);
-  const name = isGenericName(device.name) ? "" : String(device.name ?? "");
+  const name = isGenericName(device.name, device.vendor) ? "" : String(device.name ?? "");
 
   const adapterVendor: IdentityFact<string> =
     macKind === "global" && adapter
