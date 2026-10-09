@@ -755,70 +755,26 @@ export function lookupOui(mac: string, hostname?: string | null): OuiEntry {
   return UNKNOWN_VENDOR;
 }
 
-/** Consulta al agente local (sin CORS ni bloqueos del navegador). */
-async function resolveViaAgent(mac: string): Promise<string> {
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4000);
-    const res = await fetch(
-      `http://localhost:8765/vendor?mac=${encodeURIComponent(mac)}`,
-      { signal: controller.signal, cache: "no-store" },
-    );
-    clearTimeout(timer);
-    if (!res.ok) return "";
-    const body = (await res.json()) as { vendor?: string };
-    return body.vendor?.trim() ?? "";
-  } catch {
-    return "";
-  }
-}
-
+/**
+ * Resolución 100% local: tabla propia, caché, catálogo IEEE empaquetado y
+ * nombre. No se envía la MAC a ningún servicio externo. Una MAC aleatoria o
+ * administrada localmente no identifica fabricante.
+ */
 export async function resolveVendor(mac: string, hostname?: string | null): Promise<OuiEntry> {
   const local = lookupOui(mac, hostname);
   if (local.brand !== "unknown") return local;
 
   const normalized = normalizeMac(mac);
-
-  // Una MAC aleatoria no pertenece a ningún fabricante: no se consulta Internet.
-  if (!OUI[prefix(normalized)] && isRandomizedMac(normalized)) {
+  if (isRandomizedMac(normalized)) {
     return lookupByHostname(hostname) ?? PRIVATE_MAC_ENTRY;
   }
+  if (local.vendor !== UNKNOWN_VENDOR.vendor) return local;
 
-  const fromAgent = await resolveViaAgent(normalized);
-  if (fromAgent && !/not found|unknown/i.test(fromAgent)) {
-    return cacheOui(normalized, fromAgent, brandFromVendorName(fromAgent));
-  }
-
-  const urls = [
-    `https://api.macvendors.com/${encodeURIComponent(normalized)}`,
-    `https://api.maclookup.app/v2/macs/${encodeURIComponent(normalized)}`,
-  ];
-
-  for (const url of urls) {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 900);
-      const res = await fetch(url, { signal: controller.signal, cache: "no-store" });
-      clearTimeout(timer);
-      if (!res.ok) continue;
-      const contentType = res.headers.get("content-type") ?? "";
-      const body = contentType.includes("application/json") ? await res.json() : await res.text();
-      const vendor =
-        typeof body === "string"
-          ? body.trim()
-          : (body as { company?: string; vendorDetails?: { companyName?: string } }).company ??
-            (body as { company?: string; vendorDetails?: { companyName?: string } }).vendorDetails
-              ?.companyName ??
-            "";
-      if (!vendor || /not found|unknown/i.test(vendor)) continue;
-      return cacheOui(normalized, vendor, brandFromVendorName(vendor));
-    } catch {
-      /* siguiente proveedor */
-    }
-  }
-
-  const byHost = lookupByHostname(hostname);
-  return byHost ? cacheOui(normalized, byHost.vendor, byHost.brand) : local;
+  const { loadIeeeRegistry, ieeeVendor } = await import("./identity");
+  await loadIeeeRegistry();
+  const ieee = ieeeVendor(normalized);
+  if (ieee) return { vendor: ieee, brand: brandFromVendorName(ieee) };
+  return lookupByHostname(hostname) ?? local;
 }
 
 export function vendorFromMac(mac: string, hostname?: string | null): string {

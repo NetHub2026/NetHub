@@ -131,6 +131,7 @@ import {
 import { SpeedTestPanel } from "@/components/network/SpeedTestPanel";
 import { UpdateModal } from "@/components/network/UpdateModal";
 import { DeviceTypeIcon } from "@/components/network/DeviceTypeIcon";
+import { InventoryIdentityBadge } from "@/components/network/IdentityBadge";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -1187,6 +1188,7 @@ function Dashboard() {
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2">
                         <span className="truncate font-medium">{d.name}</span>
+                        <InventoryIdentityBadge device={d} />
                         <span
                           className={cn(
                             "size-1.5 shrink-0 rounded-full",
