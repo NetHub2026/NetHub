@@ -1,4 +1,5 @@
 import { normalizeDeviceType, type Device, type DeviceType } from "./devices";
+import { inferType, isGenericName } from "./identity";
 import {
   brandFromVendorName,
   lookupByHostname,
@@ -36,8 +37,20 @@ interface RawHost {
   tags?: string[] | string;
 }
 
-function guessType(name: string, vendor: string): DeviceType {
-  const text = `${name} ${vendor}`.toLowerCase();
+/**
+ * Tipo inicial de un dispositivo recién detectado. Las reglas se aplican al
+ * nombre/hostname; el fabricante del adaptador solo cuenta para marcas
+ * monoproducto (consolas, impresoras, cámaras, routers de operadora...). Sin
+ * pistas se queda en "Otro" en lugar de inventar un tipo.
+ */
+function guessType(name: string, vendor: string, mac = ""): DeviceType {
+  const byName = isGenericName(name, vendor) ? null : guessTypeFromName(name);
+  if (byName) return byName;
+  return inferType({ name: "", type: "other", mac, vendor, services: [] }, vendor) ?? "other";
+}
+
+function guessTypeFromName(name: string): DeviceType | null {
+  const text = name.toLowerCase();
 
   // Consolas
   if (/playstation|\bps[45]\b|xbox|nintendo|switch|steamdeck|steam deck|sony interactive|valve/.test(text))
@@ -60,7 +73,7 @@ function guessType(name: string, vendor: string): DeviceType {
 
   // Tablets y móviles
   if (/ipad|tablet|\btab\b|galaxy.?tab|mediapad|matepad|surface.?pro/.test(text)) return "tablet";
-  if (/iphone|android|pixel|galaxy|phone|movil|m[oó]vil|xiaomi|redmi|\bpoco\b|honor|oppo|oneplus|vivo|realme/.test(text))
+  if (/iphone|android|pixel|galaxy|phone|movil|m[oó]vil|redmi|\bpoco\b/.test(text))
     return "smartphone";
 
   // Almacenamiento en red
@@ -80,10 +93,10 @@ function guessType(name: string, vendor: string): DeviceType {
   // Portátiles y sobremesas
   if (/laptop|portatil|port[aá]til|macbook|notebook|thinkpad|ideapad|vivobook|zenbook|latitude|inspiron|pavilion/.test(text))
     return "laptop";
-  if (/\bpc\b|desktop|sobremesa|imac|mac.?mini|\bmsi\b|gigabyte|asrock|\basus\b|lenovo|\bdell\b|intel|torre/.test(text))
+  if (/\bpc\b|desktop|sobremesa|imac|mac.?mini|\bmsi\b|gigabyte|asrock|torre/.test(text))
     return "pc";
 
-  return "iot";
+  return null;
 }
 
 const WIFI_ONLY_TYPES = new Set<DeviceType>([
@@ -121,7 +134,7 @@ function makeDevice(ip: string, mac: string, extra: Partial<Device> = {}): Devic
   const vendor = extra.vendor || byHostname?.vendor || oui.vendor;
   const vendorBrand = brandFromVendorName(vendor);
   const brand = extra.brand ?? (vendorBrand !== "unknown" ? vendorBrand : byHostname?.brand ?? oui.brand);
-  const type = extra.type ? normalizeDeviceType(extra.type) : guessType(name, vendor);
+  const type = extra.type ? normalizeDeviceType(extra.type) : guessType(name, vendor, normalizedMac);
   const tags = defaultTagsForType(type, sanitizeTags(extra.tags));
   return {
     id: normalizedMac || ip,
