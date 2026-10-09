@@ -149,7 +149,7 @@ export function isGenericName(name: string | null | undefined, vendor?: string |
   if (GENERIC_NAME.test(text)) return true;
   // "Fabricante 42": nombre generado automáticamente a partir del fabricante y la IP.
   const m = text.match(/^(.+)\s\d{1,3}$/);
-  return !!(m && vendor && m[1].trim().toLowerCase() === vendor.trim().toLowerCase());
+  return !!(m?.[1] && vendor && m[1].trim().toLowerCase() === vendor.trim().toLowerCase());
 }
 
 /** Pistas inequívocas o casi en el nombre / hostname. Orden: de más a menos específico. */
