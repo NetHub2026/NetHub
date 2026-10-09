@@ -1,4 +1,5 @@
 import { normalizeDeviceType, type Device, type DeviceType } from "./devices";
+import { inferType, isGenericName } from "./identity";
 import {
   brandFromVendorName,
   lookupByHostname,
