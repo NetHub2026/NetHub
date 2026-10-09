@@ -29,6 +29,7 @@ import {
 import { Globe } from "lucide-react";
 import { detectServices, likelyServices, type PortScanProgress, type ServiceHit } from "@/lib/services";
 import { VendorIcon } from "./VendorIcon";
+import { IdentityDetails } from "./IdentityBadge";
 import { cn } from "@/lib/utils";
 
 const connectionTags = ["Cableado / Ethernet", "Wi-Fi", "Wi-Fi 2.4GHz", "Wi-Fi 5GHz", "Wi-Fi 6"];
@@ -235,7 +236,7 @@ export function DeviceDetailPanel({
     setVendorNote(
       privateMac
         ? "La dirección es privada, no hay fabricante que consultar."
-        : "No se ha encontrado más información. Con el agente en marcha la búsqueda es más fiable.",
+        : "El catálogo local no tiene más información para esta MAC.",
     );
   };
 
@@ -330,6 +331,7 @@ export function DeviceDetailPanel({
               className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-brand"
             />
           </label>
+          <IdentityDetails device={device} />
           <label className="block">
             <span className="text-xs text-muted-foreground">Tipo de dispositivo</span>
             <span className="mt-1 flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 focus-within:border-brand">
@@ -376,7 +378,7 @@ export function DeviceDetailPanel({
               ) : (
                 <Globe className="size-3.5" />
               )}
-              Buscar fabricante en Internet
+              Buscar fabricante en el catálogo local
             </button>
             {privateMac && (
               <span className="mt-2 block text-[11px] text-muted-foreground">
