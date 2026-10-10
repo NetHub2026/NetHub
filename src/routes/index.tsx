@@ -26,8 +26,10 @@ import {
   Siren,
   Home as HomeIcon,
 } from "lucide-react";
-import { deviceTypeLabels, type Device, type DeviceType } from "@/lib/devices";
+import { type Device, type DeviceType } from "@/lib/devices";
 import {
+  changeDirectoryEntry,
+  type DirectoryKind,
   clearStoredDirectory,
   directoryFromDevices,
   emptyDirectory,
@@ -129,7 +131,8 @@ import {
 } from "@/lib/persistence";
 
 import { UpdateModal } from "@/components/network/UpdateModal";
-import { DeviceTypeIcon } from "@/components/network/DeviceTypeIcon";
+import { DirectoryManager } from "@/components/network/DirectoryManager";
+import { DeviceTypeFilter } from "@/components/network/DeviceTypeFilter";
 import {
   InventoryIdentityIcon,
   InventoryDeviceBrand,
@@ -159,14 +162,6 @@ export const Route = createFileRoute("/")({
   }),
   component: Dashboard,
 });
-
-const filters: Array<{ value: DeviceType | "all"; label: string }> = [
-  { value: "all", label: "Todos" },
-  ...(Object.keys(deviceTypeLabels) as DeviceType[]).map((t) => ({
-    value: t,
-    label: deviceTypeLabels[t],
-  })),
-];
 
 /** Etiquetas de conexión: se muestran como icono, no como etiqueta de texto. */
 const WIFI_TAGS = ["Wi-Fi", "Wi-Fi 2.4GHz", "Wi-Fi 5GHz", "Wi-Fi 6"];
@@ -216,7 +211,7 @@ function Dashboard() {
       return next;
     });
   };
-  const [filter, setFilter] = useState<DeviceType | "all">("all");
+  const [filter, setFilter] = useState<DeviceType[]>([]);
   const [query, setQuery] = useState("");
   const [network, setNetwork] = useState<string>(ALL_NETWORKS);
   const [onlyOnline, setOnlyOnline] = useState(false);
@@ -708,7 +703,7 @@ function Dashboard() {
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return items.filter((d) => {
-      if (filter !== "all" && d.type !== filter) return false;
+      if (filter.length > 0 && !filter.includes(d.type)) return false;
       if (network !== ALL_NETWORKS && (networkOf(d) ?? "unknown") !== network) return false;
       if (onlyOnline && d.status !== "online") return false;
       if (personFilter !== "all" && (d.person ?? "") !== personFilter) return false;
@@ -720,6 +715,19 @@ function Dashboard() {
         .includes(q);
     });
   }, [items, filter, network, onlyOnline, personFilter, locationFilter, query]);
+
+  const manageEntry = (kind: DirectoryKind, previous: string, replacement: string) => {
+    try {
+      const next = changeDirectoryEntry(items, directory, kind, previous, replacement);
+      setDirectory(next.directory);
+      setItems(next.devices);
+      void saveDirectoryAnywhere(next.directory);
+      if (kind === "people" && personFilter.toLowerCase() === previous.toLowerCase()) setPersonFilter(replacement.trim() || "all");
+      if (kind === "locations" && locationFilter.toLowerCase() === previous.toLowerCase()) setLocationFilter(replacement.trim() || "all");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo actualizar el nombre.");
+    }
+  };
 
   const selected = items.find((d) => d.id === selectedId) ?? null;
 
@@ -993,6 +1001,13 @@ function Dashboard() {
           </section>
         )}
 
+        {viewMode === "inventory" && (
+          <div className="mb-5 flex flex-wrap justify-end gap-2">
+            <DirectoryManager kind="people" names={options.people} devices={items} onCreate={createPerson} onChange={(previous, replacement) => manageEntry("people", previous, replacement)} />
+            <DirectoryManager kind="locations" names={options.locations} devices={items} onCreate={createLocation} onChange={(previous, replacement) => manageEntry("locations", previous, replacement)} />
+          </div>
+        )}
+
         {showEmpty && viewMode === "inventory" && (
           <section className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
             <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-brand/15 text-brand">
@@ -1060,6 +1075,7 @@ function Dashboard() {
                 <h2 className="mr-auto text-base font-semibold">
                   Dispositivos <span className="text-muted-foreground">({visible.length})</span>
                 </h2>
+                <DeviceTypeFilter value={filter} onChange={setFilter} />
                 <label className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <input
@@ -1130,24 +1146,6 @@ function Dashboard() {
                 >
                   Solo activos
                 </button>
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                {filters.map((f) => (
-                  <button
-                    key={f.value}
-                    onClick={() => setFilter(f.value)}
-                    className={cn(
-                      "inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm transition-colors",
-                      filter === f.value
-                        ? "border-brand bg-brand text-brand-foreground"
-                        : "border-border text-muted-foreground hover:bg-accent hover:text-foreground",
-                    )}
-                  >
-                    {f.value !== "all" && <DeviceTypeIcon type={f.value} />}
-                    {f.label}
-                  </button>
-                ))}
               </div>
 
               <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
