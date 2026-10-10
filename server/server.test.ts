@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, rm, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { once } from "node:events";
@@ -56,6 +56,28 @@ describe("Network boundaries", () => {
   });
 });
 describe("Durable continuous monitor", () => {
+  it("retains seven recoverable backup versions without archiving every state write", async () => {
+    const { monitor, directory } = await fixture();
+    await monitor.scan();
+    for (let revision = 1; revision <= 9; revision++) {
+      await monitor.settings({ contractedMbps: revision * 100 });
+      await monitor.store.backup();
+      await new Promise((resolve) => setTimeout(resolve, 2));
+    }
+    const archive = join(directory, "backups");
+    const files = (await readdir(archive)).sort();
+    expect(files).toHaveLength(7);
+    const values = await Promise.all(files.map(async (file) =>
+      JSON.parse(await readFile(join(archive, file), "utf8")).settings.contractedMbps,
+    ));
+    expect(values).toEqual([300, 400, 500, 600, 700, 800, 900]);
+    await monitor.settings({ contractedMbps: 1000 });
+    expect(await readdir(archive)).toHaveLength(7);
+    const restored = JSON.parse(await readFile(join(archive, files[0]!), "utf8"));
+    await monitor.importData(restored);
+    expect(monitor.state.devices).toHaveLength(3);
+    expect((await monitor.store.load()).settings.contractedMbps).toBe(1000);
+  });
   it("serializes concurrent backups and updates without truncating either JSON", async () => {
     const { monitor, directory } = await fixture();
     await monitor.scan();

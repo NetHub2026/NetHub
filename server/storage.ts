@@ -1,4 +1,5 @@
-import { mkdir, readFile, open, rename, copyFile } from "node:fs/promises";
+import { mkdir, readFile, open, rename, copyFile, readdir, unlink } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { ServerState } from "./types";
 import { emptyPatternState, sanitizePatterns } from "../src/lib/patterns";
@@ -257,6 +258,23 @@ export class StateStore {
         await file.close();
       }
       await rename(temporary, target);
+      const archive = join(this.directory, "backups");
+      await mkdir(archive, { recursive: true, mode: 0o700 });
+      const name = `state-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID()}.json`;
+      const archivedTemporary = join(archive, name + ".tmp");
+      await copyFile(target, archivedTemporary);
+      const archivedFile = await open(archivedTemporary, "r+");
+      try {
+        await archivedFile.sync();
+      } finally {
+        await archivedFile.close();
+      }
+      await rename(archivedTemporary, join(archive, name));
+      const versions = (await readdir(archive))
+        .filter((entry) => /^state-[0-9TZ-]+-[a-f0-9-]{36}\.json$/.test(entry))
+        .sort()
+        .reverse();
+      for (const expired of versions.slice(7)) await unlink(join(archive, expired));
     });
     this.queue = copy.catch(() => {});
     return copy;

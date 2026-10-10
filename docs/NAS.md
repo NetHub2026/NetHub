@@ -83,7 +83,7 @@ Para acceso remoto utiliza una VPN. No abras el puerto en el router directamente
 
 ## Copias, actualización y recuperación
 
-El volumen `nethub_data` persiste al recrear el contenedor. No elimines ese volumen ni uses `docker compose down -v` al actualizar. Se genera una copia adicional cada 24 horas; puedes crearla o descargar un JSON desde Configuración. Esa copia adicional es la última copia, no un historial de versiones. Incluye el volumen de Docker en las copias de seguridad del NAS, o descarga periódicamente el JSON.
+El volumen `nethub_data` persiste al recrear el contenedor. No elimines ese volumen ni uses `docker compose down -v` al actualizar. Se genera una copia adicional cada 24 horas; puedes crearla o descargar un JSON desde Configuración. Además de `server-state.backup.json`, se conservan las siete últimas versiones en `/data/backups/`, con fecha en el nombre. Las copias manuales y las previas a una importación también cuentan dentro de ese límite; no equivale necesariamente a siete días. Para recuperar una versión antigua, copia ese JSON al PC e impórtalo desde la web, o restaura el archivo con el contenedor detenido. Incluye el volumen de Docker en las copias de seguridad del NAS, o descarga periódicamente el JSON.
 
 Antes de actualizar, descarga una copia. Importa la nueva imagen y recrea el contenedor conservando el volumen `nethub_data` y el secreto. Cambiar la contraseña requiere editar el archivo privado y reiniciar; la contraseña no se guarda en el JSON ni en la imagen.
 

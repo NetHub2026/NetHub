@@ -623,7 +623,7 @@ function App() {
                   <h2 className="text-lg font-semibold">Datos y copias</h2>
                   <p className="mt-2 text-sm text-muted-foreground">
                     Inventario, posiciones, actividad, rutinas y hasta 100 pruebas de velocidad se
-                    guardan en el NAS. Se crea una copia adicional cada 24 horas.
+                    guardan en el NAS. Se crea una copia cada 24 horas y se conservan las siete últimas versiones.
                   </p>
                   <div className="mt-4 flex flex-wrap gap-3">
                     <label className="cursor-pointer rounded-lg border border-border px-3 py-2 text-sm">
