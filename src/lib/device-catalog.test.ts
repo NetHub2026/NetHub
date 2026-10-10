@@ -9,12 +9,17 @@ describe("Catálogo de dispositivos", () => {
     expect(new Set(types).size).toBe(types.length);
     expect([...types].sort()).toEqual(Object.keys(deviceTypeLabels).sort());
     for (const type of types) expect(normalizeDeviceType(type)).toBe(type);
+    for (const old of ["web-server", "mail-server", "proxy-server", "file-server"])
+      expect(normalizeDeviceType(old)).toBe("server");
+    expect(normalizeDeviceType("voice-assistant")).toBe("speaker");
+    expect(normalizeDeviceType("processing-unit")).toBe("circuit-board");
+    expect(deviceTypeLabels.nas).toBe("NAS");
     expect(normalizeDeviceType("phone")).toBe("smartphone");
     expect(normalizeDeviceType("toString")).toBe("other");
   });
   it("busca por nombre sin tildes y por familia", () => {
     expect(searchDeviceTypes("frigorifico").flatMap(group => group.types)).toEqual(["smart-fridge"]);
-    expect(searchDeviceTypes("servidores").flatMap(group => group.types)).toContain("mail-server");
+    expect(searchDeviceTypes("servidores").flatMap(group => group.types)).toContain("server");
     expect(searchDeviceTypes("no-existe-este-tipo")).toEqual([]);
   });
   it("conserva los tipos nuevos asignados manualmente incluso con MAC privada", () => {
