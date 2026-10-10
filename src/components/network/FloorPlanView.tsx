@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Device } from "@/lib/devices";
+import type { PatternState } from "@/lib/patterns";
 import { DeviceTypeIcon } from "./DeviceTypeIcon";
 import {
   planId,
@@ -44,6 +45,9 @@ type Props = {
   onSave: (plan: FloorPlan | null, expected: string | null) => Promise<boolean>;
   canMeasure?: boolean;
   demo?: boolean;
+  patterns?: PatternState;
+  embedded?: boolean;
+  onSelectDevice?: (id: string) => void;
 };
 const control =
   "rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-50";
@@ -54,7 +58,21 @@ const pointColor = (m: CoveragePoint) =>
       ? "#e7a126"
       : "#f15c67";
 
-export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo = false }: Props) {
+export function FloorPlanView({
+  devices,
+  plan,
+  onSave,
+  canMeasure = false,
+  demo = false,
+  patterns,
+  embedded = false,
+  onSelectDevice,
+}: Props) {
+  const anomalous = new Set(
+    (patterns?.anomalies ?? [])
+      .filter((a) => !a.reviewedAt && Date.now() - new Date(a.at).getTime() < 6 * 3600_000)
+      .map((a) => a.deviceId),
+  );
   const [draft, setDraft] = useState(plan);
   const [busy, setBusy] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -231,7 +249,7 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
         <div>
           <h2 className="flex items-center gap-2 text-lg font-semibold">
             <MapPin className="size-5 text-primary" />
-            Plano y cobertura
+            {embedded ? "Mi casa" : "Plano y cobertura"}
           </h2>
           <p className="text-sm text-muted-foreground">
             Tu plano real, tus equipos y mediciones donde tú estás.
@@ -457,7 +475,7 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
               </span>
             )}
           </div>
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className={`grid gap-4 ${embedded ? "" : "xl:grid-cols-[minmax(0,1fr)_320px]"}`}>
             <div
               ref={viewport}
               className="self-start overflow-auto rounded-2xl border border-border bg-background"
@@ -619,10 +637,11 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
                         <button
                           key={d.id}
                           aria-label={draft.locked ? d.name : `Mover ${d.name}`}
-                          title={d.name}
+                          title={`${d.name}${!d.trusted && d.isNew ? " · Intruso" : anomalous.has(d.id) ? " · Anomalía" : ""}`}
                           className={`absolute z-20 flex size-7 -translate-x-1/2 -translate-y-1/2 touch-none items-center justify-center rounded-full border-2 border-white shadow-lg ${d.status === "online" ? "bg-sky-600 text-white" : "bg-slate-500 text-white"}`}
                           style={{ left: `${p.x}%`, top: `${p.y}%` }}
-                          disabled={busy || draft.locked}
+                          disabled={busy}
+                          onClick={() => { if (draft.locked) onSelectDevice?.(d.id); }}
                           onPointerDown={(event) => {
                             if (draft.locked) return;
                             event.stopPropagation();
@@ -652,7 +671,20 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
                             setDraft(plan);
                           }}
                         >
-                          <DeviceTypeIcon type={d.type} className="size-3.5" />
+                          {(d.status === "online" ||
+                            (!d.trusted && d.isNew) ||
+                            anomalous.has(d.id)) && (
+                            <span
+                              aria-hidden="true"
+                              className={`pointer-events-none absolute inset-0 rounded-full motion-safe:animate-ping ${!d.trusted && d.isNew ? "bg-red-500/40" : anomalous.has(d.id) ? "bg-amber-500/40" : "bg-sky-500/30"}`}
+                              style={{ animationDuration: "2.8s" }}
+                            />
+                          )}
+                          <span
+                            aria-hidden="true"
+                            className={`pointer-events-none absolute inset-0 rounded-full ${!d.trusted && d.isNew ? "bg-red-600" : anomalous.has(d.id) ? "bg-amber-500 text-slate-950" : ""}`}
+                          />
+                          <DeviceTypeIcon type={d.type} className="relative size-3.5" />
                         </button>
                       );
                     })}
@@ -666,7 +698,24 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
                 )}
               </div>
             </div>
-            <aside className="space-y-4 rounded-2xl border border-border bg-card p-4">
+            {(!embedded || mode === "measure") && <aside className="space-y-4 rounded-2xl border border-border bg-card p-4">
+              <div
+                className="flex flex-wrap gap-3 text-xs text-muted-foreground"
+                aria-label="Estados de equipos"
+              >
+                <span>
+                  <span className="inline-block size-2 rounded-full bg-sky-500" /> Activo
+                </span>
+                <span>
+                  <span className="inline-block size-2 rounded-full bg-slate-500" /> Inactivo
+                </span>
+                <span>
+                  <span className="inline-block size-2 rounded-full bg-red-500" /> Intruso
+                </span>
+                <span>
+                  <span className="inline-block size-2 rounded-full bg-amber-500" /> Anomalía
+                </span>
+              </div>
               <h3 className="font-semibold">
                 {mode === "measure" ? "Mediciones reales" : "Tu red sobre el plano"}
               </h3>
@@ -804,7 +853,7 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
                   </div>
                 </>
               )}
-            </aside>
+            </aside>}
           </div>
           {!!points.length && (
             <div className="overflow-x-auto rounded-xl border border-border">

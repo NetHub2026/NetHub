@@ -35,15 +35,15 @@ export function DashboardNavigation({
       aria-label="Vista del panel"
       className="flex max-w-full flex-wrap items-center rounded-md border border-border bg-muted/40 p-0.5"
     >
-      {dashboardViews.map(([id, label, Icon]) => (
+      {dashboardViews.filter(([id]) => id !== "floorplan").map(([id, label, Icon]) => (
         <button
           key={id}
           type="button"
           onClick={() => onChange(id)}
-          aria-current={value === id ? "page" : undefined}
+          aria-current={value === id || (id === "home" && value === "floorplan") ? "page" : undefined}
           className={cn(
             "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
-            value === id
+            value === id || (id === "home" && value === "floorplan")
               ? "bg-background text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground",
           )}

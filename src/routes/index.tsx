@@ -804,7 +804,7 @@ function Dashboard() {
           </section>
         )}
 
-        {viewMode === "floorplan" && <FloorPlanView devices={items} plan={settings.floorPlan ?? null} onSave={async (floorPlan) => {
+        {viewMode === "floorplan" && <FloorPlanView patterns={patterns} devices={items} plan={settings.floorPlan ?? null} onSave={async (floorPlan) => {
           const next = { ...settingsRef.current, floorPlan };
           if (getRuntime() !== "web" && !await writeSettingsFile(next)) return false;
           if (getRuntime() === "web") window.localStorage.setItem("nethub.settings.v1", JSON.stringify(next));
@@ -974,6 +974,15 @@ function Dashboard() {
         )}
         {viewMode === "home" && (
           <HomeTwin
+            onSetupPlan={() => setViewMode("floorplan")}
+            planView={settings.floorPlan ? <FloorPlanView embedded onSelectDevice={setSelectedId} patterns={patterns} devices={items} plan={settings.floorPlan} onSave={async (floorPlan) => {
+              const next = { ...settingsRef.current, floorPlan };
+              if (getRuntime() !== "web" && !await writeSettingsFile(next)) return false;
+              if (getRuntime() === "web") window.localStorage.setItem("nethub.settings.v1", JSON.stringify(next));
+              else saveSettings(next);
+              setSettings(next);
+              return true;
+            }} /> : undefined}
             devices={items}
             onUpdateDevice={update}
             patterns={patterns}

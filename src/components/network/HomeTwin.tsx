@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   Brain,
@@ -52,10 +52,14 @@ export function HomeTwin({
   onOpenPerformance,
   monitoringHost = "este PC",
   trafficAvailable = true,
+  planView,
+  onSetupPlan,
 }: {
   devices: Device[];
   monitoringHost?: string;
   trafficAvailable?: boolean;
+  planView?: ReactNode;
+  onSetupPlan?: () => void;
   onUpdateDevice?: (device: Device) => void;
   patterns: PatternState;
   rxMbps: number;
@@ -64,6 +68,7 @@ export function HomeTwin({
   onOpenPerformance: () => void;
 }) {
   const [placing, setPlacing] = useState(false);
+  const [homeView, setHomeView] = useState<"plan" | "rooms">("plan");
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
   const dragging = useRef<string | null>(null);
   const [selectedAnomalyId, setSelectedAnomalyId] = useState<string | null>(null);
@@ -108,8 +113,16 @@ export function HomeTwin({
   const pulse = Math.min(1, rxMbps / 200);
   return (
     <>
+      {!planView && onSetupPlan && <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-base font-semibold">Mi casa</h2><Button variant="outline" onClick={onSetupPlan}>Añadir plano real</Button></div>}
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
-        <section className="overflow-hidden rounded-xl border border-border bg-card">
+        <div className="min-w-0">
+          {planView && <div className="mb-3 flex justify-end" role="group" aria-label="Representación de Mi casa">
+            <div className="flex gap-1 rounded-lg border border-border bg-muted/40 p-1">
+              <Button size="sm" variant={homeView === "plan" ? "secondary" : "ghost"} aria-pressed={homeView === "plan"} onClick={() => setHomeView("plan")}>Plano</Button>
+              <Button size="sm" variant={homeView === "rooms" ? "secondary" : "ghost"} aria-pressed={homeView === "rooms"} onClick={() => setHomeView("rooms")}>Habitaciones</Button>
+            </div>
+          </div>}
+        {planView && homeView === "plan" ? planView : <section className="overflow-hidden rounded-xl border border-border bg-card">
           <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
             <div className="flex items-center gap-3">
               <span className="relative flex size-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
@@ -218,7 +231,13 @@ export function HomeTwin({
                       const on = prob === null ? d.status === "online" : prob > 0.5;
                       const threat = !d.trusted && d.isNew;
                       const weird = anomalous.has(d.id);
-                      const tone = threat || weird ? "destructive" : on ? "primary" : "muted";
+                      const tone = threat
+                        ? "destructive"
+                        : weird
+                          ? "warning"
+                          : on
+                            ? "primary"
+                            : "muted";
                       return (
                         <button
                           key={d.id}
@@ -310,7 +329,11 @@ export function HomeTwin({
                             <span
                               className={cn(
                                 "absolute inset-0 rounded-full animate-ping",
-                                tone === "destructive" ? "bg-destructive/50" : "bg-primary/40",
+                                tone === "destructive"
+                                  ? "bg-destructive/50"
+                                  : tone === "warning"
+                                    ? "bg-amber-500/40"
+                                    : "bg-primary/40",
                               )}
                               style={{ animationDuration: `${2 + (h % 20) / 10}s` }}
                             />
@@ -322,6 +345,8 @@ export function HomeTwin({
                                 "border-destructive bg-destructive/20 text-destructive",
                               tone === "primary" &&
                                 "border-primary bg-primary/15 text-primary shadow-[0_0_18px_-2px_var(--color-primary)]",
+                              tone === "warning" &&
+                                "border-amber-500 bg-amber-500/20 text-amber-500",
                               tone === "muted" && "border-border bg-muted text-muted-foreground",
                             )}
                           >
@@ -346,10 +371,10 @@ export function HomeTwin({
               <span className="size-2 rounded-full bg-muted-foreground/40" /> Apagado
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="size-2 rounded-full bg-destructive" />{" "}
-              {monitoringHost === "este PC"
-                ? "Intruso o comportamiento raro"
-                : "Nuevo o comportamiento inusual"}
+              <span className="size-2 rounded-full bg-destructive" /> Intruso
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-amber-500" /> Anomalía
             </span>
             <span>
               {placing
@@ -357,7 +382,8 @@ export function HomeTwin({
                 : "Asigna habitaciones desde la ficha de cada equipo."}
             </span>
           </footer>
-        </section>
+        </section>}
+        </div>
         <aside className="rounded-xl border border-border bg-card">
           <header className="flex items-center gap-3 border-b border-border px-5 py-4">
             <span className="flex size-9 items-center justify-center rounded-lg bg-primary/15 text-primary">

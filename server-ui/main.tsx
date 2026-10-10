@@ -460,7 +460,10 @@ function App() {
                     networks={networks}
                     counts={Object.fromEntries([
                       [ALL_NETWORKS, devices.length],
-                      [UNKNOWN_NETWORK, devices.filter(d => networkOf(d) === UNKNOWN_NETWORK).length],
+                      [
+                        UNKNOWN_NETWORK,
+                        devices.filter((d) => networkOf(d) === UNKNOWN_NETWORK).length,
+                      ],
                       ...networks.map((n) => [
                         n.id,
                         devices.filter((d) => networkOf(d) === n.id).length,
@@ -523,6 +526,8 @@ function App() {
             )}
             {view === "home" && (
               <HomeTwin
+                onSetupPlan={() => setView("floorplan")}
+                planView={state.floorPlan ? <FloorPlanView embedded onSelectDevice={setSelected} patterns={state.patterns} devices={devices} plan={state.floorPlan} canMeasure demo={state.server.demo} onSave={(plan, expected) => mutate("floor-plan", {plan, expected})} /> : undefined}
                 monitoringHost="este NAS"
                 trafficAvailable={state.server.traffic.available}
                 devices={devices}
@@ -692,6 +697,7 @@ function App() {
             )}
             {view === "floorplan" && (
               <FloorPlanView
+                patterns={state.patterns}
                 devices={devices}
                 plan={state.floorPlan ?? null}
                 canMeasure
