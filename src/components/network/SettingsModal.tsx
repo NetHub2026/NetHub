@@ -4,6 +4,7 @@ import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Bell,
+  Info,
   FolderOpen,
   HardDriveDownload,
   Monitor,
@@ -23,7 +24,7 @@ import {
   scanIntervalOptions,
   type Settings,
 } from "@/lib/settings";
-import { backupDataFile, isDesktop, openDataFolder } from "@/lib/desktop";
+import { APP_VERSION, backupDataFile, getRuntime, isDesktop, openDataFolder, runtimeLabels } from "@/lib/desktop";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -50,6 +51,7 @@ const sections: Array<{ id: SectionId; label: string; icon: React.ReactNode }> =
 /** Panel de preferencias de NetHub, organizado por secciones. */
 export function SettingsModal({ open, settings, onClose, onChange, onReset, directoryManagers }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [section, setSection] = useState<SectionId>("system");
   const [message, setMessage] = useState<string | null>(null);
@@ -65,6 +67,7 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset, dire
   useEffect(() => {
     if (!open) {
       setConfirmOpen(false);
+      setAboutOpen(false);
       setConfirmText("");
       return;
     }
@@ -190,6 +193,9 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset, dire
                   <span>{s.label}</span>
                 </Button>
               ))}
+              <Button variant="ghost" size="sm" onClick={() => setAboutOpen(true)} className="justify-start px-3 py-2 text-muted-foreground sm:mt-auto">
+                <Info className="size-4" /> Acerca de
+              </Button>
             </nav>
 
             <div
@@ -519,6 +525,22 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset, dire
           </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
+      <DialogPrimitive.Root open={aboutOpen && open} onOpenChange={setAboutOpen}>
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="fixed inset-0 z-[60] bg-background/80" />
+          <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-[60] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-card p-6 shadow-xl outline-none">
+            <DialogPrimitive.Title className="text-lg font-semibold">Acerca de NetHub</DialogPrimitive.Title>
+            <DialogPrimitive.Description className="mt-2 text-sm text-muted-foreground">Panel de red doméstica</DialogPrimitive.Description>
+            <div className="mt-4 space-y-2 text-sm">
+              <p>Versión {APP_VERSION}</p>
+              <p className="text-muted-foreground">{runtimeLabels[getRuntime()]}</p>
+              <p className="text-muted-foreground">© 2026 oyogor</p>
+              <a href="mailto:nethub2026@outlook.es" className="block text-brand hover:underline">nethub2026@outlook.es</a>
+            </div>
+            <DialogPrimitive.Close asChild><Button variant="outline" className="mt-6 w-full">Cerrar</Button></DialogPrimitive.Close>
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
       <AlertDialogPrimitive.Root open={confirmOpen && open} onOpenChange={setConfirmOpen}>
         <AlertDialogPrimitive.Portal>
           <AlertDialogPrimitive.Overlay className="fixed inset-0 z-[60] bg-background/80 overscroll-none" />

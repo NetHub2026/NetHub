@@ -54,13 +54,10 @@ import {
   APP_VERSION,
   applyNativeSettings,
   getDbPath,
-  getRuntime,
   nativeScan,
   notifyNative,
   onDesktopScanRequest,
   readLiveTraffic,
-  runtimeLabels,
-  type Runtime,
   type TrafficSample,
 } from "@/lib/desktop";
 import {
@@ -250,7 +247,6 @@ function Dashboard() {
   });
   const [notice, setNotice] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
-  const [runtime, setRuntime] = useState<Runtime>("web");
   const [dbPath, setDbPath] = useState("Almacenamiento del navegador (localStorage)");
   const [updateOpen, setUpdateOpen] = useState(false);
   const [, setCountdown] = useState(120);
@@ -381,7 +377,6 @@ function Dashboard() {
       setSlaSamples(await loadSlaAnywhere());
       if (cancelled) return;
       setMeta(loadScanMeta());
-      setRuntime(getRuntime());
       setDbPath(await getDbPath());
       setHydrated(true);
     })();
@@ -778,7 +773,7 @@ function Dashboard() {
           <div className="min-w-0 flex-1 basis-1/2 sm:basis-auto">
             <h1 className="text-lg font-semibold leading-none">NetHub</h1>
             <p className="mt-1 text-xs text-muted-foreground">
-              Red doméstica · {runtimeLabels[runtime]} · v{APP_VERSION} · © 2026 oyogor
+              v{APP_VERSION}
             </p>
           </div>
           <StatusPill status={status} />
