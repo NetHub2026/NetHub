@@ -9,6 +9,7 @@ describe("Device Identity v1", () => {
     const id = deriveIdentity({ ...base, mac: "00:09:BF:11:22:33" });
     expect(id.adapterVendor).toEqual({ value: "Nintendo Co.,Ltd", confidence: "probable", source: "oui" });
     expect(id.type.value).toBe("console");
+    expect(id.vendor).toEqual({ value: null, confidence: "unknown", source: null });
   });
   it("MAC aleatoria/local no da fabricante", () => {
     expect(classifyMac("DA:A1:19:00:00:01")).toBe("local");
@@ -21,6 +22,7 @@ describe("Device Identity v1", () => {
   });
   it("Intel no implica PC", () => {
     expect(deriveIdentity({ ...base, mac: "3C:97:0E:00:00:01" }).type.value).toBeNull();
+    expect(deriveIdentity({ ...base, mac: "3C:97:0E:00:00:01" }).vendor.value).toBeNull();
   });
   it("hostname informativo", () => {
     const id = deriveIdentity({ ...base, mac: "DA:A1:19:00:00:01", name: "iPhone-de-Usuario" });
@@ -31,12 +33,18 @@ describe("Device Identity v1", () => {
     expect(deriveIdentity({ ...base, mac: "DA:A1:19:00:00:01", name: "Dispositivo 42" }).type.confidence).toBe("unknown");
   });
   it("lo manual prevalece", () => {
-    const id = deriveIdentity({ ...base, mac: "00:09:BF:11:22:33", name: "iPhone", type: "tv", vendor: "LG", manualEdit: true });
+    const id = deriveIdentity({ ...base, mac: "00:09:BF:11:22:33", name: "iPhone", type: "tv", vendor: "LG", manualEdit: true, identityManual: { type: true, vendor: true } });
     expect(id.type).toEqual({ value: "tv", confidence: "confirmed", source: "manual" });
     expect(id.vendor).toEqual({ value: "LG", confidence: "confirmed", source: "manual" });
+    const nameOnly = deriveIdentity({ ...base, mac: "00:09:BF:11:22:33", name: "Salón", type: "tv", vendor: "LG", manualEdit: true });
+    expect(nameOnly.type).toEqual({ value: "tv", confidence: "unknown", source: "legacy" });
+    expect(nameOnly.vendor.value).toBeNull();
+    const typeOnly = deriveIdentity({ ...base, mac: "00:09:BF:11:22:33", type: "tv", vendor: "LG", identityManual: { type: true } });
+    expect(typeOnly.vendor.value).toBeNull();
   });
   it("registro antiguo sin campos nuevos funciona", () => {
-    const old = { name: "Salón", type: "tv", mac: "00:09:BF:00:00:01", vendor: "Fabricante desconocido" } as never;
-    expect(() => deriveIdentity(old)).not.toThrow();
+    const old = { name: "iPhone", type: "tv" as const, mac: "00:09:BF:00:00:01", vendor: "Fabricante desconocido" };
+    expect(deriveIdentity(old).type).toEqual({ value: "tv", confidence: "unknown", source: "legacy" });
+    expect(old.type).toBe("tv");
   });
 });
