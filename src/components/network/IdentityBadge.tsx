@@ -52,26 +52,7 @@ export function ConfidencePill({
         className,
       )}
     >
-      {fact.source === "legacy" ? "Legado / no verificado" : label}
-      {source && fact.source !== "legacy" && <span className="ml-1 opacity-70">· {source}</span>}
-    </span>
-  );
-}
-
-/** Etiqueta compacta para la lista del inventario: solo el tipo y su fiabilidad. */
-export function InventoryIdentityBadge({ device }: { device: Device }) {
-  const id = useIdentity(device);
-  return (
-    <span
-      title={`Tipo: ${id.type.value ? deviceTypeLabels[id.type.value] : "Desconocido"} · ${id.type.source === "legacy" ? sourceLabels.legacy : confidenceLabels[id.type.confidence]}`}
-      className={cn(
-        "shrink-0 rounded-full border px-1.5 text-[10px] leading-4",
-        tone[id.type.confidence],
-      )}
-    >
-      {id.type.source === "legacy"
-        ? "Legado / no verificado"
-        : confidenceLabels[id.type.confidence]}
+      {fact.source === "legacy" ? "Guardado anteriormente · sin verificar" : label}
     </span>
   );
 }
@@ -118,7 +99,9 @@ export function IdentityDetails({ device }: { device: Device }) {
       </dl>
       {macNote && <p className="mt-2 text-[11px] text-muted-foreground">{macNote}</p>}
       <p className="mt-2 text-[10px] text-muted-foreground/70">
-        El OUI identifica al fabricante del adaptador, no la marca del aparato.
+        Las sugerencias automáticas se basan en el nombre, los servicios o el catálogo del adaptador.
+        Los datos guardados anteriormente no se han podido verificar. El fabricante del adaptador
+        puede ser distinto de la marca del aparato.
       </p>
     </div>
   );

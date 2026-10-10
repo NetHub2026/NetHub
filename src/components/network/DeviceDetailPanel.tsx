@@ -308,7 +308,7 @@ export function DeviceDetailPanel({
                 )}
                 {device.trusted && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-success/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-success">
-                    <ShieldCheck className="size-3" /> Confiable
+                    <ShieldCheck className="size-3" /> Conocido
                   </span>
                 )}
               </div>

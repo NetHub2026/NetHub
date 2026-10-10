@@ -131,7 +131,6 @@ import {
 import { UpdateModal } from "@/components/network/UpdateModal";
 import { DeviceTypeIcon } from "@/components/network/DeviceTypeIcon";
 import {
-  InventoryIdentityBadge,
   InventoryIdentityIcon,
   InventoryDeviceBrand,
 } from "@/components/network/IdentityBadge";
@@ -1171,7 +1170,6 @@ function Dashboard() {
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2">
                         <span className="truncate font-medium">{d.name}</span>
-                        <InventoryIdentityBadge device={d} />
                         <span
                           className={cn(
                             "size-1.5 shrink-0 rounded-full",
@@ -1201,9 +1199,6 @@ function Dashboard() {
                       <span className="mt-1.5 flex flex-wrap gap-1.5">
                         {d.isNew && !d.trusted && (
                           <Badge className="bg-warning/15 text-warning">Nuevo</Badge>
-                        )}
-                        {d.trusted && (
-                          <Badge className="bg-success/15 text-success">Confiable</Badge>
                         )}
                         {d.blocked && (
                           <Badge className="bg-destructive/15 text-destructive">Bloqueado</Badge>
