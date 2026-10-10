@@ -33,17 +33,17 @@ export interface DeviceIdentity {
 export type MacKind = "global" | "local" | "multicast" | "invalid";
 
 export const confidenceLabels: Record<IdentityConfidence, string> = {
-  confirmed: "Confirmado",
-  probable: "Probable",
-  unknown: "Desconocido",
+  confirmed: "Indicado por ti",
+  probable: "Sugerido automáticamente",
+  unknown: "Sin verificar",
 };
 
 export const sourceLabels: Record<Exclude<IdentitySource, null>, string> = {
   manual: "Manual",
-  legacy: "Legado / no verificado",
-  oui: "OUI",
-  hostname: "Nombre/hostname",
-  network: "Señales de red",
+  legacy: "Guardado anteriormente",
+  oui: "Catálogo del adaptador",
+  hostname: "Nombre del dispositivo",
+  network: "Servicios detectados",
 };
 
 /* ------------------------------------------------------------------ MAC */
