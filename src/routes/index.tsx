@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   Activity,
-  FileSpreadsheet,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
@@ -107,7 +106,7 @@ import {
   loadEventsAnywhere,
   saveEventsAnywhere,
 } from "@/lib/persistence";
-import { exportInventoryCsv } from "@/lib/backup";
+import { InventoryExport } from "@/components/network/InventoryExport";
 import { ALL_NETWORKS, countByNetwork, detectNetworks, networkOf } from "@/lib/networks";
 import { PerformanceView } from "@/components/network/PerformanceView";
 import { DeviceDetailPanel } from "@/components/network/DeviceDetailPanel";
@@ -962,18 +961,7 @@ function Dashboard() {
                 Modo ausente activo
               </span>
             )}
-            <button
-              onClick={() => {
-                exportInventoryCsv(visible);
-                setNotice(
-                  `Inventario exportado en CSV con ${visible.length} dispositivos, listo para hoja de cálculo.`,
-                );
-              }}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <FileSpreadsheet className="size-3.5" />
-              Exportar selección (CSV)
-            </button>
+            <InventoryExport devices={visible} />
           </div>
         </section>
 

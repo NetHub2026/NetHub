@@ -43,7 +43,7 @@ import { slaCsv } from "../src/lib/sla";
 import { connectionOf, wifiBand } from "../src/lib/connections";
 import type { ServerSnapshot, ServerSettings } from "../server/types";
 import "./style.css";
-import { exportInventoryCsv } from "../src/lib/backup";
+import { InventoryExport } from "../src/components/network/InventoryExport";
 import { commonServices, serviceUrl } from "../src/lib/services";
 
 let csrf = "";
@@ -440,12 +440,7 @@ function App() {
                     <option value="online">Activos</option>
                     <option value="offline">Inactivos</option>
                   </select>
-                  <button
-                    className="rounded-lg border border-border px-3 py-2 text-xs"
-                    onClick={() => exportInventoryCsv(filtered)}
-                  >
-                    Exportar selección (CSV)
-                  </button>
+                  <InventoryExport devices={filtered} />
                 </div>
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>
