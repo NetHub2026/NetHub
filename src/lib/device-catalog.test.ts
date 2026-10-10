@@ -4,6 +4,9 @@ import { deviceTypeGroups, searchDeviceTypes } from "./device-catalog";
 import { deriveIdentity } from "./identity";
 
 describe("Catálogo de dispositivos", () => {
+  it("incluye robot de cocina como tipo genérico del hogar", () => {
+    expect(deviceTypeGroups.find(g => g.types.includes("kitchen-robot"))?.label).toBe("Hogar y domótica");
+  });
   it("incluye cada tipo una sola vez y conserva todos los valores al cargar", () => {
     const types = deviceTypeGroups.flatMap((group) => group.types);
     expect(new Set(types).size).toBe(types.length);
@@ -26,7 +29,7 @@ describe("Catálogo de dispositivos", () => {
     );
     expect(searchDeviceTypes("ventilador").flatMap((group) => group.types)).toEqual(["smart-fan"]);
     expect(searchDeviceTypes("smartwatch").flatMap((group) => group.types)).toEqual(["smartwatch"]);
-    expect(searchDeviceTypes("reloj digital").flatMap((group) => group.types)).toEqual(["clock"]);
+    expect(searchDeviceTypes("reloj").flatMap((group) => group.types)).toContain("clock");
     expect(searchDeviceTypes("frigorifico").flatMap((group) => group.types)).toEqual([
       "smart-fridge",
     ]);

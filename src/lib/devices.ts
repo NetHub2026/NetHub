@@ -18,6 +18,7 @@ export interface Device {
   downstream: number;
   upstream: number;
   tags: string[];
+  connectionSource?: "local" | "manual" | "router" | undefined;
   notes?: string;
   /** Controles locales (simulados, listos para enviar al router/API) */
   blocked?: boolean;
@@ -79,13 +80,14 @@ export const deviceTypeLabels = {
   "barcode-scanner": "Lector de códigos de barras",
   scanner: "Escáner de documentos",
   smartwatch: "Smartwatch / reloj inteligente",
-  clock: "Reloj digital de pared / mesa",
+  clock: "Reloj",
   sensor: "Sensor",
   doorbell: "Timbre inteligente",
   "smart-appliance": "Otro electrodoméstico",
   "smart-fridge": "Frigorífico inteligente",
   "smart-washer": "Lavadora inteligente",
   "robot-vacuum": "Robot aspirador",
+  "kitchen-robot": "Robot de cocina",
   thermostat: "Termostato",
   "air-conditioner": "Aire acondicionado",
   "smart-fan": "Ventilador inteligente",

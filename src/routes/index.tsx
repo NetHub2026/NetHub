@@ -19,7 +19,6 @@ import {
   Sun,
   Users,
   Wifi,
-  WifiOff,
   Waypoints,
   BarChart3,
   Gauge,
@@ -139,6 +138,8 @@ import { InventoryIdentityIcon, InventoryDeviceBrand } from "@/components/networ
 
 import { arrangeInventory } from "@/lib/inventory-view";
 import { InventoryViewControls } from "@/components/network/InventoryViewControls";
+import { InventorySummary } from "@/components/network/InventorySummary";
+import { CONNECTION_TAGS, connectionOf } from "@/lib/connections";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -165,14 +166,8 @@ export const Route = createFileRoute("/")({
 });
 
 /** Etiquetas de conexión: se muestran como icono, no como etiqueta de texto. */
-const WIFI_TAGS = ["Wi-Fi", "Wi-Fi 2.4GHz", "Wi-Fi 5GHz", "Wi-Fi 6"];
+const WIFI_TAGS = CONNECTION_TAGS.filter(t => t !== "Cableado / Ethernet");
 const WIRED_TAG = "Cableado / Ethernet";
-
-function connectionOf(device: Device): "wifi" | "wired" | null {
-  if (device.tags.some((t) => WIFI_TAGS.includes(t))) return "wifi";
-  if (device.tags.includes(WIRED_TAG)) return "wired";
-  return null;
-}
 
 /** Etiquetas visibles: sin las de conexión (ya representadas con su icono). */
 function visibleTags(device: Device): string[] {
@@ -695,7 +690,6 @@ function Dashboard() {
       return next;
     });
 
-  const online = items.filter((d) => d.status === "online");
   const intruders = newDevices(items);
 
   /** Sin inventario y ya cargado el almacenamiento: pantalla de bienvenida. */
@@ -1045,21 +1039,7 @@ function Dashboard() {
 
         {!showEmpty && viewMode === "inventory" && (
           <>
-            <section className="grid gap-4 sm:grid-cols-2">
-              <Stat
-                icon={<Wifi className="size-4" />}
-                label="Dispositivos activos"
-                value={`${online.length}`}
-                hint={`de ${items.length} conocidos`}
-                accent
-              />
-              <Stat
-                icon={<WifiOff className="size-4" />}
-                label="Inactivos"
-                value={`${items.length - online.length}`}
-                hint="sin conexión reciente"
-              />
-            </section>
+            <InventorySummary devices={items} networks={detectedNetworks.length} />
 
             <section className="mt-8">
               <h2 className="text-base font-semibold">Redes detectadas</h2>
@@ -1489,36 +1469,6 @@ function Badge({ children, className }: { children: React.ReactNode; className?:
     >
       {children}
     </span>
-  );
-}
-
-function Stat({
-  icon,
-  label,
-  value,
-  hint,
-  accent,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  hint: string;
-  accent?: boolean;
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-card p-5">
-      <div
-        className={cn(
-          "flex size-8 items-center justify-center rounded-lg",
-          accent ? "bg-brand/15 text-brand" : "bg-muted text-muted-foreground",
-        )}
-      >
-        {icon}
-      </div>
-      <p className="mt-3 text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
-      <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
-    </div>
   );
 }
 

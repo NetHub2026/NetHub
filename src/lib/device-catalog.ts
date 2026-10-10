@@ -47,6 +47,7 @@ export const deviceTypeGroups: Array<{ label: string; types: DeviceType[] }> = [
       "smart-fridge",
       "smart-washer",
       "robot-vacuum",
+      "kitchen-robot",
       "thermostat",
       "air-conditioner",
       "smart-fan",
