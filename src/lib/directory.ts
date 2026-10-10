@@ -36,11 +36,46 @@ export function withEntry(list: string[], value: string): string[] {
 }
 
 /** Completa las listas con las personas y ubicaciones ya usadas en los dispositivos. */
-export function directoryFromDevices(devices: Device[], base: Directory = emptyDirectory): Directory {
+export function directoryFromDevices(
+  devices: Device[],
+  base: Directory = emptyDirectory,
+): Directory {
   return sanitizeDirectory({
     people: [...base.people, ...devices.map((d) => d.person ?? "")],
     locations: [...base.locations, ...devices.map((d) => d.location ?? "")],
   });
+}
+
+export type DirectoryKind = keyof Directory;
+
+/** Rename or remove an entry and its assignments together, including legacy-only entries. */
+export function changeDirectoryEntry(
+  devices: Device[],
+  directory: Directory,
+  kind: DirectoryKind,
+  previous: string,
+  replacement: string,
+) {
+  const field = kind === "people" ? "person" : "location";
+  const matches = (value: string | undefined) =>
+    value?.trim().toLowerCase() === previous.trim().toLowerCase();
+  const name = replacement.trim();
+  const options = directoryFromDevices(devices, directory);
+  if (
+    name &&
+    options[kind].some((value) => !matches(value) && value.toLowerCase() === name.toLowerCase())
+  ) {
+    throw new Error("Ya existe un nombre igual. Elige otro.");
+  }
+  return {
+    directory: {
+      ...options,
+      [kind]: clean([...options[kind].filter((value) => !matches(value)), name]),
+    },
+    devices: devices.map((device) =>
+      matches(device[field]) ? { ...device, [field]: name || undefined } : device,
+    ),
+  };
 }
 
 export function loadStoredDirectory(): Directory {
