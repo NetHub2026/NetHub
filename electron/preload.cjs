@@ -4,7 +4,6 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("nethub", {
   internetProvider: () => ipcRenderer.invoke("nethub:internet-provider"),
-  shutdownPc: (ip) => ipcRenderer.invoke("nethub:shutdown-pc", ip),
   readDevices: () => ipcRenderer.invoke("nethub:read"),
   writeDevices: (json) => ipcRenderer.invoke("nethub:write", json),
   scanNetwork: () => ipcRenderer.invoke("nethub:scan"),

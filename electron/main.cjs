@@ -17,7 +17,6 @@ const { readWindowState, windowSize, mergeWindowState } = require("./window-stat
 const path = require("node:path");
 const { resolveIconPath } = require("./icon-path.cjs");
 const { interfaceConnectionTag, wifiTagForMac } = require("./local-connection.cjs");
-const { shutdownArgs, shutdownError } = require("./remote-power.cjs");
 const fs = require("node:fs");
 const os = require("node:os");
 const http = require("node:http");
@@ -963,22 +962,6 @@ ipcMain.handle("nethub:scan-ports", async (_e, ip, ports, timeout) => {
   return Promise.all(list.map((port) => probeTcpPort(target, port, ms)));
 });
 ipcMain.handle("nethub:wol", (_e, mac) => sendWol(mac));
-ipcMain.handle("nethub:shutdown-pc", (_e, ip) => {
-  if (!isWindows) return { ok: false, error: "El apagado remoto de Windows requiere NetHub en Windows." };
-  const target = lanTarget(ip);
-  const args = target && shutdownArgs(target, activeIPv4Interfaces().map(i => i.address));
-  if (!args) return { ok: false, error: "Solo se permite otro PC de una red privada. Este equipo no se puede apagar desde su ficha." };
-  try {
-    const stored = JSON.parse(readDevices() || "[]");
-    const records = Array.isArray(stored) ? stored : stored.devices;
-    if (!Array.isArray(records) || !records.some(d => d.ip === target && ["pc", "laptop"].includes(d.type))) return { ok: false, error: "El destino debe ser un PC del inventario." };
-  } catch { return { ok: false, error: "No se pudo validar el PC en el inventario." }; }
-  return new Promise(resolve => {
-    execFile("shutdown.exe", args, { timeout: 10_000, windowsHide: true }, (error, stdout, stderr) => {
-      resolve(error ? { ok: false, error: shutdownError(error, stderr, stdout) } : { ok: true });
-    });
-  });
-});
 ipcMain.handle("nethub:traffic", () => readTraffic());
 ipcMain.handle("nethub:check-update", () => checkUpdate());
 ipcMain.handle("nethub:download-and-install", (event) => downloadAndInstall(event.sender));

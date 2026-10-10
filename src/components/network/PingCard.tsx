@@ -4,8 +4,6 @@ import type { Device } from "@/lib/devices";
 import { averageRtt, pingIp, pushSample, type PingResult } from "@/lib/ping";
 import { supportsWol, wakeDevice } from "@/lib/wol";
 import { cn } from "@/lib/utils";
-import { getRuntime, requestPcShutdown } from "@/lib/desktop";
-import { AlertDialog, AlertDialogContent, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 
 interface PingCardProps {
   device: Device;
@@ -24,24 +22,6 @@ export function PingCard({ device, onUpdate }: PingCardProps) {
   const [last, setLast] = useState<PingResult | null>(null);
   const [waking, setWaking] = useState(false);
   const [wolNote, setWolNote] = useState<string | null>(null);
-  const [powerOpen, setPowerOpen] = useState(false);
-  const [powerBusy, setPowerBusy] = useState(false);
-  const [powerNote, setPowerNote] = useState("");
-  const canShutdown = getRuntime() === "electron" && (device.type === "pc" || device.type === "laptop") && !device.tags.includes("Este equipo");
-  const shutdown = async () => {
-    if (powerBusy) return;
-    setPowerBusy(true);
-    setPowerNote("Enviando la solicitud a Windows…");
-    try {
-      const result = await requestPcShutdown(device.ip);
-      setPowerNote(result.ok ? "Windows ha aceptado la solicitud. Comprueba el estado con un nuevo escaneo; la solicitud no confirma que el PC ya esté apagado." : result.error || "No se pudo solicitar el apagado.");
-    } catch {
-      setPowerNote("No se pudo enviar la solicitud. No se ha confirmado el apagado del PC.");
-    } finally {
-      setPowerBusy(false);
-    }
-  };
-
   const history = device.latency ?? [];
   const average = averageRtt(history);
   const max = Math.max(50, ...history.map((s) => s.rtt ?? 0));
@@ -171,8 +151,6 @@ export function PingCard({ device, onUpdate }: PingCardProps) {
           )}
         </div>
       )}
-      {canShutdown && <div className="mt-3 border-t border-border pt-3"><button onClick={() => setPowerOpen(true)} disabled={powerBusy || device.status !== "online"} className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive disabled:opacity-50"><Power className="size-4" />{powerBusy ? "Solicitando…" : "Solicitar apagado de Windows"}</button><p className="mt-2 text-xs text-muted-foreground">Requiere permisos de administración remota ya configurados en ese PC.</p>{powerNote && <p role="status" className="mt-2 text-xs text-muted-foreground">{powerNote}</p>}</div>}
-      <AlertDialog open={powerOpen} onOpenChange={setPowerOpen}><AlertDialogContent className="z-[80]"><AlertDialogTitle>¿Solicitar el apagado de {device.name}?</AlertDialogTitle><AlertDialogDescription>Se enviará una solicitud a {device.ip}. Guarda antes el trabajo en ese PC. Windows puede impedir el apagado si hay aplicaciones abiertas; NetHub no forzará su cierre ni modificará permisos.</AlertDialogDescription>{powerNote && <p role="status" className="rounded-md border border-border bg-muted/40 p-3 text-sm">{powerNote}</p>}<AlertDialogFooter><AlertDialogCancel disabled={powerBusy}>{powerNote ? "Cerrar" : "Cancelar"}</AlertDialogCancel><AlertDialogAction disabled={powerBusy} onClick={(event) => { event.preventDefault(); void shutdown(); }} className="bg-destructive text-destructive-foreground">{powerBusy ? "Solicitando…" : "Solicitar apagado"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </div>
   );
 }
