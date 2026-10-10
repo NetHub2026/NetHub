@@ -11,7 +11,9 @@ const {
   Tray,
   nativeImage,
   shell,
+  screen,
 } = require("electron");
+const { readWindowState, windowSize, mergeWindowState } = require("./window-state.cjs");
 const path = require("node:path");
 const { resolveIconPath } = require("./icon-path.cjs");
 const fs = require("node:fs");
@@ -143,10 +145,13 @@ function readSettings() {
   }
 }
 
-/** Escribe settings.json creándolo si no existe. */
+let savedWindowState = null;
+
+/** Escribe settings.json conservando el tamaño de ventana nativo. */
 function writeSettings(json) {
   try {
-    fs.writeFileSync(settingsPath(), String(json ?? "{}"), "utf8");
+    const state = savedWindowState || readWindowState(readSettings());
+    fs.writeFileSync(settingsPath(), mergeWindowState(String(json ?? "{}"), state), "utf8");
     return { ok: true, path: settingsPath() };
   } catch (error) {
     return { ok: false, error: String(error) };
@@ -1251,11 +1256,10 @@ function createTray() {
 }
 
 function createWindow() {
+  savedWindowState = readWindowState(readSettings());
+  const size = windowSize(savedWindowState, screen.getPrimaryDisplay().workAreaSize);
   const win = new BrowserWindow({
-    width: 1520,
-    height: 920,
-    minWidth: 1024,
-    minHeight: 680,
+    ...size,
     center: true,
     backgroundColor: "#0b1120",
     title: "NetHub",
@@ -1275,6 +1279,22 @@ function createWindow() {
     const image = nativeImage.createFromPath(iconPath("app-icon.png"));
     if (!image.isEmpty()) win.setIcon(image);
   }
+  const rememberWindow = () => {
+    if (win.isDestroyed() || win.isMinimized()) return;
+    const { width, height } = win.getNormalBounds();
+    savedWindowState = { width, height, maximized: win.isMaximized() };
+    writeSettings(readSettings() || "{}");
+  };
+  let resizeTimer;
+  win.on("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(rememberWindow, 400);
+  });
+  win.on("maximize", rememberWindow);
+  win.on("unmaximize", rememberWindow);
+  win.on("close", rememberWindow);
+  win.on("closed", () => clearTimeout(resizeTimer));
+  if (savedWindowState?.maximized) win.maximize();
   // Sin barra de menú (File, Edit, View, Window, Help). En desarrollo
   // se pueden abrir las DevTools con Ctrl+Shift+I.
   win.setMenuBarVisibility(false);

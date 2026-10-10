@@ -140,13 +140,8 @@ import { DirectoryManager } from "@/components/network/DirectoryManager";
 import { DeviceTypeFilter } from "@/components/network/DeviceTypeFilter";
 import { InventoryIdentityIcon, InventoryDeviceBrand } from "@/components/network/IdentityBadge";
 
-import {
-  arrangeInventory,
-  inventorySortLabels,
-  inventoryGroupLabels,
-  type InventorySort,
-  type InventoryGroup,
-} from "@/lib/inventory-view";
+import { arrangeInventory } from "@/lib/inventory-view";
+import { InventoryViewControls } from "@/components/network/InventoryViewControls";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -1152,6 +1147,11 @@ function Dashboard() {
                     </option>
                   </select>
                 </span>
+                <InventoryViewControls
+                  order={settings.inventorySort}
+                  grouping={settings.inventoryGroup}
+                  onChange={updateSettings}
+                />
                 <button
                   onClick={() => setOnlyOnline((v) => !v)}
                   className={cn(
@@ -1165,42 +1165,6 @@ function Dashboard() {
                 </button>
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                  Ordenar por
-                  <select
-                    aria-label="Ordenar inventario"
-                    value={settings.inventorySort}
-                    onChange={(e) =>
-                      updateSettings({ inventorySort: e.target.value as InventorySort })
-                    }
-                    className="rounded-md border border-input bg-background px-3 py-2 text-foreground"
-                  >
-                    {Object.entries(inventorySortLabels).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                  Agrupar por
-                  <select
-                    aria-label="Agrupar inventario"
-                    value={settings.inventoryGroup}
-                    onChange={(e) =>
-                      updateSettings({ inventoryGroup: e.target.value as InventoryGroup })
-                    }
-                    className="rounded-md border border-input bg-background px-3 py-2 text-foreground"
-                  >
-                    {Object.entries(inventoryGroupLabels).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
               {inventoryGroups.map((group) => (
                 <div key={group.key} className="mt-5">
                   {group.label && (
