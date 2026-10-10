@@ -14,3 +14,4 @@
 - Device detail uses a Radix modal with a reversible body lock; focus, Escape and interior scrolling stay isolated from the background.
 - Identity provenance is optional and per field; legacy stored types remain unverified and the shared manualEdit flag never proves which field was edited.
 - Derived apparatus brand never falls back to OUI adapter vendor; this prevents a network card manufacturer being presented as the device brand.
+- Vitest uses a standalone browser-safe configuration rather than the application Vite plugins; domain tests do not initialize SSR or publishing infrastructure.
