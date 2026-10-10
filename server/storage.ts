@@ -245,11 +245,20 @@ export class StateStore {
     this.queue = write.catch(() => {});
     return write;
   }
-  async backup(): Promise<void> {
-    await this.queue;
-    await copyFile(
-      join(this.directory, "server-state.json"),
-      join(this.directory, "server-state.backup.json"),
-    );
+  backup(): Promise<void> {
+    const copy = this.queue.then(async () => {
+      const target = join(this.directory, "server-state.backup.json");
+      const temporary = target + ".tmp";
+      await copyFile(join(this.directory, "server-state.json"), temporary);
+      const file = await open(temporary, "r+");
+      try {
+        await file.sync();
+      } finally {
+        await file.close();
+      }
+      await rename(temporary, target);
+    });
+    this.queue = copy.catch(() => {});
+    return copy;
   }
 }

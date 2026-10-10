@@ -8,7 +8,7 @@ const macPattern = /^[0-9a-f]{2}(?::[0-9a-f]{2}){5}$/i;
 export function privateIp(value: unknown): value is string {
   if (typeof value !== "string") return false;
   const parts = value.split(".");
-  if (parts.length !== 4 || parts.some((p) => !/^\d{1,3}$/.test(p) || Number(p) > 255))
+  if (parts.length !== 4 || parts.some((p) => !/^(0|[1-9]\d{0,2})$/.test(p) || Number(p) > 255))
     return false;
   const [a, b] = parts.map(Number);
   return a === 10 || (a === 192 && b === 168) || (a === 172 && b! >= 16 && b! <= 31);

@@ -39,6 +39,8 @@ describe("Network boundaries", () => {
       "169.254.1.1",
       "192.168.300.1",
       "172.32.0.1",
+      "010.1.1.1",
+      "192.168.000.1",
       "10.1.1.1;whoami",
     ])
       expect(privateIp(ip)).toBe(false);
@@ -54,6 +56,19 @@ describe("Network boundaries", () => {
   });
 });
 describe("Durable continuous monitor", () => {
+  it("serializes concurrent backups and updates without truncating either JSON", async () => {
+    const { monitor, directory } = await fixture();
+    await monitor.scan();
+    await Promise.all([
+      monitor.store.backup(),
+      monitor.store.backup(),
+      monitor.settings({ contractedMbps: 750 }),
+    ]);
+    expect(
+      JSON.parse(await readFile(join(directory, "server-state.backup.json"), "utf8")).devices,
+    ).toHaveLength(3);
+    expect((await monitor.store.load()).settings.contractedMbps).toBe(750);
+  });
   it("imports a Windows JSON with legacy speed history and backs up the previous state", async () => {
     const { monitor, directory } = await fixture();
     await monitor.scan();
