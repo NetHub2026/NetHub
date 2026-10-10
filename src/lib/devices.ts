@@ -1,25 +1,7 @@
 import type { VendorBrand } from "./oui";
 import type { ServiceHit } from "./services";
 
-export type DeviceType =
-  | "pc"
-  | "laptop"
-  | "smartphone"
-  | "tablet"
-  | "tv"
-  | "set-top-box"
-  | "console"
-  | "home-assistant"
-  | "router"
-  | "nas"
-  | "printer"
-  | "camera"
-  | "smart-plug"
-  | "smart-bulb"
-  | "led-strip"
-  | "speaker"
-  | "iot"
-  | "other";
+export type DeviceType = keyof typeof deviceTypeLabels;
 
 export type DeviceStatus = "online" | "offline";
 
@@ -67,7 +49,7 @@ export interface Device {
   location?: string;
 }
 
-export const deviceTypeLabels: Record<DeviceType, string> = {
+export const deviceTypeLabels = {
   pc: "PC de sobremesa",
   laptop: "Portátil",
   smartphone: "Smartphone",
@@ -85,6 +67,62 @@ export const deviceTypeLabels: Record<DeviceType, string> = {
   "led-strip": "Tira LED inteligente",
   speaker: "Altavoz inteligente",
   iot: "IoT / Otros conectados",
+  "streaming-dongle": "Dongle de streaming",
+  "media-player": "Reproductor multimedia",
+  projector: "Proyector",
+  "audio-player": "Reproductor de audio",
+  amplifier: "Amplificador / receptor AV",
+  radio: "Radio conectada",
+  "photo-frame": "Marco de fotos digital",
+  "photo-camera": "Cámara de fotos",
+  "ip-phone": "Teléfono IP",
+  "barcode-scanner": "Lector de códigos de barras",
+  scanner: "Escáner de documentos",
+  smartwatch: "Reloj inteligente",
+  clock: "Reloj conectado",
+  sensor: "Sensor",
+  doorbell: "Timbre inteligente",
+  "smart-appliance": "Electrodoméstico inteligente",
+  "smart-fridge": "Frigorífico inteligente",
+  "smart-washer": "Lavadora inteligente",
+  "robot-vacuum": "Robot aspirador",
+  thermostat: "Termostato",
+  "air-conditioner": "Aire acondicionado",
+  "touch-panel": "Panel táctil",
+  controller: "Controlador domótico",
+  "weather-station": "Estación meteorológica",
+  "solar-panel": "Panel solar / inversor",
+  "smart-lock": "Cerradura inteligente",
+  "baby-monitor": "Vigilabebés",
+  "garage-door": "Puerta de garaje",
+  "voice-assistant": "Asistente de voz",
+  robot: "Robot conectado",
+  switch: "Switch de red",
+  "access-point": "Punto de acceso Wi-Fi",
+  "wifi-extender": "Repetidor Wi-Fi",
+  "mesh-node": "Nodo Wi-Fi mesh",
+  modem: "Módem / ONT",
+  firewall: "Firewall",
+  vpn: "Servidor / equipo VPN",
+  "network-appliance": "Equipo de red",
+  ups: "SAI / UPS",
+  server: "Servidor",
+  "web-server": "Servidor web",
+  "mail-server": "Servidor de correo",
+  "proxy-server": "Servidor proxy",
+  "file-server": "Servidor de archivos",
+  "virtual-machine": "Máquina virtual",
+  "cloud-device": "Equipo / servicio en la nube",
+  "circuit-board": "Placa electrónica",
+  arduino: "Arduino / microcontrolador",
+  "raspberry-pi": "Raspberry Pi / miniordenador",
+  rfid: "Lector / etiqueta RFID",
+  "processing-unit": "Unidad de procesamiento",
+  car: "Vehículo conectado",
+  automotive: "Equipo de automoción",
+  industrial: "Equipo industrial",
+  medical: "Equipo médico",
+  energy: "Equipo de energía",
   other: "Otro",
 };
 
@@ -99,6 +137,6 @@ const legacyTypes: Record<string, DeviceType> = {
 /** Convierte cualquier tipo guardado (incluido uno antiguo) en un tipo válido. */
 export function normalizeDeviceType(value: unknown): DeviceType {
   const raw = String(value ?? "").trim();
-  if (raw in deviceTypeLabels) return raw as DeviceType;
-  return legacyTypes[raw] ?? "other";
+  if (Object.hasOwn(deviceTypeLabels, raw)) return raw as DeviceType;
+  return Object.hasOwn(legacyTypes, raw) ? legacyTypes[raw]! : "other";
 }

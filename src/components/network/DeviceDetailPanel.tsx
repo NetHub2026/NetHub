@@ -18,8 +18,8 @@ import {
   Radar,
 } from "lucide-react";
 import { openExternalUrl } from "@/lib/desktop";
-import { deviceTypeLabels, type Device, type DeviceType } from "@/lib/devices";
-import { DeviceTypeIcon } from "./DeviceTypeIcon";
+import { type Device } from "@/lib/devices";
+import { DeviceTypePicker } from "./DeviceTypePicker";
 import { PingCard } from "./PingCard";
 import { activityLabels, formatDateTime, relativeTime, type ActivityEvent } from "@/lib/activity";
 import { detectNetworkId, type NetworkDef } from "@/lib/networks";
@@ -357,30 +357,12 @@ export function DeviceDetailPanel({
               />
             </label>
             <IdentityDetails device={device} />
-            <label className="block">
-              <span className="text-xs text-muted-foreground">Tipo de dispositivo</span>
-              <span className="mt-1 flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 focus-within:border-brand">
-                <DeviceTypeIcon type={device.type} className="shrink-0 text-brand" />
-                <select
-                  value={device.type}
-                  onChange={(e) =>
-                    onUpdate({
-                      ...device,
-                      type: e.target.value as DeviceType,
-                      manualEdit: true,
-                      identityManual: { ...device.identityManual, type: true },
-                    })
-                  }
-                  className="min-w-0 flex-1 rounded-sm bg-popover text-sm text-popover-foreground outline-none"
-                >
-                  {(Object.keys(deviceTypeLabels) as DeviceType[]).map((t) => (
-                    <option key={t} value={t} className="bg-popover text-popover-foreground">
-                      {deviceTypeLabels[t]}
-                    </option>
-                  ))}
-                </select>
-              </span>
-            </label>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Tipo de dispositivo</p>
+              <DeviceTypePicker value={[device.type]} onChange={([type]) => {
+                if (type) onUpdate({ ...device, type, manualEdit: true, identityManual: { ...device.identityManual, type: true } });
+              }} />
+            </div>
             <label className="block">
               <span className="text-xs text-muted-foreground">Fabricante / marca guardado</span>
               <span className="mt-1 flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 focus-within:border-brand">
