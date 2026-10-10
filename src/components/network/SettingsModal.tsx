@@ -7,6 +7,8 @@ import {
   FolderOpen,
   HardDriveDownload,
   Monitor,
+  MapPin,
+  Users,
   Palette,
   Radar,
   RotateCcw,
@@ -30,20 +32,23 @@ interface Props {
   onClose: () => void;
   onChange: (patch: Partial<Settings>) => void;
   onReset: () => void;
+  directoryManagers: { people: React.ReactNode; locations: React.ReactNode };
 }
 
-type SectionId = "system" | "appearance" | "network" | "alerts" | "data";
+type SectionId = "system" | "appearance" | "network" | "alerts" | "data" | "people" | "locations";
 
 const sections: Array<{ id: SectionId; label: string; icon: React.ReactNode }> = [
   { id: "system", label: "Sistema y arranque", icon: <Monitor className="size-4" /> },
   { id: "appearance", label: "Apariencia", icon: <Palette className="size-4" /> },
   { id: "network", label: "Red y telemetría", icon: <Radar className="size-4" /> },
   { id: "alerts", label: "Alertas y monitorización", icon: <Bell className="size-4" /> },
+  { id: "people", label: "Personas", icon: <Users className="size-4" /> },
+  { id: "locations", label: "Ubicaciones", icon: <MapPin className="size-4" /> },
   { id: "data", label: "Mantenimiento y datos", icon: <Save className="size-4" /> },
 ];
 
 /** Panel de preferencias de NetHub, organizado por secciones. */
-export function SettingsModal({ open, settings, onClose, onChange, onReset }: Props) {
+export function SettingsModal({ open, settings, onClose, onChange, onReset, directoryManagers }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [section, setSection] = useState<SectionId>("system");
@@ -434,6 +439,9 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset }: Pr
                   />
                 </div>
               )}
+
+              {section === "people" && directoryManagers.people}
+              {section === "locations" && directoryManagers.locations}
 
               {section === "data" && (
                 <div className="space-y-5">

@@ -1001,13 +1001,6 @@ function Dashboard() {
           </section>
         )}
 
-        {viewMode === "inventory" && (
-          <div className="mb-5 flex flex-wrap justify-end gap-2">
-            <DirectoryManager kind="people" names={options.people} devices={items} onCreate={createPerson} onChange={(previous, replacement) => manageEntry("people", previous, replacement)} />
-            <DirectoryManager kind="locations" names={options.locations} devices={items} onCreate={createLocation} onChange={(previous, replacement) => manageEntry("locations", previous, replacement)} />
-          </div>
-        )}
-
         {showEmpty && viewMode === "inventory" && (
           <section className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
             <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-brand/15 text-brand">
@@ -1365,6 +1358,10 @@ function Dashboard() {
       <UpdateModal open={updateOpen} onClose={() => setUpdateOpen(false)} />
 
       <SettingsModal
+        directoryManagers={{
+          people: <DirectoryManager kind="people" names={options.people} devices={items} onCreate={createPerson} onChange={(previous, replacement) => manageEntry("people", previous, replacement)} />,
+          locations: <DirectoryManager kind="locations" names={options.locations} devices={items} onCreate={createLocation} onChange={(previous, replacement) => manageEntry("locations", previous, replacement)} />,
+        }}
         open={settingsOpen}
         settings={settings}
         onClose={() => setSettingsOpen(false)}
