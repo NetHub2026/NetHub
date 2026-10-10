@@ -313,7 +313,7 @@ export function DeviceDetailPanel({
                 )}
               </div>
               <DialogPrimitive.Title className="mt-3 flex items-center gap-2 text-2xl font-semibold">
-              <InventoryIdentityIcon device={device} />
+                <InventoryIdentityIcon device={device} />
                 {device.name}
               </DialogPrimitive.Title>
               <p className="font-mono text-sm text-muted-foreground">{device.ip}</p>
