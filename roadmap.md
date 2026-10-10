@@ -1,5 +1,11 @@
 # NetHub — Hoja de ruta
 
+## Correcciones acotadas Device Identity v1 (1.3.2 sin release)
+- [x] Bloqueo reversible del fondo en la ficha, scroll interior y accesibilidad sin romper Configuración.
+- [x] Procedencia por campo: tipo manual explícito, tipo legado sin confirmar y OUI separado de marca; datos antiguos intactos.
+- [x] Ocho tests de identidad pasan; TypeScript y build automáticos OK; lint relevante sin errores (tres advertencias). Navegador verifica rueda sobre fondo/panel, Escape anidado, restauración de posición/foco, desbloqueo, Configuración y pantalla pequeña.
+- Límite: manualEdit antiguo no distingue campos; tipos anteriores se conservan como legado/no verificado. Solo nuevas elecciones explícitas registran procedencia por campo. Validación del archivo portable Windows pendiente del usuario, fuera de este bloque.
+
 ## Pulido UI — primera fase hacia v1.4.0 (sin cambio de versión)
 - [x] Configuración: dimensiones constantes, scroll contenido, bloqueo del fondo, foco y confirmación anidada.
 - [x] Inventario: frecuencia solo en Configuración, sin contador ni banda de éxito; último escaneo simplificado.

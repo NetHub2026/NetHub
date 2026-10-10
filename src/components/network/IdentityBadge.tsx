@@ -11,6 +11,7 @@ import {
   type IdentityFact,
 } from "@/lib/identity";
 import { cn } from "@/lib/utils";
+import { DeviceTypeIcon } from "./DeviceTypeIcon";
 
 /** Carga el catálogo IEEE local tras el primer render y vuelve a pintar al terminar. */
 export function useIdentity(device: Device) {
@@ -32,7 +33,13 @@ const tone = {
   unknown: "border-dashed border-border text-muted-foreground/70",
 } as const;
 
-export function ConfidencePill({ fact, className }: { fact: IdentityFact<unknown>; className?: string }) {
+export function ConfidencePill({
+  fact,
+  className,
+}: {
+  fact: IdentityFact<unknown>;
+  className?: string;
+}) {
   const label = confidenceLabels[fact.confidence];
   const source = fact.source ? sourceLabels[fact.source] : null;
   return (
@@ -44,8 +51,8 @@ export function ConfidencePill({ fact, className }: { fact: IdentityFact<unknown
         className,
       )}
     >
-      {label}
-      {source && <span className="ml-1 opacity-70">· {source}</span>}
+      {fact.source === "legacy" ? "Legado / no verificado" : label}
+      {source && fact.source !== "legacy" && <span className="ml-1 opacity-70">· {source}</span>}
     </span>
   );
 }
@@ -55,12 +62,27 @@ export function InventoryIdentityBadge({ device }: { device: Device }) {
   const id = useIdentity(device);
   return (
     <span
-      title={`Tipo: ${confidenceLabels[id.type.confidence]}${id.type.source ? ` (${sourceLabels[id.type.source]})` : ""}`}
-      className={cn("shrink-0 rounded-full border px-1.5 text-[10px] leading-4", tone[id.type.confidence])}
+      title={`Tipo: ${id.type.value ? deviceTypeLabels[id.type.value] : "Desconocido"} · ${id.type.source === "legacy" ? sourceLabels.legacy : confidenceLabels[id.type.confidence]}`}
+      className={cn(
+        "shrink-0 rounded-full border px-1.5 text-[10px] leading-4",
+        tone[id.type.confidence],
+      )}
     >
-      {confidenceLabels[id.type.confidence]}
+      {id.type.source === "legacy"
+        ? "Legado / no verificado"
+        : confidenceLabels[id.type.confidence]}
     </span>
   );
+}
+
+export function InventoryIdentityIcon({ device }: { device: Device }) {
+  const id = useIdentity(device);
+  return <DeviceTypeIcon type={id.type.value ?? device.type} />;
+}
+
+export function InventoryDeviceBrand({ device }: { device: Device }) {
+  const id = useIdentity(device);
+  return <>{id.vendor.value ? `Marca: ${id.vendor.value}` : "Marca desconocida"}</>;
 }
 
 /** Bloque de la ficha: tipo, marca y adaptador con su procedencia. */
@@ -76,24 +98,26 @@ export function IdentityDetails({ device }: { device: Device }) {
           : null;
   const rows: Array<[string, string, IdentityFact<unknown>]> = [
     ["Tipo", id.type.value ? deviceTypeLabels[id.type.value] : "Desconocido", id.type],
-    ["Marca", id.vendor.value ?? "Desconocido", id.vendor],
-    ["Adaptador de red", id.adapterVendor.value ?? "Desconocido", id.adapterVendor],
+    ["Marca del aparato", id.vendor.value ?? "Desconocido", id.vendor],
+    ["Adaptador (OUI)", id.adapterVendor.value ?? "Desconocido", id.adapterVendor],
   ];
   return (
     <div className="rounded-md border border-border bg-muted/20 p-3">
       <p className="text-xs font-medium text-muted-foreground">Identificación automática</p>
       <dl className="mt-2 space-y-1.5 text-xs">
         {rows.map(([k, v, fact]) => (
-          <div key={k} className="flex items-center gap-2">
-            <dt className="w-28 shrink-0 text-muted-foreground">{k}</dt>
-            <dd className="min-w-0 flex-1 truncate" title={v}>{v}</dd>
+          <div key={k} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1">
+            <dt className="min-w-0 text-muted-foreground">{k}</dt>
             <ConfidencePill fact={fact} />
+            <dd className="col-span-2 min-w-0 break-words" title={v}>
+              {v}
+            </dd>
           </div>
         ))}
       </dl>
       {macNote && <p className="mt-2 text-[11px] text-muted-foreground">{macNote}</p>}
       <p className="mt-2 text-[10px] text-muted-foreground/70">
-        El adaptador es la empresa registrada para la tarjeta de red (catálogo IEEE local); puede no coincidir con la marca del aparato.
+        El OUI identifica al fabricante del adaptador, no la marca del aparato.
       </p>
     </div>
   );

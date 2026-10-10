@@ -13,7 +13,7 @@
 import type { Device, DeviceType } from "./devices";
 
 export type IdentityConfidence = "confirmed" | "probable" | "unknown";
-export type IdentitySource = "manual" | "oui" | "hostname" | "network" | null;
+export type IdentitySource = "manual" | "legacy" | "oui" | "hostname" | "network" | null;
 
 export interface IdentityFact<T> {
   value: T | null;
@@ -40,6 +40,7 @@ export const confidenceLabels: Record<IdentityConfidence, string> = {
 
 export const sourceLabels: Record<Exclude<IdentitySource, null>, string> = {
   manual: "Manual",
+  legacy: "Legado / no verificado",
   oui: "OUI",
   hostname: "Nombre/hostname",
   network: "Señales de red",
@@ -50,7 +51,10 @@ export const sourceLabels: Record<Exclude<IdentitySource, null>, string> = {
 /** Devuelve los 12 dígitos hexadecimales en mayúsculas, o null si no es una MAC válida. */
 export function macHex(mac: string | null | undefined): string | null {
   const raw = String(mac ?? "").trim();
-  if (!/^[0-9a-f]{2}([:-]?[0-9a-f]{2}){5}$/i.test(raw) && !/^[0-9a-f]{4}\.[0-9a-f]{4}\.[0-9a-f]{4}$/i.test(raw))
+  if (
+    !/^[0-9a-f]{2}([:-]?[0-9a-f]{2}){5}$/i.test(raw) &&
+    !/^[0-9a-f]{4}\.[0-9a-f]{4}\.[0-9a-f]{4}$/i.test(raw)
+  )
     return null;
   const hex = raw.replace(/[^0-9a-f]/gi, "").toUpperCase();
   if (hex.length !== 12) return null;
@@ -98,7 +102,12 @@ export interface RawRegistry {
 
 /** Instala un catálogo ya cargado (usado por la carga perezosa y por las pruebas). */
 export function installRegistry(raw: RawRegistry) {
-  registry = { names: raw.names, l: parseBlock(raw["24"]), m: parseBlock(raw["28"]), s: parseBlock(raw["36"]) };
+  registry = {
+    names: raw.names,
+    l: parseBlock(raw["24"]),
+    m: parseBlock(raw["28"]),
+    s: parseBlock(raw["36"]),
+  };
   listeners.forEach((fn) => fn());
 }
 
@@ -132,8 +141,12 @@ export function onRegistryLoaded(fn: () => void): () => void {
 export function ieeeVendor(mac: string | null | undefined): string | null {
   if (!registry) return null;
   if (classifyMac(mac) !== "global") return null;
-  const hex = macHex(mac)!;
-  const hit = registry.s.get(hex.slice(0, 9)) ?? registry.m.get(hex.slice(0, 7)) ?? registry.l.get(hex.slice(0, 6));
+  const hex = macHex(mac);
+  if (!hex) return null;
+  const hit =
+    registry.s.get(hex.slice(0, 9)) ??
+    registry.m.get(hex.slice(0, 7)) ??
+    registry.l.get(hex.slice(0, 6));
   return hit === undefined ? null : (registry.names[hit] ?? null);
 }
 
@@ -149,27 +162,40 @@ export function isGenericName(name: string | null | undefined, vendor?: string |
   if (GENERIC_NAME.test(text)) return true;
   // "Fabricante 42": nombre generado automáticamente a partir del fabricante y la IP.
   const m = text.match(/^(.+)\s\d{1,3}$/);
-  return !!(m?.[1] && vendor && m[1].trim().toLowerCase() === vendor.trim().toLowerCase());
+  const prefix = m?.[1];
+  return Boolean(prefix && vendor && prefix.trim().toLowerCase() === vendor.trim().toLowerCase());
 }
 
 /** Pistas inequívocas o casi en el nombre / hostname. Orden: de más a menos específico. */
 const NAME_TYPE_RULES: Array<[RegExp, DeviceType]> = [
   [/playstation|\bps[345]\b|xbox|nintendo|\bswitch\b|steam.?deck/i, "console"],
   [/home.?assistant|\bhassio\b|\bhass\b/i, "home-assistant"],
-  [/apple.?tv|chromecast|fire.?tv|firestick|shield.?tv|android.?tv.?box|mi.?box|\broku\b|decodificador|tv.?box|set.?top/i, "set-top-box"],
+  [
+    /apple.?tv|chromecast|fire.?tv|firestick|shield.?tv|android.?tv.?box|mi.?box|\broku\b|decodificador|tv.?box|set.?top/i,
+    "set-top-box",
+  ],
   [/bravia|webos|tizen|smart.?tv|\b(lg|samsung|philips|tcl|hisense).?tv\b|televisi/i, "tv"],
   [/\bipad\b|galaxy.?tab|\btablet\b|matepad|mediapad/i, "tablet"],
   [/iphone|\bpixel\b|galaxy.?[saz]\d|redmi.?note|smartphone|m[oó]vil/i, "smartphone"],
-  [/macbook|thinkpad|ideapad|vivobook|zenbook|latitude|inspiron|laptop|port[aá]til|notebook/i, "laptop"],
+  [
+    /macbook|thinkpad|ideapad|vivobook|zenbook|latitude|inspiron|laptop|port[aá]til|notebook/i,
+    "laptop",
+  ],
   [/\bimac\b|mac.?mini|mac.?studio|desktop|sobremesa|\bpc\b/i, "pc"],
   [/synology|diskstation|qnap|truenas|unraid|\bnas\b/i, "nas"],
-  [/laserjet|officejet|deskjet|envy.?\d|printer|impresora|\bepson\b|\bbrother\b|canon.?(mg|ts|ix|mf)/i, "printer"],
+  [
+    /laserjet|officejet|deskjet|envy.?\d|printer|impresora|\bepson\b|\bbrother\b|canon.?(mg|ts|ix|mf)/i,
+    "printer",
+  ],
   [/\bcam(era)?\b|c[aá]mara|reolink|hikvision|dahua|doorbell|timbre|tapo.?c\d/i, "camera"],
   [/\becho\b|alexa|homepod|sonos|nest.?(mini|audio)|altavoz|speaker/i, "speaker"],
   [/smart.?plug|enchufe|tapo.?p1\d\d|\bhs1\d\d\b|\bkp1\d\d\b|sonoff|shelly.?plug/i, "smart-plug"],
   [/\bbulb\b|bombilla|\bhue\b|yeelight|lifx|tradfri|wiz/i, "smart-bulb"],
   [/led.?strip|tira.?led|lightstrip|govee|nanoleaf/i, "led-strip"],
-  [/router|\bhgu\b|fritz.?box|livebox|repetidor|extender|access.?point|unifi|openwrt|deco.?[mx]\d/i, "router"],
+  [
+    /router|\bhgu\b|fritz.?box|livebox|repetidor|extender|access.?point|unifi|openwrt|deco.?[mx]\d/i,
+    "router",
+  ],
 ];
 
 /** Marca del aparato deducible del nombre (no del adaptador). */
@@ -199,7 +225,10 @@ const ADAPTER_TYPE_RULES: Array<[RegExp, DeviceType]> = [
   [/seiko epson|brother industries|canon inc/i, "printer"],
   [/sonos/i, "speaker"],
   [/roku/i, "set-top-box"],
-  [/sagemcom|sercomm|arcadyan|mitrastar|askey|comtrend|zyxel|technicolor|avm gmbh|ubiquiti/i, "router"],
+  [
+    /sagemcom|sercomm|arcadyan|mitrastar|askey|comtrend|zyxel|technicolor|avm gmbh|ubiquiti/i,
+    "router",
+  ],
 ];
 
 /** Servicios que identifican el tipo con bastante seguridad. */
@@ -216,10 +245,15 @@ function typeFromServices(device: Pick<Device, "services">): DeviceType | null {
 
 function isMeaningfulVendor(v: string | null | undefined): v is string {
   const text = String(v ?? "").trim();
-  return text.length > 0 && !/^(fabricante desconocido|mac privada|desconocido|unknown)/i.test(text);
+  return (
+    text.length > 0 && !/^(fabricante desconocido|mac privada|desconocido|unknown)/i.test(text)
+  );
 }
 
-export type IdentityInput = Pick<Device, "name" | "type" | "mac" | "vendor" | "manualEdit" | "services">;
+export type IdentityInput = Pick<
+  Device,
+  "name" | "type" | "mac" | "vendor" | "manualEdit" | "identityManual" | "services"
+>;
 
 /**
  * Calcula la identidad de un dispositivo. `adapterName` permite pasar el
@@ -237,23 +271,25 @@ export function deriveIdentity(device: IdentityInput, adapterName?: string | nul
 
   // Marca del aparato
   let vendor: IdentityFact<string> = { value: null, confidence: "unknown", source: null };
-  if (device.manualEdit && isMeaningfulVendor(device.vendor)) {
+  if (device.identityManual?.vendor && isMeaningfulVendor(device.vendor)) {
     vendor = { value: device.vendor.trim(), confidence: "confirmed", source: "manual" };
   } else {
     const byName = name ? NAME_BRAND_RULES.find(([re]) => re.test(name))?.[1] : undefined;
     if (byName) vendor = { value: byName, confidence: "probable", source: "hostname" };
-    else if (adapterVendor.value) vendor = { ...adapterVendor };
   }
 
   // Tipo
   let type: IdentityFact<DeviceType> = { value: null, confidence: "unknown", source: null };
-  if (device.manualEdit) {
+  if (device.identityManual?.type) {
     type = { value: device.type, confidence: "confirmed", source: "manual" };
+  } else if (device.type && device.type !== "other") {
+    type = { value: device.type, confidence: "unknown", source: "legacy" };
   } else {
     const byName = name ? NAME_TYPE_RULES.find(([re]) => re.test(name))?.[1] : undefined;
     const byNet = typeFromServices(device);
-    const byAdapter = adapterVendor.value
-      ? ADAPTER_TYPE_RULES.find(([re]) => re.test(adapterVendor.value!))?.[1]
+    const adapterValue = adapterVendor.value;
+    const byAdapter = adapterValue
+      ? ADAPTER_TYPE_RULES.find(([re]) => re.test(adapterValue))?.[1]
       : undefined;
     if (byName) type = { value: byName, confidence: "probable", source: "hostname" };
     else if (byNet) type = { value: byNet, confidence: "probable", source: "network" };
@@ -265,5 +301,7 @@ export function deriveIdentity(device: IdentityInput, adapterName?: string | nul
 
 /** Tipo sugerido para un dispositivo recién detectado, o null si no hay pistas. */
 export function inferType(device: IdentityInput, adapterName?: string | null): DeviceType | null {
-  return deriveIdentity({ ...device, manualEdit: false }, adapterName).type.value;
+  const automatic = { ...device, manualEdit: false };
+  delete automatic.identityManual;
+  return deriveIdentity(automatic, adapterName).type.value;
 }
