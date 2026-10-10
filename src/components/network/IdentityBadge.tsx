@@ -33,7 +33,13 @@ const tone = {
   unknown: "border-dashed border-border text-muted-foreground/70",
 } as const;
 
-export function ConfidencePill({ fact, className }: { fact: IdentityFact<unknown>; className?: string }) {
+export function ConfidencePill({
+  fact,
+  className,
+}: {
+  fact: IdentityFact<unknown>;
+  className?: string;
+}) {
   const label = confidenceLabels[fact.confidence];
   const source = fact.source ? sourceLabels[fact.source] : null;
   return (
@@ -57,9 +63,14 @@ export function InventoryIdentityBadge({ device }: { device: Device }) {
   return (
     <span
       title={`Tipo: ${id.type.value ? deviceTypeLabels[id.type.value] : "Desconocido"} · ${id.type.source === "legacy" ? sourceLabels.legacy : confidenceLabels[id.type.confidence]}`}
-      className={cn("shrink-0 rounded-full border px-1.5 text-[10px] leading-4", tone[id.type.confidence])}
+      className={cn(
+        "shrink-0 rounded-full border px-1.5 text-[10px] leading-4",
+        tone[id.type.confidence],
+      )}
     >
-      {id.type.source === "legacy" ? "Legado / no verificado" : confidenceLabels[id.type.confidence]}
+      {id.type.source === "legacy"
+        ? "Legado / no verificado"
+        : confidenceLabels[id.type.confidence]}
     </span>
   );
 }
@@ -97,7 +108,9 @@ export function IdentityDetails({ device }: { device: Device }) {
         {rows.map(([k, v, fact]) => (
           <div key={k} className="flex items-center gap-2">
             <dt className="w-28 shrink-0 text-muted-foreground">{k}</dt>
-            <dd className="min-w-0 flex-1 truncate" title={v}>{v}</dd>
+            <dd className="min-w-0 flex-1 truncate" title={v}>
+              {v}
+            </dd>
             <ConfidencePill fact={fact} />
           </div>
         ))}

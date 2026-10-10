@@ -131,7 +131,11 @@ import {
 import { SpeedTestPanel } from "@/components/network/SpeedTestPanel";
 import { UpdateModal } from "@/components/network/UpdateModal";
 import { DeviceTypeIcon } from "@/components/network/DeviceTypeIcon";
-import { InventoryIdentityBadge, InventoryIdentityIcon, InventoryDeviceBrand } from "@/components/network/IdentityBadge";
+import {
+  InventoryIdentityBadge,
+  InventoryIdentityIcon,
+  InventoryDeviceBrand,
+} from "@/components/network/IdentityBadge";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";

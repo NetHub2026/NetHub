@@ -17,7 +17,11 @@ export function useDocumentScrollLock(open: boolean) {
     const overscroll = documentElement.style.overscrollBehavior;
     const behavior = documentElement.style.scrollBehavior;
     Object.assign(body.style, {
-      position: "fixed", top: `-${y}px`, left: `-${x}px`, width: "100%", overflow: "hidden",
+      position: "fixed",
+      top: `-${y}px`,
+      left: `-${x}px`,
+      width: "100%",
+      overflow: "hidden",
     });
     documentElement.style.overscrollBehavior = "none";
     return () => {
