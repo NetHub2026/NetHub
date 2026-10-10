@@ -78,6 +78,18 @@ jobs:
       - name: Construir ejecutable portable
         run: npm run build:portable
 
+      - name: Comprobar iconos empaquetados de Windows
+        shell: pwsh
+        run: |
+          foreach ($name in @("favicon.ico", "app-icon.png")) {
+            $source = Join-Path "public" $name
+            $packed = Join-Path "dist-electron/win-unpacked/resources/icons" $name
+            if (-not (Test-Path -LiteralPath $packed)) { throw "Falta el icono empaquetado: $name" }
+            if ((Get-FileHash -LiteralPath $source).Hash -ne (Get-FileHash -LiteralPath $packed).Hash) {
+              throw "El icono empaquetado no coincide: $name"
+            }
+          }
+
       - name: Renombrar ejecutable a NetHub.exe
         shell: pwsh
         run: |
