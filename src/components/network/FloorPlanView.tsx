@@ -56,6 +56,8 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
   const [draft, setDraft] = useState(plan);
   const [busy, setBusy] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [planHeight, setPlanHeight] = useState(400);
+  const viewport = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<"devices" | "measure" | "rooms">("devices");
   const [deviceId, setDeviceId] = useState("");
   const [roomName, setRoomName] = useState("");
@@ -76,6 +78,16 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
   }, [plan?.updatedAt, busy]);
   useEffect(() => () => abort.current?.abort(), []);
   useEffect(() => setZoom(1), [plan?.image]);
+  useEffect(() => {
+    const fit = () => {
+      const top = viewport.current?.getBoundingClientRect().top;
+      if (top !== undefined)
+        setPlanHeight(Math.max(180, window.innerHeight - Math.max(0, top) - 16));
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [draft?.image, mode, editingRoom, corners.length > 0]);
 
   async function save(next: FloorPlan | null) {
     if (busy) return false;
@@ -339,21 +351,23 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
                 ["rooms", "Habitaciones", Square],
                 ["measure", "Medir cobertura", Radio],
               ] as const
-            ).map(([key, label, Icon]) => (
-              <button
-                key={key}
-                disabled={busy}
-                className={`${control} ${mode === key ? "border-primary text-primary" : ""}`}
-                onClick={() => {
-                  setMode(key);
-                  setCorners([]);
-                  setEditingRoom(null);
-                }}
-              >
-                <Icon className="mr-1 inline size-4" />
-                {label}
-              </button>
-            ))}
+            )
+              .filter(([key]) => key !== "measure" || canMeasure)
+              .map(([key, label, Icon]) => (
+                <button
+                  key={key}
+                  disabled={busy}
+                  className={`${control} ${mode === key ? "border-primary text-primary" : ""}`}
+                  onClick={() => {
+                    setMode(key);
+                    setCorners([]);
+                    setEditingRoom(null);
+                  }}
+                >
+                  <Icon className="mr-1 inline size-4" />
+                  {label}
+                </button>
+              ))}
             {mode === "devices" && (
               <select
                 aria-label="Equipo que colocar"
@@ -423,9 +437,10 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
           </div>
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
             <div
-              className="self-start overflow-auto rounded-2xl border border-border bg-white"
+              ref={viewport}
+              className="self-start overflow-auto rounded-2xl border border-border bg-background"
               aria-label="Área desplazable del plano"
-              style={{ maxHeight: "max(240px, 100dvh - 350px)" }}
+              style={{ maxHeight: planHeight }}
             >
               <div
                 ref={surface}
@@ -433,7 +448,7 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
                 style={{
                   aspectRatio: `${draft.width}/${draft.height}`,
                   width: `${zoom * 100}%`,
-                  maxWidth: `calc(max(240px, 100dvh - 350px) * ${(draft.width / draft.height) * zoom})`,
+                  maxWidth: `${(planHeight - 4) * (draft.width / draft.height) * zoom}px`,
                   margin: zoom === 1 ? "0 auto" : "0",
                   backgroundImage: `url(${draft.image})`,
                   backgroundSize: "100% 100%",
@@ -564,6 +579,7 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
                     style={{ left: `${m.x}%`, top: `${m.y}%`, backgroundColor: pointColor(m) }}
                     title={`${m.label} · ${m.session}: ${m.downloadMbps.toFixed(1)} Mbps / ${m.latencyMs.toFixed(1)} ms`}
                     onClick={() => {
+                      if (!canMeasure) return;
                       setPosition({ x: m.x, y: m.y });
                       setMode("measure");
                     }}
@@ -641,9 +657,14 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
                       ? "Elige un equipo y toca el plano para colocarlo. Arrastra su icono para moverlo."
                       : "Escribe el nombre y toca cada esquina. Cierra con el primer punto o «Cerrar habitación». Para corregir una habitación, pulsa «Editar» y arrastra sus esquinas."}
                   </p>
+                  {!canMeasure && (
+                    <p className="rounded-lg bg-primary/10 p-3 text-sm">
+                      Para medir la cobertura, abre la dirección de NetHub en el NAS desde el
+                      navegador del móvil. En PC puedes preparar el plano y colocar los equipos.
+                    </p>
+                  )}
                   <p className="text-sm text-muted-foreground">
-                    {draft.measurements.length} mediciones guardadas. Abre «Medir cobertura» para
-                    medir y comparar visitas.
+                    {draft.measurements.length} mediciones guardadas. {canMeasure ? "Abre «Medir cobertura» para medir y comparar visitas." : "Las mediciones se realizan desde el navegador conectado al NAS."}
                   </p>
                 </>
               )}
