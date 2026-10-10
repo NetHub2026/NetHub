@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   Activity,
-  ArrowDownUp,
   FileSpreadsheet,
   ShieldAlert,
   ShieldCheck,
@@ -105,7 +104,7 @@ import {
 } from "@/lib/persistence";
 import { exportInventoryCsv } from "@/lib/backup";
 import { ALL_NETWORKS, countByNetwork, detectNetworks, networkOf } from "@/lib/networks";
-import { BandwidthChart } from "@/components/network/BandwidthChart";
+import { PerformanceModal } from "@/components/network/PerformanceModal";
 import { DeviceDetailPanel } from "@/components/network/DeviceDetailPanel";
 import { NetworkTabs } from "@/components/network/NetworkTabs";
 import { NetworkTopology } from "@/components/network/NetworkTopology";
@@ -128,7 +127,7 @@ import {
   loadHealthAnywhere,
   saveHealthAnywhere,
 } from "@/lib/persistence";
-import { SpeedTestPanel } from "@/components/network/SpeedTestPanel";
+
 import { UpdateModal } from "@/components/network/UpdateModal";
 import { DeviceTypeIcon } from "@/components/network/DeviceTypeIcon";
 import {
@@ -248,6 +247,8 @@ function Dashboard() {
   const [runtime, setRuntime] = useState<Runtime>("web");
   const [dbPath, setDbPath] = useState("Almacenamiento del navegador (localStorage)");
   const [updateOpen, setUpdateOpen] = useState(false);
+  const [performanceOpen, setPerformanceOpen] = useState(false);
+  const performanceTriggerRef = useRef<HTMLButtonElement>(null);
   const [, setCountdown] = useState(120);
   const [autoScanning, setAutoScanning] = useState(false);
   /** Evita escaneos solapados (manual + automático). */
@@ -697,11 +698,6 @@ function Dashboard() {
 
   const online = items.filter((d) => d.status === "online");
   const intruders = newDevices(items);
-  /** Uso del enlace: descarga real medida sobre la velocidad contratada. */
-  const linkUsage = Math.min(
-    100,
-    Math.round((traffic.rxMbps / Math.max(1, settings.linkSpeedMbps)) * 100),
-  );
 
   /** Sin inventario y ya cargado el almacenamiento: pantalla de bienvenida. */
   const showEmpty = hydrated && items.length === 0;
@@ -762,6 +758,14 @@ function Dashboard() {
             </p>
           </div>
           <StatusPill status={status} />
+          <button
+            ref={performanceTriggerRef}
+            onClick={() => setPerformanceOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Gauge className="size-4" />
+            Rendimiento
+          </button>
           <button
             onClick={() => setUpdateOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -1017,7 +1021,7 @@ function Dashboard() {
 
         {!showEmpty && viewMode === "inventory" && (
           <>
-            <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <section className="grid gap-4 sm:grid-cols-2">
               <Stat
                 icon={<Wifi className="size-4" />}
                 label="Dispositivos activos"
@@ -1031,37 +1035,9 @@ function Dashboard() {
                 value={`${items.length - online.length}`}
                 hint="sin conexión reciente"
               />
-              <Stat
-                icon={<ArrowDownUp className="size-4" />}
-                label="Descarga total"
-                value={`${traffic.rxMbps.toFixed(1)} Mbps`}
-                hint={`subida ${traffic.txMbps.toFixed(1)} Mbps · en tiempo real`}
-              />
-              <Stat
-                icon={<Activity className="size-4" />}
-                label="Uso del enlace"
-                value={`${linkUsage}%`}
-                hint={`sobre ${settings.linkSpeedMbps} Mbps contratados`}
-              />
             </section>
 
-            <section className="mt-6 rounded-2xl border border-border bg-card p-6">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h2 className="text-base font-semibold">Tráfico en tiempo real (últimos 60 s)</h2>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">
-                  <span className="relative flex size-2">
-                    <span className="absolute inline-flex size-2 animate-ping rounded-full bg-emerald-500 opacity-75" />
-                    <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
-                  </span>
-                  En vivo
-                </span>
-              </div>
-              <BandwidthChart />
-            </section>
-
-            <SpeedTestPanel />
-
-            <section className="mt-8">
+<section className="mt-8">
               <h2 className="text-base font-semibold">Redes detectadas</h2>
               <p className="mt-1 text-xs text-muted-foreground">
                 Las subredes se detectan solas a partir de las IP encontradas; puedes cambiar la red
@@ -1386,6 +1362,7 @@ function Dashboard() {
         onCreateLocation={createLocation}
       />
 
+      <PerformanceModal open={performanceOpen} onClose={() => setPerformanceOpen(false)} traffic={traffic} linkSpeedMbps={settings.linkSpeedMbps} triggerRef={performanceTriggerRef} />
       <UpdateModal open={updateOpen} onClose={() => setUpdateOpen(false)} />
 
       <SettingsModal
