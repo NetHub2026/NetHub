@@ -21,4 +21,17 @@ function resolveIconPath(file, { resourcesPath, appPath, electronDir }) {
   return path.join(electronDir, "..", "public", file);
 }
 
-module.exports = { resolveIconPath };
+/** Windows reads taskbar metadata after the portable payload may have disappeared. */
+function persistentTaskbarIcon(source, cacheDir) {
+  try {
+    const bytes = fs.readFileSync(source);
+    const digest = require("node:crypto").createHash("sha256").update(bytes).digest("hex").slice(0,16);
+    fs.mkdirSync(cacheDir, { recursive: true });
+    const target = path.join(cacheDir, `nethub-${digest}${path.extname(source)}`);
+    if (!fs.existsSync(target) || !fs.readFileSync(target).equals(bytes)) fs.writeFileSync(target, bytes);
+    return target;
+  } catch {
+    return source;
+  }
+}
+module.exports = { resolveIconPath, persistentTaskbarIcon };

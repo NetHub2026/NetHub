@@ -1,10 +1,10 @@
 import { afterEach, expect, it } from "vitest";
 import { createRequire } from "node:module";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const { resolveIconPath } = createRequire(import.meta.url)("../../electron/icon-path.cjs");
+const { resolveIconPath, persistentTaskbarIcon } = createRequire(import.meta.url)("../../electron/icon-path.cjs");
 const roots: string[] = [];
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
@@ -33,4 +33,19 @@ it("uses public icons in development without a packaged resources folder", () =>
   expect(
     resolveIconPath("favicon.ico", { appPath: root, electronDir: join(root, "electron") }),
   ).toBe(join(root, "public", "favicon.ico"));
+});
+
+
+it("keeps taskbar icons outside the temporary payload and refreshes changed assets", () => {
+  const root = mkdtempSync(join(tmpdir(), "nethub-icon-")); roots.push(root);
+  const payload=join(root,"payload"), cache=join(root,"persistent");
+  mkdirSync(payload); const source=join(payload,"favicon.ico");
+  writeFileSync(source,"icon-v1"); const first=persistentTaskbarIcon(source,cache);
+  expect(first.startsWith(cache)).toBe(true);
+  expect(persistentTaskbarIcon(source,cache)).toBe(first);
+  writeFileSync(source,"icon-v2"); const second=persistentTaskbarIcon(source,cache);
+  expect(second).not.toBe(first);
+  rmSync(payload,{recursive:true,force:true});
+  expect(readFileSync(first,"utf8")).toBe("icon-v1");
+  expect(readFileSync(second,"utf8")).toBe("icon-v2");
 });

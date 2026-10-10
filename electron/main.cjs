@@ -18,7 +18,7 @@ const {
 } = require("electron");
 const { readWindowState, windowSize, mergeWindowState } = require("./window-state.cjs");
 const path = require("node:path");
-const { resolveIconPath } = require("./icon-path.cjs");
+const { resolveIconPath, persistentTaskbarIcon } = require("./icon-path.cjs");
 const { createTrafficSampler } = require("./traffic-sampler.cjs");
 const { interfaceConnectionTag, wifiTagForMac } = require("./local-connection.cjs");
 const fs = require("node:fs");
@@ -1278,7 +1278,7 @@ function createWindow() {
     const relaunchExe = portableExe || (app.isPackaged ? process.execPath : "");
     win.setAppDetails({
       appId: WINDOWS_APP_ID,
-      appIconPath: relaunchExe || iconPath("favicon.ico"),
+      appIconPath: persistentTaskbarIcon(iconPath("favicon.ico"), path.join(app.getPath("userData"), "taskbar-icons")),
       appIconIndex: 0,
       ...(relaunchExe
         ? { relaunchCommand: `"${relaunchExe}"`, relaunchDisplayName: "NetHub" }
