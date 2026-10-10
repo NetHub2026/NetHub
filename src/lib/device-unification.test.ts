@@ -29,3 +29,14 @@ describe("Manual device unification", () => {
     expect(mergeScan(unifyDevices(records(), a!.id, b!.id), [])[0]?.status).toBe("offline");
   });
 });
+
+it("conserva los campos elegidos, su procedencia y la posición tras escanear", () => {
+  const [a, b] = records();
+  Object.assign(a!, { vendor: "Marca A", identityManual: { vendor: true }, location: "Zona A" });
+  Object.assign(b!, { vendor: "Marca B", person: "Persona de ejemplo", location: "Zona B", roomPosition: { room: "Zona B", x: 60, y: 70 } });
+  const merged = unifyDevices([a!, b!], a!.id, b!.id, { vendor: "other", location: "other", person: "other" });
+  const scanned = mergeScan(JSON.parse(JSON.stringify(merged)), [b!]);
+  expect(scanned[0]).toMatchObject({ name: a!.name, vendor: "Marca B", location: "Zona B", person: "Persona de ejemplo", roomPosition: { room: "Zona B", x: 60, y: 70 } });
+  expect(scanned[0]?.identityManual?.vendor).not.toBe(true);
+  expect(separateDevice(merged, a!.id)).toEqual([a, b]);
+});

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Brain,
@@ -23,15 +23,12 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import { Button } from "@/components/ui/button";
 import { useDocumentScrollLock } from "@/hooks/use-document-scroll-lock";
 import { cn } from "@/lib/utils";
-
 const UNASSIGNED = "Sin ubicar";
-
 function hash(s: string) {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
   return Math.abs(h);
 }
-
 function timeAgo(iso: string) {
   const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
   if (m < 1) return "ahora";
@@ -40,28 +37,31 @@ function timeAgo(iso: string) {
   if (h < 24) return `hace ${h} h`;
   return new Date(iso).toLocaleDateString("es-ES", { day: "numeric", month: "short" });
 }
-
 const kindLabel: Record<Anomaly["kind"], { label: string; icon: typeof Moon }> = {
   unusual_online: { label: "Conexión fuera de rutina", icon: Moon },
   unusual_offline: { label: "Ausencia inesperada", icon: AlertTriangle },
   traffic_spike: { label: "Pico de tráfico anómalo", icon: Zap },
 };
-
 export function HomeTwin({
   devices,
   patterns,
   rxMbps,
   onSelectDevice,
+  onUpdateDevice,
   onReviewAnomaly,
   onOpenPerformance,
 }: {
   devices: Device[];
+  onUpdateDevice?: (device: Device) => void;
   patterns: PatternState;
   rxMbps: number;
   onSelectDevice: (id: string) => void;
   onReviewAnomaly: (id: string, reviewed: boolean) => void;
   onOpenPerformance: () => void;
 }) {
+  const [placing, setPlacing] = useState(false);
+  const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
+  const dragging = useRef<string | null>(null);
   const [selectedAnomalyId, setSelectedAnomalyId] = useState<string | null>(null);
   const [anomalyFilter, setAnomalyFilter] = useState<"pending" | "reviewed" | "all">("pending");
   const selectedAnomaly = patterns.anomalies.find((a) => a.id === selectedAnomalyId);
@@ -88,7 +88,6 @@ export function HomeTwin({
         .map((a) => a.deviceId),
     );
   }, [patterns.anomalies]);
-
   const rooms = useMemo(() => {
     const map = new Map<string, Device[]>();
     for (const d of devices) {
@@ -101,10 +100,8 @@ export function HomeTwin({
       return b[1].length - a[1].length;
     });
   }, [devices]);
-
   const online = devices.filter((d) => d.status === "online").length;
   const pulse = Math.min(1, rxMbps / 200);
-
   return (
     <>
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
@@ -130,6 +127,7 @@ export function HomeTwin({
               </div>
             </div>
             <div className="flex items-center gap-3 text-xs">
+              <Button variant="outline" size="sm" disabled={!onUpdateDevice} onClick={() => setPlacing(!placing)}>{placing ? "Terminar" : "Colocar dispositivos"}</Button>
               <Clock className="size-3.5 text-muted-foreground" />
               <input
                 type="range"
@@ -155,7 +153,6 @@ export function HomeTwin({
               )}
             </div>
           </header>
-
           {devices.length === 0 ? (
             <p className="p-10 text-center text-sm text-muted-foreground">
               Escanea la red para dibujar tu casa.
@@ -191,8 +188,10 @@ export function HomeTwin({
                     </div>
                     {list.map((d) => {
                       const h = hash(d.id);
-                      const x = 12 + (h % 76);
-                      const y = 24 + ((h >> 8) % 62);
+                      const saved = d.roomPosition?.room === room && Number.isFinite(d.roomPosition.x) && Number.isFinite(d.roomPosition.y) ? { x: Math.max(12, Math.min(88, d.roomPosition.x)), y: Math.max(24, Math.min(86, d.roomPosition.y)) } : undefined;
+                      const position = positions[d.id] ?? saved;
+                      const x = position?.x ?? 12 + (h % 76);
+                      const y = position?.y ?? 24 + ((h >>> 8) % 62);
                       const prob = viewingPast
                         ? (onlineProbability(patterns, d.id, hour!) ?? 0)
                         : null;
@@ -204,9 +203,29 @@ export function HomeTwin({
                         <button
                           key={d.id}
                           type="button"
-                          onClick={() => onSelectDevice(d.id)}
+                          aria-label={placing ? `Colocar ${d.name}` : d.name}
+                          onClick={() => { if (!placing) onSelectDevice(d.id); }}
+                          onPointerDown={e => { if (!placing) return; e.preventDefault(); dragging.current = d.id; e.currentTarget.setPointerCapture(e.pointerId); }}
+                          onPointerMove={e => {
+                            if (dragging.current !== d.id) return;
+                            const rect = e.currentTarget.parentElement!.getBoundingClientRect();
+                            setPositions(prev => ({ ...prev, [d.id]: { x: Math.max(12, Math.min(88, (e.clientX - rect.left) / rect.width * 100)), y: Math.max(24, Math.min(86, (e.clientY - rect.top) / rect.height * 100)) } }));
+                          }}
+                          onPointerUp={() => {
+                            if (dragging.current !== d.id) return;
+                            dragging.current = null;
+                            const position = positions[d.id];
+                            if (position) onUpdateDevice?.({ ...d, roomPosition: { room, ...position } });
+                            setPositions(prev => { const next = { ...prev }; delete next[d.id]; return next; });
+                          }}
+                          onPointerCancel={() => { dragging.current = null; setPositions({}); }}
+                          onKeyDown={e => {
+                            if (!placing || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+                            e.preventDefault();
+                            onUpdateDevice?.({ ...d, roomPosition: { room, x: Math.max(12, Math.min(88, x + (e.key === "ArrowRight" ? 4 : e.key === "ArrowLeft" ? -4 : 0))), y: Math.max(24, Math.min(86, y + (e.key === "ArrowDown" ? 4 : e.key === "ArrowUp" ? -4 : 0))) } });
+                          }}
                           title={`${d.name} · ${d.ip}${prob !== null ? ` · ${Math.round(prob * 100)} % a esa hora` : ""}`}
-                          className="group absolute -translate-x-1/2 -translate-y-1/2 transition-all duration-700"
+                          className={cn("group absolute -translate-x-1/2 -translate-y-1/2", placing ? "touch-none cursor-move" : "transition-all duration-700")}
                           style={{
                             left: `${x}%`,
                             top: `${y}%`,
@@ -255,10 +274,9 @@ export function HomeTwin({
             <span className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-destructive" /> Intruso o comportamiento raro
             </span>
-            <span>Asigna habitaciones desde la ficha de cada equipo.</span>
+            <span>{placing ? "Arrastra los dispositivos o usa las flechas del teclado. La posición se guarda automáticamente." : "Asigna habitaciones desde la ficha de cada equipo."}</span>
           </footer>
         </section>
-
         <aside className="rounded-xl border border-border bg-card">
           <header className="flex items-center gap-3 border-b border-border px-5 py-4">
             <span className="flex size-9 items-center justify-center rounded-lg bg-primary/15 text-primary">

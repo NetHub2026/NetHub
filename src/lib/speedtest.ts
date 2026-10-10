@@ -3,6 +3,7 @@ import { appendSpeedHistoryAnywhere, loadSpeedHistoryAnywhere, saveSpeedHistoryA
 const CF = "https://speed.cloudflare.com";
 
 export interface SpeedResult {
+  migratedSla?: boolean;
   at: string;
   /** Latencia media en ms */
   ping: number;

@@ -178,7 +178,7 @@ export interface TrafficSample {
 }
 
 /** Versión de NetHub que se muestra en la interfaz (coincide con package.json). */
-export const APP_VERSION = "1.4.17";
+export const APP_VERSION = "1.4.18";
 
 /** Repositorio oficial; el antiguo solo como respaldo (GitHub redirige el repo transferido). */
 const GITHUB_REPOS = ["NetHub2026/NetHub", "oyogor1985/nethub"];
@@ -357,6 +357,7 @@ export interface DbPayload {
   patterns?: unknown;
   speedHistory?: unknown[];
   speedHistoryLimit?: number;
+  speedHistoryUnified?: boolean;
 }
 
 async function readDbRaw(): Promise<string | null> {
@@ -394,6 +395,7 @@ export async function readDbFile(): Promise<DbPayload | null> {
       away: obj.away ?? null,
       sla: Array.isArray(obj.sla) ? obj.sla : [],
       patterns: obj.patterns ?? null,
+      speedHistoryUnified: obj.speedHistoryUnified === true,
       ...(Array.isArray(obj.speedHistory) ? { speedHistory: obj.speedHistory } : {}),
       ...(typeof obj.speedHistoryLimit === "number" ? { speedHistoryLimit: obj.speedHistoryLimit } : {}),
     };

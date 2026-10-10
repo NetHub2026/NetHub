@@ -1,11 +1,9 @@
 import type { Device } from "./devices";
-
 export function networkEntries(device: Device): Device[] {
   if (device.networkEntries?.length) return device.networkEntries;
   const { networkEntries: _entries, ...record } = device;
   return [record];
 }
-
 export function unifiedDevice(primary: Device, entries: Device[]): Device {
   const current = [...entries].sort((a, b) =>
     Number(b.status === "online") - Number(a.status === "online") ||
@@ -22,15 +20,23 @@ export function unifiedDevice(primary: Device, entries: Device[]): Device {
   else delete result.networkId;
   return result;
 }
-
-export function unifyDevices(devices: Device[], primaryId: string, otherId: string): Device[] {
+export type MergeField = "name" | "vendor" | "type" | "person" | "location";
+export type MergeChoices = Partial<Record<MergeField, "primary" | "other">>;
+export function unifyDevices(devices: Device[], primaryId: string, otherId: string, choices: MergeChoices = {}): Device[] {
   const primary = devices.find(d => d.id === primaryId);
   const other = devices.find(d => d.id === otherId);
   if (!primary || !other || primaryId === otherId) return devices;
   const entries = [...new Map([...networkEntries(primary), ...networkEntries(other)].map(d => [d.id, d])).values()];
-  return devices.filter(d => d.id !== otherId).map(d => d.id === primaryId ? unifiedDevice(primary, entries) : d);
+  const identity = { ...primary, identityManual: { ...primary.identityManual } };
+  for (const field of ["name", "vendor", "type", "person", "location"] as const) {
+    if (choices[field] !== "other") continue;
+    Object.assign(identity, { [field]: other[field] });
+    if (field === "vendor") Object.assign(identity, { brand: other.brand });
+    if (field === "location") Object.assign(identity, { roomPosition: other.roomPosition });
+    if (field === "type" || field === "vendor") Object.assign(identity.identityManual, { [field]: other.identityManual?.[field] });
+  }
+  return devices.filter(d => d.id !== otherId).map(d => d.id === primaryId ? unifiedDevice(identity, entries) : d);
 }
-
 export function separateDevice(devices: Device[], id: string): Device[] {
   return devices.flatMap(d => d.id === id && d.networkEntries?.length ? networkEntries(d) : [d]);
 }

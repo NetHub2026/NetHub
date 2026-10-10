@@ -1,3 +1,4 @@
+import type { MergeChoices, MergeField } from "@/lib/device-unification";
 import { useEffect, useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ import {
   Radar,
 } from "lucide-react";
 import { openExternalUrl } from "@/lib/desktop";
-import { type Device } from "@/lib/devices";
+import { deviceTypeLabels, type Device } from "@/lib/devices";
 import { DeviceTypePicker } from "./DeviceTypePicker";
 import { PingCard } from "./PingCard";
 import { activityLabels, formatDateTime, relativeTime, type ActivityEvent } from "@/lib/activity";
@@ -64,7 +65,7 @@ interface DeviceDetailPanelProps {
   onCreateLocation?: (name: string) => void;
   events?: ActivityEvent[];
   devices?: Device[];
-  onUnify?: (otherId: string) => void;
+  onUnify?: (otherId: string, choices: MergeChoices) => void;
   onSeparate?: () => void;
 }
 
@@ -85,6 +86,7 @@ export function DeviceDetailPanel({
 }: DeviceDetailPanelProps) {
   const [tagDraft, setTagDraft] = useState("");
   const [mergeId, setMergeId] = useState("");
+  const [mergeChoices, setMergeChoices] = useState<MergeChoices>({});
   const [portProgress, setPortProgress] = useState<PortScanProgress | null>(null);
   const [personDraft, setPersonDraft] = useState("");
   const [locationDraft, setLocationDraft] = useState("");
@@ -100,6 +102,7 @@ export function DeviceDetailPanel({
   useEffect(() => {
     setTagDraft("");
     setMergeId("");
+    setMergeChoices({});
     setPersonDraft("");
     setLocationDraft("");
     setFeedback(null);
@@ -593,7 +596,7 @@ export function DeviceDetailPanel({
                       {activityLabels[e.kind]}
                       {e.kind === "ip_changed" && e.previousIp
                         ? ` · ${e.previousIp} → ${e.ip}`
-                        : ""}
+                        : e.detail ? ` · ${e.detail}` : ""}
                     </span>
                     <span className="text-muted-foreground" title={formatDateTime(e.at)}>
                       {relativeTime(e.at)}
@@ -610,12 +613,25 @@ export function DeviceDetailPanel({
           <PingCard device={device} onUpdate={onUpdate} />
           <section className="mt-6 rounded-xl border border-border p-4">
             <h3 className="text-sm font-semibold">Unificar dispositivos</h3>
-            <p className="mt-2 text-xs text-muted-foreground">Elige otra entrada del mismo equipo. Se conservarán el nombre, marca, tipo, persona y ubicación de esta ficha. Sus conexiones e historial se guardan y puedes deshacer la unión.</p>
-            <select aria-label="Dispositivo para unificar" value={mergeId} onChange={e => setMergeId(e.target.value)} className="mt-3 w-full rounded-md border border-border bg-background p-2 text-sm">
+            <p className="mt-2 text-xs text-muted-foreground">Elige otra entrada del mismo equipo. Compara y elige los datos que quieres conservar. Sus conexiones e historial se guardan y puedes deshacer la unión.</p>
+            <select aria-label="Dispositivo para unificar" value={mergeId} onChange={e => { setMergeId(e.target.value); setMergeChoices({}); }} className="mt-3 w-full rounded-md border border-border bg-background p-2 text-sm">
               <option value="">Seleccionar dispositivo…</option>
               {devices.filter(d => d.id !== device.id).map(d => <option key={d.id} value={d.id}>{d.name} · {d.ip} · {d.mac}</option>)}
             </select>
-            <Button className="mt-2" disabled={!mergeId || !onUnify} onClick={() => { onUnify?.(mergeId); setMergeId(""); }}>Unificar con esta ficha</Button>
+            {(() => {
+              const other = devices.find(d => d.id === mergeId);
+              if (!other) return null;
+              const fields: Array<[MergeField, string]> = [["name", "Nombre"], ["vendor", "Marca"], ["type", "Tipo"], ["person", "Persona"], ["location", "Ubicación"]];
+              const value = (d: Device, field: MergeField) => field === "type" ? deviceTypeLabels[d.type] : d[field] || "Sin asignar";
+              return <div className="mt-3 space-y-3">{fields.map(([field, label]) => <label key={field} className="block text-xs">
+                <span className="font-semibold">{label}</span>
+                <span className="mt-1 grid grid-cols-2 gap-2 text-muted-foreground"><span>Esta ficha: {value(device, field)}</span><span>Otra ficha: {value(other, field)}</span></span>
+                <select aria-label={`Conservar ${label.toLowerCase()}`} value={mergeChoices[field] ?? "primary"} onChange={e => setMergeChoices(prev => ({ ...prev, [field]: e.target.value as "primary" | "other" }))} className="mt-1 w-full rounded border border-border bg-background p-2">
+                  <option value="primary">Esta ficha: {value(device, field)}</option><option value="other">Otra ficha: {value(other, field)}</option>
+                </select>
+              </label>)}</div>;
+            })()}
+            <Button className="mt-2" disabled={!mergeId || !onUnify} onClick={() => { onUnify?.(mergeId, mergeChoices); setMergeId(""); }}>Unificar con esta ficha</Button>
             {device.networkEntries?.length && <>
               <ul className="mt-3 space-y-2 text-xs">{device.networkEntries.map(d => <li key={d.id}>{d.mac} · {d.ip} · {d.status === "online" ? "Activo" : "Inactivo"} · {formatDateTime(d.lastSeen)}</li>)}</ul>
               <Button variant="outline" className="mt-3" onClick={onSeparate}>Deshacer unión</Button>

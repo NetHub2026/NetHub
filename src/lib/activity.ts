@@ -1,6 +1,7 @@
+import { connectionOf, wifiBand } from "./connections";
 import type { Device, DeviceType } from "./devices";
 
-export type ActivityKind = "connected" | "disconnected" | "new_device" | "ip_changed";
+export type ActivityKind = "connected" | "disconnected" | "new_device" | "ip_changed" | "connection_changed" | "mac_changed";
 
 export interface ActivityEvent {
   id: string;
@@ -11,6 +12,7 @@ export interface ActivityEvent {
   ip: string;
   type: DeviceType;
   previousIp?: string;
+  detail?: string;
 }
 
 export const MAX_EVENTS = 300;
@@ -21,6 +23,8 @@ export const activityLabels: Record<ActivityKind, string> = {
   disconnected: "Desconectado",
   new_device: "Nuevo dispositivo",
   ip_changed: "Cambio de IP",
+  connection_changed: "Cambio de conexión",
+  mac_changed: "Cambio de MAC asociada",
 };
 
 function makeEvent(kind: ActivityKind, d: Device, at: string, previousIp?: string): ActivityEvent {
@@ -48,6 +52,10 @@ export function diffActivity(previous: Device[], next: Device[]): ActivityEvent[
       continue;
     }
     if (old.ip && d.ip && old.ip !== d.ip) events.push(makeEvent("ip_changed", d, at, old.ip));
+    const connection = (device: Device) => connectionOf(device) === "wired" ? "Cable" : connectionOf(device) === "wifi" ? `Wi-Fi${wifiBand(device) ? " " + wifiBand(device) + " GHz" : ""}` : null;
+    const oldConnection = connection(old), nextConnection = connection(d);
+    if (oldConnection && nextConnection && oldConnection !== nextConnection) events.push({ ...makeEvent("connection_changed", d, at), detail: `${oldConnection} → ${nextConnection}` });
+    if (old.mac && d.mac && old.mac.toLowerCase() !== d.mac.toLowerCase()) events.push({ ...makeEvent("mac_changed", d, at), detail: `${old.mac} → ${d.mac}` });
     if (old.status !== d.status) {
       events.push(makeEvent(d.status === "online" ? "connected" : "disconnected", d, at));
     }

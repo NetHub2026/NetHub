@@ -14,16 +14,20 @@ const kindStyle: Record<ActivityKind, { icon: typeof Wifi; cls: string }> = {
   connected: { icon: Wifi, cls: "bg-success/15 text-success" },
   disconnected: { icon: WifiOff, cls: "bg-destructive/15 text-destructive" },
   new_device: { icon: Sparkles, cls: "bg-brand/15 text-brand" },
+  connection_changed: { icon: ArrowLeftRight, cls: "bg-muted text-foreground" },
+  mac_changed: { icon: ArrowLeftRight, cls: "bg-muted text-foreground" },
   ip_changed: { icon: ArrowLeftRight, cls: "bg-muted text-foreground" },
 };
 
-type Filter = "all" | "connected" | "disconnected" | "new_device" | "ip_changed";
+type Filter = "all" | ActivityKind;
 const filters: Array<[Filter, string]> = [
   ["all", "Todos"],
   ["connected", "Conexiones"],
   ["disconnected", "Desconexiones"],
   ["new_device", "Nuevos"],
   ["ip_changed", "Cambios de IP"],
+  ["connection_changed", "Cambios de conexión"],
+  ["mac_changed", "MAC asociadas"],
 ];
 
 interface Props {
@@ -136,7 +140,7 @@ export function ActivityTimeline({ events, onSelectDevice, onClear }: Props) {
                           <span className="block text-xs text-muted-foreground">
                             {e.kind === "ip_changed" && e.previousIp
                               ? `${e.previousIp} → ${e.ip}`
-                              : e.ip}
+                              : e.detail ?? e.ip}
                           </span>
                         </span>
                         <span className={cn("rounded-full px-2 py-0.5 text-[11px]", style.cls)}>

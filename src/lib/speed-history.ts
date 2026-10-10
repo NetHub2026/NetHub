@@ -15,7 +15,7 @@ export function sanitizeSpeedHistory(value: unknown): SpeedResult[] {
     const fields = ["ping", "jitter", "download", "upload"] as const;
     if (fields.some(key => typeof item[key] !== "number" || !Number.isFinite(item[key]) || item[key] < 0)) return [];
     const peak = (key: "peakDownload" | "peakUpload", fallback: number) => typeof item[key] === "number" && Number.isFinite(item[key]) && item[key] >= 0 ? item[key] : fallback;
-    return [{ at: item.at, ping: item.ping, jitter: item.jitter, download: item.download, upload: item.upload,
+    return [{ ...(item.migratedSla === true ? { migratedSla: true } : {}), at: item.at, ping: item.ping, jitter: item.jitter, download: item.download, upload: item.upload,
       peakDownload: peak("peakDownload", item.download), peakUpload: peak("peakUpload", item.upload) }];
   }).sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).filter(item => {
     const key = new Date(item.at).toISOString();
