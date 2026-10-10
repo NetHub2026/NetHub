@@ -14,7 +14,7 @@ export function InventorySummary({ devices, networks }: { devices: Device[]; net
     { label: "Sin ubicación", value: devices.filter(d => !d.location?.trim()).length, hint: "pendientes de asignar", Icon: MapPin },
   ];
   return (
-    <section aria-label="Resumen del inventario" className="space-y-1.5">
+    <section aria-label="Resumen del inventario">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
         {cards.map(({ label, value, hint, Icon }) => (
           <div key={label} className="min-w-0 rounded-xl border border-border bg-card px-3 py-2.5">
@@ -27,10 +27,6 @@ export function InventorySummary({ devices, networks }: { devices: Device[]; net
           </div>
         ))}
       </div>
-      <p className="text-[10px] leading-4 text-muted-foreground">
-        Cable y Wi-Fi: activos con conexión detectada o indicada en su ficha. Las etiquetas antiguas sin confirmar no se cuentan.
-        {summary.bandUnknown > 0 && ` ${summary.bandUnknown} por Wi-Fi sin banda identificada.`}
-      </p>
     </section>
   );
 }
