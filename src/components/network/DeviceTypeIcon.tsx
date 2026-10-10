@@ -80,6 +80,7 @@ export const deviceTypeIcons: Record<DeviceType, React.ComponentType<{ className
   "robot-vacuum": Bot,
   thermostat: Thermometer,
   "air-conditioner": Fan,
+  "smart-fan": Fan,
   "touch-panel": Tablet,
   controller: HouseWifi,
   "weather-station": Thermometer,

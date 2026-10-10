@@ -49,6 +49,7 @@ export const deviceTypeGroups: Array<{ label: string; types: DeviceType[] }> = [
       "robot-vacuum",
       "thermostat",
       "air-conditioner",
+      "smart-fan",
       "touch-panel",
       "controller",
       "weather-station",
