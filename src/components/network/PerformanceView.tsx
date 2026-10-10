@@ -3,8 +3,8 @@ import { SpeedTestPanel } from "./SpeedTestPanel";
 import type { TrafficSample } from "@/lib/desktop";
 import { InternetProviderCard } from "./InternetProviderCard";
 
-export function PerformanceView({ traffic, linkSpeedMbps, isp, ispAuto, onProviderDetected }: {
-  traffic: TrafficSample; linkSpeedMbps: number; isp: string; ispAuto: boolean; onProviderDetected: (name: string) => void;
+export function PerformanceView({ traffic, linkSpeedMbps, isp, ispAuto, onProviderDetected, onProviderEnable }: {
+  traffic: TrafficSample; linkSpeedMbps: number; isp: string; ispAuto: boolean; onProviderDetected: (name: string) => void; onProviderEnable: () => void;
 }) {
   const linkUsage = Math.min(100, Math.round((traffic.rxMbps / Math.max(1, linkSpeedMbps)) * 100));
   return (
@@ -13,7 +13,7 @@ export function PerformanceView({ traffic, linkSpeedMbps, isp, ispAuto, onProvid
           <h2 className="text-lg font-semibold">Rendimiento de la red</h2>
           <p className="mt-1 text-sm text-muted-foreground">Consulta el tráfico de este equipo y mide la velocidad de tu conexión.</p>
         </div>
-        <InternetProviderCard name={isp} automatic={ispAuto} onDetected={onProviderDetected} compact />
+        <InternetProviderCard name={isp} automatic={ispAuto} onDetected={onProviderDetected} onEnable={onProviderEnable} compact />
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-xl border border-border bg-card p-4">
             <p className="text-xs text-muted-foreground">Descarga y subida actuales</p>

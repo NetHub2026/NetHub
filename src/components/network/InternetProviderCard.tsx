@@ -3,8 +3,8 @@ import { Globe, RefreshCw } from "lucide-react";
 import { readInternetProvider } from "@/lib/desktop";
 import { parseInternetProvider, providerLogo, type InternetProvider } from "@/lib/internet-provider";
 
-export function InternetProviderCard({ name, automatic, onDetected, compact = false }: {
-  name: string; automatic: boolean; onDetected: (name: string) => void; compact?: boolean;
+export function InternetProviderCard({ name, automatic, onDetected, onEnable, compact = false }: {
+  name: string; automatic: boolean; onDetected: (name: string) => void; onEnable: () => void; compact?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -45,11 +45,13 @@ export function InternetProviderCard({ name, automatic, onDetected, compact = fa
       </div>
       <div className="min-w-0 flex-1"><p className="text-xs text-muted-foreground">Proveedor de Internet</p><p className="break-words text-lg font-semibold">{name === "tu operador" ? busy ? "Detectando…" : "Sin identificar" : name}</p></div>
       {automatic && <button onClick={() => void detect()} disabled={busy} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50"><RefreshCw className={`size-4 ${busy ? "animate-spin" : ""}`} />{busy ? "Detectando…" : "Volver a detectar"}</button>}
+      {!automatic && <button onClick={onEnable} className="rounded-md border border-brand px-3 py-2 text-sm text-brand">Activar detección automática</button>}
     </div>
     {automatic && details && !compact && <dl className="mt-4 divide-y divide-border overflow-hidden rounded-xl border border-border text-sm">
       {[["Dirección IP pública", details.ip], ["Nombre de host público", details.hostname], ["Ubicación aproximada", details.location], ["Zona horaria", details.timezone]].map(([label, value]) => <div key={label} className="grid gap-1 px-4 py-3 sm:grid-cols-[14rem_1fr]"><dt className="text-muted-foreground">{label}</dt><dd className="break-all">{value || "No disponible"}</dd></div>)}
     </dl>}
-    <p role="status" className="mt-3 text-xs text-muted-foreground">{automatic ? message : "Nombre configurado manualmente"}</p>
+    <p role="status" className="mt-3 text-xs text-muted-foreground">{automatic ? message : name === "tu operador" ? "Detección automática desactivada" : "Nombre configurado manualmente"}</p>
+    {!automatic && <p className="mt-2 text-xs text-muted-foreground">Al activarla, IPWhois recibirá tu IP pública para identificar el proveedor y la ubicación aproximada. No se envía el inventario. Se sustituirá el nombre manual por el detectado; puedes desactivarla en Configuración.</p>}
     {!compact && <p className="mt-2 text-xs text-muted-foreground">Con VPN o redes compartidas puede aparecer otro operador. Puedes corregirlo en Configuración → Alertas y monitorización.</p>}
     {!compact && automatic && <details className="mt-2 text-xs text-muted-foreground"><summary className="cursor-pointer">Cómo se detecta</summary><p className="mt-2">Consulta IPWhois con tu conexión pública, sin enviar dispositivos ni datos de la red local. La ubicación es una estimación de la IP. Los logos se cargan desde la web del proveedor cuando se reconoce.</p></details>}
   </div>;

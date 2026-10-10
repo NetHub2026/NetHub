@@ -13,6 +13,7 @@ interface Props {
   isp: string;
   ispAuto: boolean;
   onProviderDetected: (name: string) => void;
+  onProviderEnable: () => void;
   running: boolean;
   intervalMinutes: number;
   onTestNow: () => void;
@@ -39,6 +40,7 @@ export function SlaView({
   isp,
   ispAuto,
   onProviderDetected,
+  onProviderEnable,
   running,
   intervalMinutes,
   onTestNow,
@@ -63,7 +65,7 @@ export function SlaView({
 
   return (
     <section className="space-y-6">
-      <InternetProviderCard name={isp} automatic={ispAuto} onDetected={onProviderDetected} />
+      <InternetProviderCard name={isp} automatic={ispAuto} onDetected={onProviderDetected} onEnable={onProviderEnable} />
       <div className="rounded-2xl border border-border bg-card p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-base font-semibold">

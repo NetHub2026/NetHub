@@ -70,7 +70,7 @@ export const defaultSettings: Settings = {
   alertSound: true,
   healthIntervalSeconds: 30,
   ispName: "tu operador",
-  ispAuto: true,
+  ispAuto: false,
   slaIntervalMinutes: 0,
   awayAutoArm: true,
   checkUpdatesOnStart: true,
@@ -149,7 +149,7 @@ export function sanitizeSettings(value: Partial<Settings>): Settings {
       ? Number(value.healthIntervalSeconds)
       : defaultSettings.healthIntervalSeconds,
     ispName: String(value.ispName || defaultSettings.ispName).slice(0, 120),
-    ispAuto: typeof value.ispAuto === "boolean" ? value.ispAuto : !value.ispName || value.ispName === "tu operador",
+    ispAuto: value.ispAuto === true,
     slaIntervalMinutes: [0, 120, 360, 720].includes(Number(value.slaIntervalMinutes))
       ? Number(value.slaIntervalMinutes)
       : defaultSettings.slaIntervalMinutes,

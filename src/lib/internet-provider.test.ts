@@ -15,7 +15,8 @@ describe("Proveedor de Internet", () => {
   });
   it("conserva un operador manual de versiones anteriores", () => {
     expect(sanitizeSettings({ ispName: "Example Telecom" }).ispAuto).toBe(false);
-    expect(sanitizeSettings({ ispName: "tu operador" }).ispAuto).toBe(true);
+    expect(sanitizeSettings({ ispName: "tu operador" }).ispAuto).toBe(false);
+    expect(sanitizeSettings({}).ispAuto).toBe(false);
     expect(sanitizeSettings({ ispName: "Example Telecom", ispAuto: true }).ispAuto).toBe(true);
   });
 });
