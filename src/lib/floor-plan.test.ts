@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { validateFloorPlan, measureLocalCoverage, type FloorPlan } from "./floor-plan";
+import {
+  validateFloorPlan,
+  measureLocalCoverage,
+  polygonRoom,
+  roomContains,
+  type FloorPlan,
+} from "./floor-plan";
 import { sanitizeSettings } from "./settings";
 const example: FloorPlan = {
   version: 1,
@@ -30,6 +36,46 @@ describe("real floor plan", () => {
     ).toThrow();
     expect(() => validateFloorPlan({ ...example, image: "x".repeat(2_000_001) })).toThrow();
     expect(sanitizeSettings({ floorPlan: { ...example, width: -1 } }).floorPlan).toBeNull();
+  });
+  it("preserves concave rooms in settings and excludes the missing corner", () => {
+    const room = polygonRoom("l", "L room", [
+      { x: 10, y: 10 },
+      { x: 70, y: 10 },
+      { x: 70, y: 30 },
+      { x: 30, y: 30 },
+      { x: 30, y: 70 },
+      { x: 10, y: 70 },
+    ]);
+    const plan = { ...example, rooms: [room] };
+    expect(sanitizeSettings({ floorPlan: plan }).floorPlan).toEqual(plan);
+    expect(validateFloorPlan(JSON.parse(JSON.stringify(plan)))).toEqual(plan);
+    expect(roomContains(room, { x: 20, y: 60 })).toBe(true);
+    expect(roomContains(room, { x: 60, y: 20 })).toBe(true);
+    expect(roomContains(room, { x: 60, y: 60 })).toBe(false);
+    expect(roomContains(room, { x: 30, y: 50 })).toBe(true);
+    expect(roomContains(example.rooms[0]!, { x: 20, y: 20 })).toBe(true);
+  });
+  it("rejects crossed, flat, oversized and invalid contours", () => {
+    for (const points of [
+      [
+        { x: 10, y: 10 },
+        { x: 60, y: 60 },
+        { x: 10, y: 60 },
+        { x: 60, y: 10 },
+      ],
+      [
+        { x: 10, y: 10 },
+        { x: 20, y: 20 },
+        { x: 30, y: 30 },
+      ],
+      [
+        { x: 10, y: 10 },
+        { x: 101, y: 10 },
+        { x: 10, y: 30 },
+      ],
+      Array(41).fill({ x: 10, y: 10 }),
+    ])
+      expect(() => polygonRoom("r", "Room", points)).toThrow();
   });
   it("rejects invented invalid measurement values and bounds history", () => {
     const m = {
