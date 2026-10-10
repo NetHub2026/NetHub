@@ -18,7 +18,7 @@ const device = (id: string, ip: string, extra: Partial<Device> = {}): Device => 
 });
 it("orders IP addresses numerically without altering the stored inventory", () => {
   const input = [device("B", "192.0.2.10"), device("A", "192.0.2.2")];
-  expect(arrangeInventory(input, "ip", "none")[0].devices.map((d) => d.id)).toEqual(["A", "B"]);
+  expect(arrangeInventory(input, "ip", "none")[0]!.devices.map((d) => d.id)).toEqual(["A", "B"]);
   expect(input.map((d) => d.id)).toEqual(["B", "A"]);
 });
 it("keeps unassigned devices in a final group and sorts within each group", () => {
@@ -29,7 +29,7 @@ it("keeps unassigned devices in a final group and sorts within each group", () =
   ];
   const groups = arrangeInventory(input, "name", "location");
   expect(groups.map((g) => g.label)).toEqual(["sala", "Sin ubicación"]);
-  expect(groups[0].devices.map((d) => d.id)).toEqual(["A", "B"]);
+  expect(groups[0]!.devices.map((d) => d.id)).toEqual(["A", "B"]);
   expect(groups.flatMap((g) => g.devices)).toHaveLength(3);
 });
 it("prioritizes active devices and recent sightings", () => {
@@ -38,5 +38,5 @@ it("prioritizes active devices and recent sightings", () => {
     device("B", "192.0.2.2", { status: "online", lastOnlineAt: "2026-01-02T00:00:00Z" }),
   ];
   for (const order of ["active", "recent"] as const)
-    expect(arrangeInventory(input, order, "none")[0].devices[0].id).toBe("B");
+    expect(arrangeInventory(input, order, "none")[0]!.devices[0]!.id).toBe("B");
 });
