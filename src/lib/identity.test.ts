@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyMac, deriveIdentity, ieeeVendor, installRegistry } from "./identity";
+import { classifyMac, deriveIdentity, identityManufacturerLabel, ieeeVendor, installRegistry } from "./identity";
 
 installRegistry({
   names: ["Nintendo Co.,Ltd", "Intel Corporate"],
@@ -82,10 +82,25 @@ describe("Device Identity v1", () => {
       vendor: "Fabricante desconocido",
     };
     expect(deriveIdentity(old).type).toEqual({
-      value: "tv",
-      confidence: "unknown",
-      source: "legacy",
+      value: "smartphone",
+      confidence: "probable",
+      source: "hostname",
     });
     expect(old.type).toBe("tv");
+  });
+  it("revalida un tipo antiguo con evidencia OUI y distingue el adaptador", () => {
+    const id = deriveIdentity({ ...base, type: "iot", mac: "00:09:BF:11:22:33" });
+    expect(id.type).toEqual({ value: "console", confidence: "probable", source: "oui" });
+    expect(identityManufacturerLabel(id)).toBe("Adaptador: Nintendo Co.,Ltd");
+    expect(id.vendor.value).toBeNull();
+  });
+  it("conserva un tipo antiguo cuando no hay pruebas suficientes", () => {
+    const id = deriveIdentity({ ...base, type: "router", mac: "3C:97:0E:11:22:33" });
+    expect(id.type).toEqual({ value: "router", confidence: "unknown", source: "legacy" });
+  });
+  it("revalida sin atribuir una edición manual al tipo", () => {
+    const id = deriveIdentity({ ...base, type: "console", manualEdit: true, mac: "00:09:BF:11:22:33" });
+    expect(id.type.confidence).toBe("probable");
+    expect(id.type.source).toBe("oui");
   });
 });

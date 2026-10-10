@@ -282,8 +282,6 @@ export function deriveIdentity(device: IdentityInput, adapterName?: string | nul
   let type: IdentityFact<DeviceType> = { value: null, confidence: "unknown", source: null };
   if (device.identityManual?.type) {
     type = { value: device.type, confidence: "confirmed", source: "manual" };
-  } else if (device.type && device.type !== "other") {
-    type = { value: device.type, confidence: "unknown", source: "legacy" };
   } else {
     const byName = name ? NAME_TYPE_RULES.find(([re]) => re.test(name))?.[1] : undefined;
     const byNet = typeFromServices(device);
@@ -294,9 +292,22 @@ export function deriveIdentity(device: IdentityInput, adapterName?: string | nul
     if (byName) type = { value: byName, confidence: "probable", source: "hostname" };
     else if (byNet) type = { value: byNet, confidence: "probable", source: "network" };
     else if (byAdapter) type = { value: byAdapter, confidence: "probable", source: "oui" };
+    // Una edición antigua no indica qué campo se cambió. Si la evidencia
+    // discrepa, conservamos su tipo sin convertirlo en una confirmación manual.
+    if (device.type && device.type !== "other" &&
+        (!type.value || (device.manualEdit && type.value !== device.type))) {
+      type = { value: device.type, confidence: "unknown", source: "legacy" };
+    }
   }
 
   return { adapterVendor, vendor, type, macKind };
+}
+
+/** Resumen del inventario sin confundir el adaptador con la marca del aparato. */
+export function identityManufacturerLabel(identity: DeviceIdentity): string {
+  if (identity.vendor.value) return `Marca: ${identity.vendor.value}`;
+  if (identity.adapterVendor.value) return `Adaptador: ${identity.adapterVendor.value}`;
+  return "Marca desconocida";
 }
 
 /** Tipo sugerido para un dispositivo recién detectado, o null si no hay pistas. */

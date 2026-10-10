@@ -1,5 +1,5 @@
 import { normalizeDeviceType, type Device, type DeviceType } from "./devices";
-import { inferType, isGenericName, loadIeeeRegistry } from "./identity";
+import { deriveIdentity, inferType, isGenericName, loadIeeeRegistry } from "./identity";
 import {
   brandFromVendorName,
   lookupByHostname,
@@ -179,14 +179,18 @@ export function sanitizeDevices(devices: Device[]): Device[] {
 export async function enrichDevicesWithResolvedVendors(devices: Device[]): Promise<Device[]> {
   await loadIeeeRegistry();
   return devices.map((device) => {
-    if (device.manualEdit || device.identityManual?.vendor) return device;
+    const identity = deriveIdentity(device);
+    const revalidated = identity.type.confidence === "probable" && identity.type.value
+      ? { ...device, type: identity.type.value }
+      : device;
+    if (device.manualEdit || device.identityManual?.vendor) return revalidated;
     const automaticName = isAutomaticDeviceName(device);
     const resolved = lookupOui(device.mac, automaticName ? undefined : device.name);
     if (resolved.brand === "unknown" && resolved.vendor === "Fabricante desconocido") {
-      return device;
+      return revalidated;
     }
     return {
-      ...device,
+      ...revalidated,
       vendor: resolved.vendor,
       brand: resolved.brand,
       ...(automaticName ? { name: suggestedName(device.mac, device.ip) } : {}),
@@ -302,15 +306,19 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
       : fresh.brand && fresh.brand !== "unknown"
         ? fresh.brand
         : old.brand;
+    const freshIdentity = deriveIdentity(fresh);
+    const type = !old.manualEdit && !old.identityManual?.type &&
+      freshIdentity.type.confidence === "probable" && freshIdentity.type.value
+      ? freshIdentity.type.value : old.type;
     const result: Device = {
       ...old,
-      tags: defaultTagsForType(old.type, sanitizeTags(old.tags)),
+      tags: defaultTagsForType(type, sanitizeTags(old.tags)),
       ip: fresh.ip,
       status: fresh.status,
       lastSeen: fresh.lastSeen,
       // El nombre, tipo y fabricante editados a mano nunca se sobrescriben.
       name: isAutomaticDeviceName(old) ? fresh.name : old.name,
-      type: old.type,
+      type,
       vendor,
       firstSeenAt: old.firstSeenAt ?? now,
       ...(fresh.status === "online" ? { lastOnlineAt: now } : {}),
