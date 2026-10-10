@@ -34,7 +34,7 @@ describe("Device Identity v1", () => {
     expect(deriveIdentity({ ...base, mac: "3C:97:0E:00:00:01" }).vendor.value).toBeNull();
   });
   it("hostname informativo", () => {
-    const id = deriveIdentity({ ...base, mac: "DA:A1:19:00:00:01", name: "iPhone-de-Gorka" });
+    const id = deriveIdentity({ ...base, mac: "DA:A1:19:00:00:01", name: "iPhone-de-Usuario" });
     expect(id.type).toEqual({ value: "smartphone", confidence: "probable", source: "hostname" });
     expect(id.vendor.value).toBe("Apple");
   });
