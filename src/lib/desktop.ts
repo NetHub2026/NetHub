@@ -14,6 +14,7 @@ export type Runtime = "web" | "tauri" | "electron";
 
 /** API que debe exponer el preload de Electron (ver modal de empaquetado). */
 interface ElectronBridge {
+  internetProvider?: () => Promise<unknown>;
   readDevices?: () => Promise<string | null>;
   writeDevices?: (json: string) => Promise<void>;
   scanNetwork?: () => Promise<unknown>;
@@ -37,6 +38,14 @@ interface ElectronBridge {
   notify?: (payload: { title: string; body: string }) => Promise<{ ok: boolean }>;
   backupDb?: () => Promise<{ ok: boolean; path?: string; error?: string }>;
   openExternal?: (url: string) => Promise<{ ok: boolean; error?: string }>;
+}
+
+export async function readInternetProvider(): Promise<unknown> {
+  try {
+    if (typeof window !== "undefined" && window.nethub?.internetProvider) return await window.nethub.internetProvider();
+    const response = await fetch("https://ipwho.is/?fields=success,ip,connection,city,region,country,timezone.id", { signal: AbortSignal.timeout(8000), credentials: "omit", referrerPolicy: "no-referrer" });
+    return response.ok ? await response.json() : null;
+  } catch { return null; }
 }
 
 /** Aplica al sistema las preferencias nativas (autoinicio, cierre, bandeja). */
@@ -167,7 +176,7 @@ export interface TrafficSample {
 }
 
 /** Versión de NetHub que se muestra en la interfaz (coincide con package.json). */
-export const APP_VERSION = "1.4.11";
+export const APP_VERSION = "1.4.12";
 
 /** Repositorio oficial; el antiguo solo como respaldo (GitHub redirige el repo transferido). */
 const GITHUB_REPOS = ["NetHub2026/NetHub", "oyogor1985/nethub"];

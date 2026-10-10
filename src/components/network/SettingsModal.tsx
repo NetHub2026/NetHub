@@ -405,13 +405,14 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset, dire
                       ))}
                     </select>
                   </Field>
+                  <Toggle label="Detectar proveedor de Internet automáticamente" hint="Al abrir Operador, consulta IPWhois con tu conexión pública. No se envía el inventario." checked={settings.ispAuto} onChange={(v) => onChange({ ispAuto: v })} />
                   <Field
                     label="Nombre de tu operador"
                     hint="Se usa en el diagnóstico (ej. Vodafone, Movistar, Digi)."
                   >
                     <input
                       value={settings.ispName}
-                      onChange={(e) => onChange({ ispName: e.target.value })}
+                      onChange={(e) => onChange({ ispName: e.target.value, ispAuto: false })}
                       className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm outline-none focus:border-brand"
                     />
                   </Field>
