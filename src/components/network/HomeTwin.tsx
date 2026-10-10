@@ -114,7 +114,7 @@ export function HomeTwin({
   return (
     <>
       {!planView && onSetupPlan && <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-base font-semibold">Mi casa</h2><Button variant="outline" onClick={onSetupPlan}>Añadir plano real</Button></div>}
-      <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
+      <div className={cn("grid gap-6", !(planView && homeView === "plan") && "xl:grid-cols-[1fr_380px]")}>
         <div className="min-w-0">
           {planView && <div className="mb-3 flex justify-end" role="group" aria-label="Representación de Mi casa">
             <div className="flex gap-1 rounded-lg border border-border bg-muted/40 p-1">

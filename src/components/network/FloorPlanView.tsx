@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import type { Device } from "@/lib/devices";
 import type { PatternState } from "@/lib/patterns";
+import { transparentPlanImage } from "@/lib/plan-background";
 import { DeviceTypeIcon } from "./DeviceTypeIcon";
 import {
   planId,
@@ -74,6 +75,15 @@ export function FloorPlanView({
       .map((a) => a.deviceId),
   );
   const [draft, setDraft] = useState(plan);
+  const [displayImage, setDisplayImage] = useState(plan?.image);
+  useEffect(() => {
+    let cancelled = false;
+    setDisplayImage(plan?.image);
+    if (plan?.image) void transparentPlanImage(plan.image).then(image => {
+      if (!cancelled) setDisplayImage(image);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [plan?.image]);
   const [busy, setBusy] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [planHeight, setPlanHeight] = useState(400);
@@ -490,7 +500,7 @@ export function FloorPlanView({
                   width: `${zoom * 100}%`,
                   maxWidth: `${(planHeight - 4) * (draft.width / draft.height) * zoom}px`,
                   margin: zoom === 1 ? "0 auto" : "0",
-                  backgroundImage: `url(${draft.image})`,
+                  backgroundImage: `url(${displayImage ?? draft.image})`,
                   backgroundSize: "100% 100%",
                   touchAction: mode === "devices" ? "pan-y" : "manipulation",
                 }}
@@ -501,7 +511,7 @@ export function FloorPlanView({
                   preserveAspectRatio="none"
                   className="pointer-events-none absolute inset-0 h-full w-full"
                 >
-                  {draft.rooms.map((room) => (
+                  {mode === "rooms" && !draft.locked && draft.rooms.map((room) => (
                     <polygon
                       key={room.id}
                       points={roomPoints(room)
