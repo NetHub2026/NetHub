@@ -296,8 +296,12 @@ function wol(mac: string, cidr: string): Promise<void> {
     };
     socket.once("error", finish);
     socket.bind(() => {
-      socket.setBroadcast(true);
-      socket.send(packet, 9, broadcast, finish);
+      try {
+        socket.setBroadcast(true);
+        socket.send(packet, 9, broadcast, finish);
+      } catch (error) {
+        finish(error as Error);
+      }
     });
   });
 }

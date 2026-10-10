@@ -346,7 +346,10 @@ export function HomeTwin({
               <span className="size-2 rounded-full bg-muted-foreground/40" /> Apagado
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="size-2 rounded-full bg-destructive" /> Intruso o comportamiento raro
+              <span className="size-2 rounded-full bg-destructive" />{" "}
+              {monitoringHost === "este PC"
+                ? "Intruso o comportamiento raro"
+                : "Nuevo o comportamiento inusual"}
             </span>
             <span>
               {placing

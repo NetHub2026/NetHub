@@ -173,6 +173,9 @@ function App() {
     };
   }, []);
   useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [view]);
+  useEffect(() => {
     if (session !== "ready") return;
     void refresh();
     const timer = setInterval(() => void refresh(), 2000);
@@ -342,7 +345,7 @@ function App() {
         </div>
         <nav
           aria-label="Secciones de NetHub"
-          className="mx-auto flex max-w-[1600px] gap-1 overflow-x-auto px-4 pb-2 sm:px-6"
+          className="server-tabs mx-auto flex max-w-[1600px] gap-1 overflow-x-auto px-4 pb-2 sm:px-6"
         >
           {views.map(([id, label, Icon]) => (
             <button
@@ -896,7 +899,7 @@ function Performance({
           <Metric label="Última descarga" value={latest ? `${latest.download} Mbps` : "—"} />
           <Metric label="Última subida" value={latest ? `${latest.upload} Mbps` : "—"} />
           <Metric
-            label="Latencia / jitter"
+            label="Latencia HTTP / jitter"
             value={latest ? `${latest.ping} / ${latest.migratedSla ? "—" : latest.jitter} ms` : "—"}
           />
         </div>

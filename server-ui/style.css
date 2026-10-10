@@ -25,3 +25,10 @@ button:disabled {
     max-width: 100vw;
   }
 }
+
+.server-tabs {
+  scrollbar-width: none;
+}
+.server-tabs::-webkit-scrollbar {
+  display: none;
+}
