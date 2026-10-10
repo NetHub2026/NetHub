@@ -131,7 +131,11 @@ import {
 import { SpeedTestPanel } from "@/components/network/SpeedTestPanel";
 import { UpdateModal } from "@/components/network/UpdateModal";
 import { DeviceTypeIcon } from "@/components/network/DeviceTypeIcon";
-import { InventoryIdentityBadge } from "@/components/network/IdentityBadge";
+import {
+  InventoryIdentityBadge,
+  InventoryIdentityIcon,
+  InventoryDeviceBrand,
+} from "@/components/network/IdentityBadge";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -1183,7 +1187,7 @@ function Dashboard() {
                           : "bg-muted text-muted-foreground",
                       )}
                     >
-                      <DeviceTypeIcon type={d.type} />
+                      <InventoryIdentityIcon device={d} />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2">
@@ -1197,7 +1201,7 @@ function Dashboard() {
                         />
                       </span>
                       <span className="mt-0.5 block truncate font-mono text-xs text-muted-foreground">
-                        {d.ip} · {d.vendor}
+                        {d.ip} · <InventoryDeviceBrand device={d} />
                       </span>
                       {(d.person || d.location) && (
                         <span className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">

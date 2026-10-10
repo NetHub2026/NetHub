@@ -55,6 +55,8 @@ export interface Device {
   servicesScannedAt?: string;
   /** El usuario ha editado manualmente nombre, tipo o fabricante */
   manualEdit?: boolean;
+  /** Provenance recorded only when this field is explicitly edited; absent in legacy data. */
+  identityManual?: { type?: boolean; vendor?: boolean };
   /** Red / router al que pertenece (asignada a mano; si falta se deduce por subred) */
   networkId?: string;
   /** Últimas medidas de latencia (ms), la más reciente al final */
