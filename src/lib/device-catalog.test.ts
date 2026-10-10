@@ -18,6 +18,9 @@ describe("Catálogo de dispositivos", () => {
     expect(normalizeDeviceType("toString")).toBe("other");
   });
   it("busca por nombre sin tildes y por familia", () => {
+    expect(searchDeviceTypes("ventilador").flatMap((group) => group.types)).toEqual(["smart-fan"]);
+    expect(searchDeviceTypes("smartwatch").flatMap((group) => group.types)).toEqual(["smartwatch"]);
+    expect(searchDeviceTypes("reloj digital").flatMap((group) => group.types)).toEqual(["clock"]);
     expect(searchDeviceTypes("frigorifico").flatMap((group) => group.types)).toEqual([
       "smart-fridge",
     ]);
