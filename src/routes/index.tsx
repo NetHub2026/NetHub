@@ -73,7 +73,12 @@ import {
 import { SettingsModal } from "@/components/network/SettingsModal";
 import { UsageView } from "@/components/network/UsageView";
 import { HomeTwin } from "@/components/network/HomeTwin";
-import { emptyPatternState, evaluatePatterns, type PatternState } from "@/lib/patterns";
+import {
+  emptyPatternState,
+  evaluatePatterns,
+  reviewAnomaly,
+  type PatternState,
+} from "@/lib/patterns";
 import { loadPatternsAnywhere, savePatternsAnywhere } from "@/lib/persistence";
 import { SlaView } from "@/components/network/SlaView";
 import { AwayMode } from "@/components/network/AwayMode";
@@ -1384,6 +1389,16 @@ function Dashboard() {
           <HomeTwin
             devices={items}
             patterns={patterns}
+            onReviewAnomaly={(id, reviewed) => {
+              const next = reviewAnomaly(patternsRef.current, id, reviewed);
+              patternsRef.current = next;
+              setPatterns(next);
+              void savePatternsAnywhere(next);
+              toast.success(
+                reviewed ? "Anomalía marcada como revisada" : "Anomalía pendiente de revisión",
+              );
+            }}
+            onOpenPerformance={() => setViewMode("performance")}
             rxMbps={traffic.rxMbps}
             onSelectDevice={(id) => {
               if (items.some((d) => d.id === id)) setSelectedId(id);
