@@ -51,9 +51,11 @@ export function HomeTwin({
   onReviewAnomaly,
   onOpenPerformance,
   monitoringHost = "este PC",
+  trafficAvailable = true,
 }: {
   devices: Device[];
   monitoringHost?: string;
+  trafficAvailable?: boolean;
   onUpdateDevice?: (device: Device) => void;
   patterns: PatternState;
   rxMbps: number;
@@ -123,8 +125,9 @@ export function HomeTwin({
               <div>
                 <h2 className="text-sm font-semibold">Gemelo digital de tu casa</h2>
                 <p className="text-xs text-muted-foreground">
-                  {online} de {devices.length} equipos encendidos · la casa late con{" "}
-                  {rxMbps.toFixed(1)} Mbps
+                  {online} de {devices.length} equipos encendidos ·{" "}
+                  {monitoringHost === "este PC" ? "la casa late con" : "descarga del NAS:"}{" "}
+                  {trafficAvailable ? `${rxMbps.toFixed(1)} Mbps` : "sin datos"}
                 </p>
               </div>
             </div>
@@ -381,8 +384,9 @@ export function HomeTwin({
                 />
               </div>
               <p className="mt-2 text-[11px] text-muted-foreground">
-                Deja NetHub abierto (o en la bandeja) con el escaneo automático activo. Cada hora
-                vigilada cuenta.
+                {monitoringHost === "este PC"
+                  ? "Deja NetHub abierto (o en la bandeja) con el escaneo automático activo. Cada hora vigilada cuenta."
+                  : "El monitor del NAS aprende con el escaneo automático activo, aunque cierres los navegadores."}
               </p>
             </div>
           )}

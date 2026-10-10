@@ -499,6 +499,7 @@ function App() {
             {view === "home" && (
               <HomeTwin
                 monitoringHost="este NAS"
+                trafficAvailable={state.server.traffic.available}
                 devices={devices}
                 patterns={state.patterns}
                 rxMbps={state.server.traffic.rxMbps}

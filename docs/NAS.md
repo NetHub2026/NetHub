@@ -1,6 +1,6 @@
 # NetHub Server 0.1.0 para NAS
 
-NetHub Server monitoriza desde un NAS Linux y ofrece una interfaz web para PC, móvil y tablet. El monitor continúa cuando se cierran los navegadores. Inventario, personas, ubicaciones, posiciones de la casa, actividad, rutinas, conectividad y hasta 100 pruebas se guardan en `data/server-state.json`.
+NetHub Server monitoriza desde un NAS Linux y ofrece una interfaz web para PC, móvil y tablet. El monitor continúa cuando se cierran los navegadores. Inventario, personas, ubicaciones, posiciones de la casa, actividad, rutinas, conectividad y hasta 100 pruebas se guardan en `/data/server-state.json`, dentro del volumen persistente de Docker.
 
 Esta edición es independiente de la aplicación portable para Windows. No instala Electron en el NAS. No incorpora apagado remoto. La primera versión requiere validar el escaneo en el NAS físico; las pruebas automatizadas utilizan datos sintéticos y no certifican la cobertura de una red real.
 
@@ -15,8 +15,8 @@ UGREEN explica la instalación de Docker y los proyectos Compose en su [guía of
 ## Instalación con el paquete de imagen
 
 1. Instala Docker desde el centro de aplicaciones de UGOS.
-2. Crea una carpeta para NetHub con las subcarpetas `data` y `secrets`. Copia `compose.server.yaml` a ella.
-3. Crea `secrets/admin-password.txt` con una contraseña propia de 12–256 caracteres. No reutilices los ejemplos de pruebas. Guarda el archivo con permisos que permitan leerlo al contenedor y restrinjan su acceso a otras personas.
+2. Crea una carpeta para NetHub con la subcarpeta `secrets`. Docker creará el volumen de datos automáticamente. Copia `compose.server.yaml` a ella.
+3. Crea `secrets/admin-password.txt` con una contraseña propia de 12–256 caracteres. No reutilices los ejemplos de pruebas. El archivo debe ser legible para el contenedor (por ejemplo, permiso 644) y la carpeta `secrets` debe estar restringida a tu usuario (por ejemplo, 700). No compartas esta carpeta con otros usuarios.
 4. Descomprime `nethub-server-0.1.0-amd64.tar.gz` e importa el `.tar` en Docker. También puede cargarse desde una terminal:
 
    ```sh
@@ -53,6 +53,8 @@ La construcción incluye el servidor y la web. Los datos, contraseñas, archivos
 
 La contraseña, interfaz seleccionada y tareas del NAS se conservan al importar. No existe sincronización automática entre el JSON del PC y el del NAS: todos los navegadores conectados al servidor utilizan la misma copia del NAS.
 
+Para utilizar una carpeta visible del NAS en vez del volumen, sustituye `nethub_data:/data` por una ruta absoluta de esa carpeta seguida de `:/data`. El contenedor funciona como UID 0 con capacidades limitadas: esa carpeta debe permitir escritura a UID 0; una carpeta propiedad de otro usuario con permisos 755 no basta. El volumen predeterminado evita este problema.
+
 ## Qué se mide
 
 - **Dispositivos:** ARP en la red local. No garantiza detectar equipos dormidos, IPv6 o redes aisladas. Un error del escáner conserva el estado anterior y muestra el problema.
@@ -81,11 +83,11 @@ Para acceso remoto utiliza una VPN. No abras el puerto en el router directamente
 
 ## Copias, actualización y recuperación
 
-La carpeta `data` persiste al recrear el contenedor. Se genera una copia adicional cada 24 horas; puedes crearla o descargar un JSON desde Configuración. Esa copia adicional es la última copia, no un historial de versiones. Incluye `data` en las copias de seguridad del NAS.
+El volumen `nethub_data` persiste al recrear el contenedor. No elimines ese volumen ni uses `docker compose down -v` al actualizar. Se genera una copia adicional cada 24 horas; puedes crearla o descargar un JSON desde Configuración. Esa copia adicional es la última copia, no un historial de versiones. Incluye el volumen de Docker en las copias de seguridad del NAS, o descarga periódicamente el JSON.
 
-Antes de actualizar, descarga una copia. Importa la nueva imagen y recrea el contenedor conservando el volumen `data` y el secreto. Cambiar la contraseña requiere editar el archivo privado y reiniciar; la contraseña no se guarda en el JSON ni en la imagen.
+Antes de actualizar, descarga una copia. Importa la nueva imagen y recrea el contenedor conservando el volumen `nethub_data` y el secreto. Cambiar la contraseña requiere editar el archivo privado y reiniciar; la contraseña no se guarda en el JSON ni en la imagen.
 
-Si `server-state.json` está dañado, el servicio se detiene y conserva el archivo. Detén el contenedor y restaura la copia del NAS sobre `data/server-state.json`. Si aparece un error de permisos ARP, comprueba `NET_RAW` y red host; no actives modo privilegiado como solución automática.
+Si `server-state.json` está dañado, el servicio se detiene y conserva el archivo. Detén el contenedor y restaura la copia del NAS sobre `/data/server-state.json` en el volumen de datos. También puedes volver a iniciar con un volumen nuevo e importar la copia desde la web. Si aparece un error de permisos ARP, comprueba `NET_RAW` y red host; no actives modo privilegiado como solución automática.
 
 ## Desarrollo y comprobaciones
 
