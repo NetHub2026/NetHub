@@ -231,6 +231,7 @@ function Dashboard() {
   const [systemDark, setSystemDark] = useState(true);
   /** Tráfico real del adaptador de red de este equipo. */
   const [traffic, setTraffic] = useState<TrafficSample>({
+    available: false,
     rxMbps: 0,
     txMbps: 0,
     totalMbps: 0,
@@ -336,11 +337,13 @@ function Dashboard() {
   // Telemetría real del adaptador de red: una muestra por segundo.
   useEffect(() => {
     let cancelled = false;
-    let last: TrafficSample = { rxMbps: 0, txMbps: 0, totalMbps: 0 };
+    let polling = false;
     const tick = async () => {
-      const sample = await readLiveTraffic(last);
+      if (polling || cancelled) return;
+      polling = true;
+      let sample;
+      try { sample = await readLiveTraffic(); } finally { polling = false; }
       if (cancelled) return;
-      last = sample;
       setTraffic(sample);
       rxRef.current = sample.rxMbps;
     };
