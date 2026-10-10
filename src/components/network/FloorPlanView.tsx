@@ -7,6 +7,8 @@ import {
   Radio,
   Square,
   LoaderCircle,
+  Lock,
+  Unlock,
   Plus,
   Minus,
 } from "lucide-react";
@@ -138,6 +140,7 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
     if (!draft || busy || event.target !== event.currentTarget) return;
     const p = coordinates(event);
     if (mode === "measure") setPosition(p);
+    if (draft.locked && mode !== "measure") return;
     if (mode === "devices") {
       if (!deviceId) {
         toast.info("Elige un dispositivo y toca su posición en el plano.");
@@ -159,7 +162,7 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
     }
   }
   async function finishRoom() {
-    if (!draft || busy || !roomName.trim()) return;
+    if (!draft || busy || draft.locked || !roomName.trim()) return;
     try {
       if (draft.rooms.length >= 40) throw new Error("Puedes marcar hasta 40 habitaciones.");
       const room = polygonRoom(planId(), roomName.trim().slice(0, 100), corners);
@@ -236,6 +239,25 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
         </div>
         <div className="flex flex-wrap gap-2">
           {draft && (
+            <button
+              className={control}
+              disabled={busy}
+              aria-pressed={draft.locked === true}
+              onClick={() => {
+                setCorners([]);
+                setEditingRoom(null);
+                void save({ ...draft, locked: !draft.locked });
+              }}
+            >
+              {draft.locked ? (
+                <Lock className="mr-1 inline size-4" />
+              ) : (
+                <Unlock className="mr-1 inline size-4" />
+              )}
+              {draft.locked ? "Desbloquear plano" : "Bloquear plano"}
+            </button>
+          )}
+          {draft && (
             <div role="group" aria-label="Zoom del plano" className="flex items-center gap-1">
               <button
                 className={control}
@@ -267,7 +289,7 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
             </div>
           )}
           <button
-            disabled={busy}
+            disabled={busy || draft?.locked}
             className={control}
             onClick={() => (draft ? setConfirm("replace") : imageInput.current?.click())}
           >
@@ -371,7 +393,7 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
             {mode === "devices" && (
               <select
                 aria-label="Equipo que colocar"
-                disabled={busy}
+                disabled={busy || draft.locked}
                 className={`${control} max-w-full`}
                 value={deviceId}
                 onChange={(e) => setDeviceId(e.target.value)}
@@ -390,7 +412,7 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
                 <input
                   aria-label="Nombre de habitación"
                   maxLength={100}
-                  disabled={busy}
+                  disabled={busy || draft.locked}
                   className={control}
                   placeholder="Nombre de habitación"
                   value={roomName}
@@ -398,7 +420,7 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
                 />
                 <button
                   className={control}
-                  disabled={busy || corners.length < 3 || !roomName.trim()}
+                  disabled={busy || draft.locked || corners.length < 3 || !roomName.trim()}
                   onClick={() => void finishRoom()}
                 >
                   Cerrar habitación
@@ -520,10 +542,11 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
                         <button
                           key={`${room.id}-${i}`}
                           aria-label={`Mover esquina ${i + 1} de ${room.name}`}
-                          disabled={busy}
+                          disabled={busy || draft.locked}
                           className="absolute z-30 size-6 -translate-x-1/2 -translate-y-1/2 touch-none rounded-full border-2 border-white bg-sky-600 text-xs text-white"
                           style={{ left: `${p.x}%`, top: `${p.y}%` }}
                           onPointerDown={(event) => {
+                            if (draft.locked) return;
                             event.stopPropagation();
                             dragging.current = `${room.id}:${i}`;
                             event.currentTarget.setPointerCapture(event.pointerId);
@@ -595,12 +618,13 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
                       return (
                         <button
                           key={d.id}
-                          aria-label={`Mover ${d.name}`}
+                          aria-label={draft.locked ? d.name : `Mover ${d.name}`}
                           title={d.name}
-                          className={`absolute z-20 flex size-9 -translate-x-1/2 -translate-y-1/2 touch-none items-center justify-center rounded-full border-2 border-white shadow-lg ${d.status === "online" ? "bg-sky-600 text-white" : "bg-slate-500 text-white"}`}
+                          className={`absolute z-20 flex size-7 -translate-x-1/2 -translate-y-1/2 touch-none items-center justify-center rounded-full border-2 border-white shadow-lg ${d.status === "online" ? "bg-sky-600 text-white" : "bg-slate-500 text-white"}`}
                           style={{ left: `${p.x}%`, top: `${p.y}%` }}
-                          disabled={busy}
+                          disabled={busy || draft.locked}
                           onPointerDown={(event) => {
+                            if (draft.locked) return;
                             event.stopPropagation();
                             dragging.current = d.id;
                             event.currentTarget.setPointerCapture(event.pointerId);
@@ -628,7 +652,7 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
                             setDraft(plan);
                           }}
                         >
-                          <DeviceTypeIcon type={d.type} className="size-4" />
+                          <DeviceTypeIcon type={d.type} className="size-3.5" />
                         </button>
                       );
                     })}
@@ -653,19 +677,23 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
                     {draft.rooms.length} habitaciones
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {mode === "devices"
-                      ? "Elige un equipo y toca el plano para colocarlo. Arrastra su icono para moverlo."
-                      : "Escribe el nombre y toca cada esquina. Cierra con el primer punto o «Cerrar habitación». Para corregir una habitación, pulsa «Editar» y arrastra sus esquinas."}
+                    {draft.locked
+                      ? "Las posiciones están bloqueadas. Puedes seguir usando el zoom."
+                      : mode === "devices"
+                        ? "Elige un equipo y toca el plano para colocarlo. Arrastra su icono para moverlo."
+                        : "Escribe el nombre y toca cada esquina. Cierra con el primer punto o «Cerrar habitación». Para corregir una habitación, pulsa «Editar» y arrastra sus esquinas."}
                   </p>
-                  {!canMeasure && (
-                    <p className="rounded-lg bg-primary/10 p-3 text-sm">
-                      Para medir la cobertura, abre la dirección de NetHub en el NAS desde el
-                      navegador del móvil. En PC puedes preparar el plano y colocar los equipos.
+                  {draft.locked && (
+                    <p className="text-sm text-muted-foreground">
+                      Plano bloqueado. Desbloquéalo para cambiar las posiciones o las habitaciones.
                     </p>
                   )}
-                  <p className="text-sm text-muted-foreground">
-                    {draft.measurements.length} mediciones guardadas. {canMeasure ? "Abre «Medir cobertura» para medir y comparar visitas." : "Las mediciones se realizan desde el navegador conectado al NAS."}
-                  </p>
+                  {canMeasure && (
+                    <p className="text-sm text-muted-foreground">
+                      {draft.measurements.length} mediciones guardadas. Abre «Medir cobertura» para
+                      medir y comparar visitas.
+                    </p>
+                  )}
                 </>
               )}
               {mode === "measure" && (
@@ -843,7 +871,7 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
                 >
                   <span>{r.name}</span>
                   <button
-                    disabled={busy}
+                    disabled={busy || draft.locked}
                     className="text-primary"
                     aria-label={`Editar ${r.name}`}
                     onClick={() => {
@@ -855,7 +883,7 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
                     Editar
                   </button>
                   <button
-                    disabled={busy}
+                    disabled={busy || draft.locked}
                     className="text-muted-foreground hover:text-destructive"
                     aria-label={`Quitar ${r.name}`}
                     onClick={() => {
@@ -874,7 +902,7 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
           )}
           {deviceId && draft.positions[deviceId] && (
             <button
-              disabled={busy}
+              disabled={busy || draft.locked}
               className={control}
               onClick={() => {
                 const positions = { ...draft.positions };
@@ -886,7 +914,7 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
             </button>
           )}
           <button
-            disabled={busy}
+            disabled={busy || draft.locked}
             className="text-xs text-muted-foreground hover:text-destructive"
             onClick={() => setConfirm("clear")}
           >

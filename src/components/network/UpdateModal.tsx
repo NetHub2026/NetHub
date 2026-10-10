@@ -45,7 +45,7 @@ export function UpdateModal({ open, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
-      <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-xl">
+      <div className="max-h-[calc(100dvh-2rem)] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-card p-6 shadow-xl">
         <div className="mb-4 flex items-start gap-3">
           <div className="flex-1">
             <h2 className="text-base font-semibold">Actualizaciones de NetHub</h2>
@@ -100,7 +100,7 @@ export function UpdateModal({ open, onClose }: Props) {
                   )}
                 </p>
                 {info.notes && (
-                  <pre className="max-h-48 overflow-auto whitespace-pre-wrap text-xs text-muted-foreground">
+                  <pre className="max-h-[45dvh] overflow-y-auto whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
                     {info.notes}
                   </pre>
                 )}
