@@ -7,6 +7,7 @@ export interface PlanRoom extends PlanPosition {
   name: string;
   width: number;
   height: number;
+  points?: PlanPosition[];
 }
 export interface CoveragePoint extends PlanPosition {
   id: string;
@@ -35,6 +36,90 @@ const coordinate = (n: unknown): n is number =>
 const text = (s: unknown, max: number): s is string => typeof s === "string" && s.length <= max;
 const positive = (n: unknown): n is number =>
   typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 100000;
+export function roomPoints(room: PlanRoom): PlanPosition[] {
+  return (
+    room.points ?? [
+      { x: room.x, y: room.y },
+      { x: room.x + room.width, y: room.y },
+      { x: room.x + room.width, y: room.y + room.height },
+      { x: room.x, y: room.y + room.height },
+    ]
+  );
+}
+export function polygonRoom(id: string, name: string, points: PlanPosition[]): PlanRoom {
+  if (
+    !Array.isArray(points) ||
+    points.length < 3 ||
+    points.length > 40 ||
+    points.some((p) => !p || !coordinate(p.x) || !coordinate(p.y))
+  )
+    throw new Error("Marca entre 3 y 40 esquinas dentro del plano.");
+  const cross = (a: PlanPosition, b: PlanPosition, c: PlanPosition) =>
+    (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  const on = (a: PlanPosition, b: PlanPosition, c: PlanPosition) =>
+    Math.abs(cross(a, b, c)) < 1e-8 &&
+    c.x >= Math.min(a.x, b.x) &&
+    c.x <= Math.max(a.x, b.x) &&
+    c.y >= Math.min(a.y, b.y) &&
+    c.y <= Math.max(a.y, b.y);
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i]!,
+      b = points[(i + 1) % points.length]!;
+    if (Math.hypot(a.x - b.x, a.y - b.y) < 0.01) throw new Error("Hay esquinas repetidas.");
+    for (let j = i + 1; j < points.length; j++) {
+      if (j === i + 1 || (i === 0 && j === points.length - 1)) continue;
+      const c = points[j]!,
+        d = points[(j + 1) % points.length]!;
+      if (
+        (cross(a, b, c) * cross(a, b, d) < 0 && cross(c, d, a) * cross(c, d, b) < 0) ||
+        on(a, b, c) ||
+        on(a, b, d) ||
+        on(c, d, a) ||
+        on(c, d, b)
+      )
+        throw new Error("El contorno no puede cruzarse. Mueve o deshaz una esquina.");
+    }
+  }
+  const area =
+    Math.abs(
+      points.reduce((sum, a, i) => {
+        const b = points[(i + 1) % points.length]!;
+        return sum + a.x * b.y - b.x * a.y;
+      }, 0),
+    ) / 2;
+  if (area < 0.1) throw new Error("El contorno no tiene suficiente superficie.");
+  const x = Math.min(...points.map((p) => p.x)),
+    y = Math.min(...points.map((p) => p.y));
+  return {
+    id,
+    name,
+    x,
+    y,
+    width: Math.max(...points.map((p) => p.x)) - x,
+    height: Math.max(...points.map((p) => p.y)) - y,
+    points: points.map((p) => ({ x: p.x, y: p.y })),
+  };
+}
+export function roomContains(room: PlanRoom, p: PlanPosition): boolean {
+  const points = roomPoints(room);
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const a = points[i]!,
+      b = points[j]!;
+    const cross = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+    if (
+      Math.abs(cross) < 1e-8 &&
+      p.x >= Math.min(a.x, b.x) &&
+      p.x <= Math.max(a.x, b.x) &&
+      p.y >= Math.min(a.y, b.y) &&
+      p.y <= Math.max(a.y, b.y)
+    )
+      return true;
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x)
+      inside = !inside;
+  }
+  return inside;
+}
 export function validateFloorPlan(value: unknown): FloorPlan | null {
   if (value === null || value === undefined) return null;
   const p = value as FloorPlan;
@@ -84,6 +169,7 @@ export function validateFloorPlan(value: unknown): FloorPlan | null {
       r.y + r.height > 100.01
     )
       throw new Error("Habitación no válida.");
+    if (r.points !== undefined) return polygonRoom(r.id, r.name, r.points);
     return { id: r.id, name: r.name, x: r.x, y: r.y, width: r.width, height: r.height };
   });
   const measurements = p.measurements.map((m) => {

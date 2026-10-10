@@ -5,6 +5,9 @@ import type { Device } from "@/lib/devices";
 import { DeviceTypeIcon } from "./DeviceTypeIcon";
 import {
   planId,
+  polygonRoom,
+  roomPoints,
+  roomContains,
   readPlanImage,
   validateFloorPlan,
   measureLocalCoverage,
@@ -45,7 +48,8 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
   const [mode, setMode] = useState<"devices" | "measure" | "rooms">("devices");
   const [deviceId, setDeviceId] = useState("");
   const [roomName, setRoomName] = useState("");
-  const [roomStart, setRoomStart] = useState<PlanPosition | null>(null);
+  const [corners, setCorners] = useState<PlanPosition[]>([]);
+  const [editingRoom, setEditingRoom] = useState<string | null>(null);
   const [position, setPosition] = useState<PlanPosition | null>(null);
   const [session, setSession] = useState("Primera visita");
   const [filterSession, setFilterSession] = useState("all");
@@ -62,7 +66,7 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
   useEffect(() => () => abort.current?.abort(), []);
 
   async function save(next: FloorPlan | null) {
-    if (busy) return;
+    if (busy) return false;
     setBusy(true);
     const stamped = next ? { ...next, updatedAt: new Date().toISOString() } : null;
     try {
@@ -70,9 +74,11 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
         throw new Error("El plano no se ha guardado. Revisa la conexión y vuelve a intentarlo.");
       setDraft(stamped);
       toast.success("Plano guardado");
+      return true;
     } catch (error) {
       toast.error((error as Error).message);
       setDraft(plan);
+      return false;
     } finally {
       setBusy(false);
     }
@@ -90,7 +96,8 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
         measurements: [],
       });
       setPosition(null);
-      setRoomStart(null);
+      setCorners([]);
+      setEditingRoom(null);
       setFilterSession("all");
     } catch (error) {
       toast.error((error as Error).message);
@@ -119,29 +126,25 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
         toast.info("Escribe el nombre de la habitación.");
         return;
       }
-      if (!roomStart) {
-        setRoomStart(p);
+      if (editingRoom) return;
+      if (corners.length >= 40) {
+        toast.info("Puedes marcar hasta 40 esquinas.");
         return;
       }
-      const room = {
-        id: planId(),
-        name: roomName.trim().slice(0, 100),
-        x: Math.min(p.x, roomStart.x),
-        y: Math.min(p.y, roomStart.y),
-        width: Math.abs(p.x - roomStart.x),
-        height: Math.abs(p.y - roomStart.y),
-      };
-      if (room.width < 2 || room.height < 2) {
-        toast.info("Marca dos esquinas más separadas.");
-        return;
+      setCorners([...corners, p]);
+    }
+  }
+  async function finishRoom() {
+    if (!draft || busy || !roomName.trim()) return;
+    try {
+      if (draft.rooms.length >= 40) throw new Error("Puedes marcar hasta 40 habitaciones.");
+      const room = polygonRoom(planId(), roomName.trim().slice(0, 100), corners);
+      if (await save({ ...draft, rooms: [...draft.rooms, room] })) {
+        setCorners([]);
+        setRoomName("");
       }
-      if (draft.rooms.length >= 40) {
-        toast.error("Puedes marcar hasta 40 habitaciones.");
-        return;
-      }
-      setRoomStart(null);
-      setRoomName("");
-      void save({ ...draft, rooms: [...draft.rooms, room] });
+    } catch (error) {
+      toast.error((error as Error).message);
     }
   }
   async function measure() {
@@ -158,10 +161,7 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
     setBusy(true);
     try {
       const result = await measureLocalCoverage(controller.signal);
-      const label =
-        current.rooms.find(
-          (r) => p.x >= r.x && p.x <= r.x + r.width && p.y >= r.y && p.y <= r.y + r.height,
-        )?.name ?? "Punto del plano";
+      const label = current.rooms.find((r) => roomContains(r, p))?.name ?? "Punto del plano";
       const next: FloorPlan = {
         ...current,
         updatedAt: new Date().toISOString(),
@@ -303,7 +303,8 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
                 className={`${control} ${mode === key ? "border-primary text-primary" : ""}`}
                 onClick={() => {
                   setMode(key);
-                  setRoomStart(null);
+                  setCorners([]);
+                  setEditingRoom(null);
                 }}
               >
                 <Icon className="mr-1 inline size-4" />
@@ -338,8 +339,36 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
                   value={roomName}
                   onChange={(e) => setRoomName(e.target.value)}
                 />
+                <button
+                  className={control}
+                  disabled={busy || corners.length < 3 || !roomName.trim()}
+                  onClick={() => void finishRoom()}
+                >
+                  Cerrar habitación
+                </button>
+                <button
+                  className={control}
+                  disabled={busy || !corners.length}
+                  onClick={() => setCorners(corners.slice(0, -1))}
+                >
+                  Deshacer esquina
+                </button>
+                {(corners.length > 0 || editingRoom) && (
+                  <button
+                    className={control}
+                    disabled={busy}
+                    onClick={() => {
+                      setCorners([]);
+                      setEditingRoom(null);
+                    }}
+                  >
+                    Cancelar edición
+                  </button>
+                )}
                 <span className="text-xs text-muted-foreground">
-                  {roomStart ? "Toca la esquina opuesta" : "Toca dos esquinas de la habitación"}
+                  {editingRoom
+                    ? "Arrastra las esquinas para corregir el contorno"
+                    : "Toca cada esquina y cierra el contorno"}
                 </span>
               </>
             )}
@@ -364,22 +393,122 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
                 }}
                 onPointerUp={place}
               >
+                <svg
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                  className="pointer-events-none absolute inset-0 h-full w-full"
+                >
+                  {draft.rooms.map((room) => (
+                    <polygon
+                      key={room.id}
+                      points={roomPoints(room)
+                        .map((p) => `${p.x},${p.y}`)
+                        .join(" ")}
+                      fill="rgba(56,189,248,0.12)"
+                      stroke="#0ea5e9"
+                      strokeWidth="1"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  ))}
+                  {!!corners.length && (
+                    <polyline
+                      points={corners.map((p) => `${p.x},${p.y}`).join(" ")}
+                      fill="none"
+                      stroke="#0284c7"
+                      strokeWidth="2"
+                      strokeDasharray="5 3"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  )}
+                </svg>
                 {draft.rooms.map((room) => (
-                  <div
+                  <span
                     key={room.id}
-                    className="pointer-events-none absolute border border-sky-500/50 bg-sky-400/5"
+                    className="pointer-events-none absolute rounded bg-white/90 px-1 text-xs font-semibold text-slate-800"
                     style={{
-                      left: `${room.x}%`,
-                      top: `${room.y}%`,
-                      width: `${room.width}%`,
-                      height: `${room.height}%`,
+                      left: `${roomPoints(room)[0]!.x}%`,
+                      top: `${roomPoints(room)[0]!.y}%`,
                     }}
                   >
-                    <span className="rounded bg-white/90 px-1 text-xs font-semibold text-slate-800">
-                      {room.name}
-                    </span>
-                  </div>
+                    {room.name}
+                  </span>
                 ))}
+                {mode === "rooms" &&
+                  corners.map((p, i) => (
+                    <button
+                      key={i}
+                      aria-label={
+                        i === 0 ? "Cerrar contorno en la primera esquina" : `Esquina nueva ${i + 1}`
+                      }
+                      className="absolute z-30 size-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-sky-600 text-xs text-white"
+                      style={{ left: `${p.x}%`, top: `${p.y}%` }}
+                      onClick={() => {
+                        if (i === 0) void finishRoom();
+                      }}
+                    >
+                      {i + 1}
+                    </button>
+                  ))}
+                {mode === "rooms" &&
+                  draft.rooms
+                    .filter((r) => r.id === editingRoom)
+                    .flatMap((room) =>
+                      roomPoints(room).map((p, i) => (
+                        <button
+                          key={`${room.id}-${i}`}
+                          aria-label={`Mover esquina ${i + 1} de ${room.name}`}
+                          disabled={busy}
+                          className="absolute z-30 size-6 -translate-x-1/2 -translate-y-1/2 touch-none rounded-full border-2 border-white bg-sky-600 text-xs text-white"
+                          style={{ left: `${p.x}%`, top: `${p.y}%` }}
+                          onPointerDown={(event) => {
+                            event.stopPropagation();
+                            dragging.current = `${room.id}:${i}`;
+                            event.currentTarget.setPointerCapture(event.pointerId);
+                          }}
+                          onPointerMove={(event) => {
+                            if (dragging.current !== `${room.id}:${i}`) return;
+                            const next = roomPoints(room).map((v, j) =>
+                              j === i ? coordinates(event) : v,
+                            );
+                            setDraft((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    rooms: prev.rooms.map((r) =>
+                                      r.id === room.id ? { ...r, points: next } : r,
+                                    ),
+                                  }
+                                : prev,
+                            );
+                          }}
+                          onPointerUp={(event) => {
+                            event.stopPropagation();
+                            if (dragging.current !== `${room.id}:${i}`) return;
+                            dragging.current = null;
+                            try {
+                              const next = polygonRoom(
+                                room.id,
+                                room.name,
+                                roomPoints(room).map((v, j) => (j === i ? coordinates(event) : v)),
+                              );
+                              void save({
+                                ...draft,
+                                rooms: draft.rooms.map((r) => (r.id === room.id ? next : r)),
+                              });
+                            } catch (error) {
+                              toast.error((error as Error).message);
+                              setDraft(plan);
+                            }
+                          }}
+                          onPointerCancel={() => {
+                            dragging.current = null;
+                            setDraft(plan);
+                          }}
+                        >
+                          {i + 1}
+                        </button>
+                      )),
+                    )}
                 {points.map((m, i) => (
                   <button
                     key={m.id}
@@ -439,13 +568,10 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
                         </button>
                       );
                     })}
-                {((position && mode === "measure") || (roomStart && mode === "rooms")) && (
+                {position && mode === "measure" && (
                   <span
                     className="pointer-events-none absolute z-30 -translate-x-1/2 -translate-y-1/2 text-3xl font-bold text-sky-700"
-                    style={{
-                      left: `${(mode === "rooms" ? roomStart : position)!.x}%`,
-                      top: `${(mode === "rooms" ? roomStart : position)!.y}%`,
-                    }}
+                    style={{ left: `${position.x}%`, top: `${position.y}%` }}
                   >
                     +
                   </span>
@@ -465,7 +591,7 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
                   <p className="text-sm text-muted-foreground">
                     {mode === "devices"
                       ? "Elige un equipo y toca el plano para colocarlo. Arrastra su icono para moverlo."
-                      : "Escribe el nombre y toca dos esquinas para marcar la habitación."}
+                      : "Escribe el nombre y toca cada esquina. Cierra con el primer punto o «Cerrar habitación». Para corregir una habitación, pulsa «Editar» y arrastra sus esquinas."}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {draft.measurements.length} mediciones guardadas. Abre «Medir cobertura» para
@@ -642,17 +768,38 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
           {!!draft.rooms.length && (
             <div className="flex flex-wrap gap-2">
               {draft.rooms.map((r) => (
-                <button
+                <div
                   key={r.id}
-                  disabled={busy}
-                  className={control}
-                  title="Quitar marca de habitación"
-                  onClick={() =>
-                    void save({ ...draft, rooms: draft.rooms.filter((room) => room.id !== r.id) })
-                  }
+                  className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
                 >
-                  {r.name} ×
-                </button>
+                  <span>{r.name}</span>
+                  <button
+                    disabled={busy}
+                    className="text-primary"
+                    aria-label={`Editar ${r.name}`}
+                    onClick={() => {
+                      setMode("rooms");
+                      setCorners([]);
+                      setEditingRoom(r.id);
+                    }}
+                  >
+                    Editar
+                  </button>
+                  <button
+                    disabled={busy}
+                    className="text-muted-foreground hover:text-destructive"
+                    aria-label={`Quitar ${r.name}`}
+                    onClick={() => {
+                      setEditingRoom(null);
+                      void save({
+                        ...draft,
+                        rooms: draft.rooms.filter((room) => room.id !== r.id),
+                      });
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
               ))}
             </div>
           )}
