@@ -1,4 +1,5 @@
 import { normalizeDeviceType, type Device, type DeviceType } from "./devices";
+import { networkEntries, unifiedDevice } from "./device-unification";
 import { deriveIdentity, inferType, isGenericName, loadIeeeRegistry } from "./identity";
 import { CONNECTION_TAGS } from "./connections";
 import {
@@ -267,6 +268,13 @@ export function resolveVendorsInBackground(
  * - deja como `offline` los conocidos que ya no aparecen.
  */
 export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
+  if (previous.some(d => d.networkEntries?.length)) {
+    const expanded = mergeScan(previous.flatMap(networkEntries), scanned);
+    const members = new Set(previous.flatMap(d => d.networkEntries?.map(e => e.id) ?? []));
+    const groups = previous.filter(d => d.networkEntries?.length).map(d =>
+      unifiedDevice(d, expanded.filter(e => d.networkEntries!.some(member => member.id === e.id))));
+    return [...groups, ...expanded.filter(d => !members.has(d.id))];
+  }
   const now = new Date().toISOString();
   const byId = new Map(previous.map((d) => [d.id, d]));
   const seen = new Set(scanned.map((d) => d.id));
