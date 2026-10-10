@@ -48,6 +48,8 @@ export interface Device {
   person?: string;
   /** Ubicación / habitación donde está el dispositivo (opcional) */
   location?: string;
+  /** Network identities explicitly unified by the user, retained for scan matching and undo. */
+  networkEntries?: Device[];
 }
 
 export const deviceTypeLabels = {
@@ -84,6 +86,7 @@ export const deviceTypeLabels = {
   clock: "Reloj",
   sensor: "Sensor",
   doorbell: "Timbre inteligente",
+  peephole: "Mirilla inteligente",
   "smart-appliance": "Otro electrodoméstico",
   "smart-fridge": "Frigorífico inteligente",
   "smart-washer": "Lavadora inteligente",

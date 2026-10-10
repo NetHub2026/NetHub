@@ -1,5 +1,6 @@
 import {
   Camera,
+  Eye,
   Cpu,
   Bell,
   Thermometer,
@@ -78,6 +79,7 @@ export const deviceTypeIcons: Record<DeviceType, React.ComponentType<{ className
   clock: Clock3,
   sensor: Radio,
   doorbell: Bell,
+  peephole: Eye,
   "smart-appliance": PlugZap,
   "smart-fridge": PlugZap,
   "smart-washer": PlugZap,

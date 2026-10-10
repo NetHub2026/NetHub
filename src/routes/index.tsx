@@ -109,6 +109,7 @@ import { exportInventoryCsv } from "@/lib/backup";
 import { ALL_NETWORKS, countByNetwork, detectNetworks, networkOf } from "@/lib/networks";
 import { PerformanceView } from "@/components/network/PerformanceView";
 import { DeviceDetailPanel } from "@/components/network/DeviceDetailPanel";
+import { unifyDevices, separateDevice } from "@/lib/device-unification";
 import { NetworkTabs } from "@/components/network/NetworkTabs";
 import { NetworkTopology } from "@/components/network/NetworkTopology";
 import { ActivityTimeline } from "@/components/network/ActivityTimeline";
@@ -1374,6 +1375,9 @@ function Dashboard() {
       </main>
 
       <DeviceDetailPanel
+        devices={items}
+        onUnify={otherId => { if (selected) setItems(prev => unifyDevices(prev, selected.id, otherId)); }}
+        onSeparate={() => { if (selected) setItems(prev => separateDevice(prev, selected.id)); }}
         events={events}
         device={selected}
         onClose={() => setSelectedId(null)}

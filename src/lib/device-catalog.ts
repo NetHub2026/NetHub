@@ -43,6 +43,7 @@ export const deviceTypeGroups: Array<{ label: string; types: DeviceType[] }> = [
       "led-strip",
       "sensor",
       "doorbell",
+      "peephole",
       "camera",
       "smart-appliance",
       "smart-fridge",
