@@ -22,6 +22,27 @@ export interface Anomaly {
   /** 0-100: lo raro que es (100 = nunca visto) */
   score: number;
   detail: string;
+  /** Fecha de revisión manual; ausente mientras esté pendiente. */
+  reviewedAt?: string;
+}
+
+/** Revisar un evento conserva la rutina y permite detectar nuevas incidencias. */
+export function reviewAnomaly(
+  state: PatternState,
+  id: string,
+  reviewed: boolean,
+  now = new Date(),
+): PatternState {
+  return {
+    ...state,
+    anomalies: state.anomalies.map((anomaly) => {
+      if (anomaly.id !== id) return anomaly;
+      const next = { ...anomaly };
+      if (reviewed) next.reviewedAt = now.toISOString();
+      else delete next.reviewedAt;
+      return next;
+    }),
+  };
 }
 
 export interface PatternState {
@@ -43,7 +64,14 @@ const STORAGE_KEY = "nethub.patterns.v1";
 const zeros = () => Array.from({ length: 24 }, () => 0);
 
 export function emptyPatternState(): PatternState {
-  return { observed: zeros(), lastKey: null, devices: {}, traffic: zeros(), anomalies: [], notified: [] };
+  return {
+    observed: zeros(),
+    lastKey: null,
+    devices: {},
+    traffic: zeros(),
+    anomalies: [],
+    notified: [],
+  };
 }
 
 function hourKey(d: Date) {
@@ -58,7 +86,11 @@ export function learningDays(state: PatternState): number {
 }
 
 /** Probabilidad (0-1) de que el equipo esté online a esa hora según su historial. */
-export function onlineProbability(state: PatternState, deviceId: string, hour: number): number | null {
+export function onlineProbability(
+  state: PatternState,
+  deviceId: string,
+  hour: number,
+): number | null {
   const obs = state.observed[hour] ?? 0;
   if (obs < MIN_LEARNING_DAYS) return null;
   const p = state.devices[deviceId];
@@ -82,7 +114,12 @@ export function evaluatePatterns(
     notified: [...prev.notified],
   };
   const fresh: Anomaly[] = [];
-  const push = (d: { id: string; name: string; ip: string }, kind: AnomalyKind, score: number, detail: string) => {
+  const push = (
+    d: { id: string; name: string; ip: string },
+    kind: AnomalyKind,
+    score: number,
+    detail: string,
+  ) => {
     const nk = `${d.id}|${kind}|${key}`;
     if (state.notified.includes(nk)) return;
     state.notified.push(nk);
@@ -113,7 +150,12 @@ export function evaluatePatterns(
           : `Solo se conecta a las ${hh(hour)} el ${Math.round(p * 100)} % de los días.`,
       );
     } else if (d.status !== "online" && p > 0.9) {
-      push(d, "unusual_offline", p * 100, `Suele estar conectado a las ${hh(hour)} (${Math.round(p * 100)} % de los días) y ahora no responde.`);
+      push(
+        d,
+        "unusual_offline",
+        p * 100,
+        `Suele estar conectado a las ${hh(hour)} (${Math.round(p * 100)} % de los días) y ahora no responde.`,
+      );
     }
   }
   if (rxMbps !== null && (state.observed[hour] ?? 0) >= MIN_LEARNING_DAYS) {
@@ -157,11 +199,17 @@ export function sanitizePatterns(value: unknown): PatternState {
   if (!value || typeof value !== "object") return base;
   const v = value as Partial<PatternState>;
   const arr = (a: unknown) =>
-    Array.isArray(a) && a.length === 24 ? a.map((n) => (typeof n === "number" && Number.isFinite(n) ? n : 0)) : zeros();
+    Array.isArray(a) && a.length === 24
+      ? a.map((n) => (typeof n === "number" && Number.isFinite(n) ? n : 0))
+      : zeros();
   const devices: Record<string, DevicePattern> = {};
   if (v.devices && typeof v.devices === "object") {
     for (const [id, p] of Object.entries(v.devices)) {
-      if (p && typeof p === "object") devices[id] = { hours: arr((p as DevicePattern).hours), lastKey: (p as DevicePattern).lastKey ?? null };
+      if (p && typeof p === "object")
+        devices[id] = {
+          hours: arr((p as DevicePattern).hours),
+          lastKey: (p as DevicePattern).lastKey ?? null,
+        };
     }
   }
   return {
@@ -169,8 +217,25 @@ export function sanitizePatterns(value: unknown): PatternState {
     lastKey: typeof v.lastKey === "string" ? v.lastKey : null,
     devices,
     traffic: arr(v.traffic),
-    anomalies: Array.isArray(v.anomalies) ? (v.anomalies as Anomaly[]).filter((a) => a && typeof a.id === "string").slice(0, MAX_ANOMALIES) : [],
-    notified: Array.isArray(v.notified) ? v.notified.filter((s): s is string => typeof s === "string").slice(-400) : [],
+    anomalies: Array.isArray(v.anomalies)
+      ? (v.anomalies as Anomaly[])
+          .filter(
+            (a) =>
+              a &&
+              typeof a.id === "string" &&
+              ["unusual_online", "unusual_offline", "traffic_spike"].includes(a.kind),
+          )
+          .slice(0, MAX_ANOMALIES)
+          .map((a) => {
+            const next = { ...a };
+            if (typeof a.reviewedAt !== "string" || !Number.isFinite(Date.parse(a.reviewedAt)))
+              delete next.reviewedAt;
+            return next;
+          })
+      : [],
+    notified: Array.isArray(v.notified)
+      ? v.notified.filter((s): s is string => typeof s === "string").slice(-400)
+      : [],
   };
 }
 
