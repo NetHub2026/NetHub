@@ -1,6 +1,6 @@
 {
   "name": "nethub",
-  "version": "1.4.6",
+  "version": "1.4.7",
   "description": "NetHub - Monitor y control de red doméstica",
   "author": "oyogor",
   "license": "UNLICENSED",
@@ -36,7 +36,18 @@
       "target": "portable",
       "icon": "public/favicon.ico",
       "verifyUpdateCodeSignature": false
-    }
+    },
+    "extraResources": [
+      {
+        "from": "public",
+        "to": "icons",
+        "filter": [
+          "favicon.ico",
+          "app-icon.png",
+          "favicon.png"
+        ]
+      }
+    ]
   },
   "overrides": {
     "rolldown": "1.2.1"

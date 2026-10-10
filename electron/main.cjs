@@ -25,6 +25,8 @@ const DB_FILE = "devices-db.json";
 const SETTINGS_FILE = "settings.json";
 const AGENT_PORT = 8765;
 const isWindows = process.platform === "win32";
+const WINDOWS_APP_ID = "dev.lovable.nethub";
+if (isWindows) app.setAppUserModelId(WINDOWS_APP_ID);
 // Repositorio oficial de NetHub. Los antiguos solo se consultan como respaldo
 // si el oficial no responde (GitHub redirige los repos transferidos).
 const OFFICIAL_REPO = "NetHub2026/NetHub";
@@ -1029,6 +1031,8 @@ function staticRoots() {
     appPath = "";
   }
   const bases = [
+    // Native Windows icon loading needs a real file outside app.asar.
+    path.join(process.resourcesPath || "", "icons"),
     path.join(__dirname, ".."),
     appPath,
     process.resourcesPath || "",
@@ -1281,6 +1285,15 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
+  if (isWindows) {
+    win.setAppDetails({
+      appId: WINDOWS_APP_ID,
+      appIconPath: iconPath("favicon.ico"),
+      appIconIndex: 0,
+    });
+    const image = nativeImage.createFromPath(iconPath("app-icon.png"));
+    if (!image.isEmpty()) win.setIcon(image);
+  }
   // Sin barra de menú (File, Edit, View, Window, Help). En desarrollo
   // se pueden abrir las DevTools con Ctrl+Shift+I.
   win.setMenuBarVisibility(false);
