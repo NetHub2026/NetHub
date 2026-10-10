@@ -13,7 +13,7 @@
 import type { Device, DeviceType } from "./devices";
 
 export type IdentityConfidence = "confirmed" | "probable" | "unknown";
-export type IdentitySource = "manual" | "oui" | "hostname" | "network" | null;
+export type IdentitySource = "manual" | "legacy" | "oui" | "hostname" | "network" | null;
 
 export interface IdentityFact<T> {
   value: T | null;
@@ -40,6 +40,7 @@ export const confidenceLabels: Record<IdentityConfidence, string> = {
 
 export const sourceLabels: Record<Exclude<IdentitySource, null>, string> = {
   manual: "Manual",
+  legacy: "Legado / no verificado",
   oui: "OUI",
   hostname: "Nombre/hostname",
   network: "Señales de red",
@@ -132,7 +133,8 @@ export function onRegistryLoaded(fn: () => void): () => void {
 export function ieeeVendor(mac: string | null | undefined): string | null {
   if (!registry) return null;
   if (classifyMac(mac) !== "global") return null;
-  const hex = macHex(mac)!;
+  const hex = macHex(mac);
+  if (!hex) return null;
   const hit = registry.s.get(hex.slice(0, 9)) ?? registry.m.get(hex.slice(0, 7)) ?? registry.l.get(hex.slice(0, 6));
   return hit === undefined ? null : (registry.names[hit] ?? null);
 }
@@ -149,7 +151,8 @@ export function isGenericName(name: string | null | undefined, vendor?: string |
   if (GENERIC_NAME.test(text)) return true;
   // "Fabricante 42": nombre generado automáticamente a partir del fabricante y la IP.
   const m = text.match(/^(.+)\s\d{1,3}$/);
-  return !!(m?.[1] && vendor && m[1].trim().toLowerCase() === vendor.trim().toLowerCase());
+  const prefix = m?.[1];
+  return Boolean(prefix && vendor && prefix.trim().toLowerCase() === vendor.trim().toLowerCase());
 }
 
 /** Pistas inequívocas o casi en el nombre / hostname. Orden: de más a menos específico. */
@@ -219,7 +222,7 @@ function isMeaningfulVendor(v: string | null | undefined): v is string {
   return text.length > 0 && !/^(fabricante desconocido|mac privada|desconocido|unknown)/i.test(text);
 }
 
-export type IdentityInput = Pick<Device, "name" | "type" | "mac" | "vendor" | "manualEdit" | "services">;
+export type IdentityInput = Pick<Device, "name" | "type" | "mac" | "vendor" | "manualEdit" | "identityManual" | "services">;
 
 /**
  * Calcula la identidad de un dispositivo. `adapterName` permite pasar el
@@ -237,23 +240,25 @@ export function deriveIdentity(device: IdentityInput, adapterName?: string | nul
 
   // Marca del aparato
   let vendor: IdentityFact<string> = { value: null, confidence: "unknown", source: null };
-  if (device.manualEdit && isMeaningfulVendor(device.vendor)) {
+  if (device.identityManual?.vendor && isMeaningfulVendor(device.vendor)) {
     vendor = { value: device.vendor.trim(), confidence: "confirmed", source: "manual" };
   } else {
     const byName = name ? NAME_BRAND_RULES.find(([re]) => re.test(name))?.[1] : undefined;
     if (byName) vendor = { value: byName, confidence: "probable", source: "hostname" };
-    else if (adapterVendor.value) vendor = { ...adapterVendor };
   }
 
   // Tipo
   let type: IdentityFact<DeviceType> = { value: null, confidence: "unknown", source: null };
-  if (device.manualEdit) {
+  if (device.identityManual?.type) {
     type = { value: device.type, confidence: "confirmed", source: "manual" };
+  } else if (device.type && device.type !== "other") {
+    type = { value: device.type, confidence: "unknown", source: "legacy" };
   } else {
     const byName = name ? NAME_TYPE_RULES.find(([re]) => re.test(name))?.[1] : undefined;
     const byNet = typeFromServices(device);
-    const byAdapter = adapterVendor.value
-      ? ADAPTER_TYPE_RULES.find(([re]) => re.test(adapterVendor.value!))?.[1]
+    const adapterValue = adapterVendor.value;
+    const byAdapter = adapterValue
+      ? ADAPTER_TYPE_RULES.find(([re]) => re.test(adapterValue))?.[1]
       : undefined;
     if (byName) type = { value: byName, confidence: "probable", source: "hostname" };
     else if (byNet) type = { value: byNet, confidence: "probable", source: "network" };
@@ -265,5 +270,5 @@ export function deriveIdentity(device: IdentityInput, adapterName?: string | nul
 
 /** Tipo sugerido para un dispositivo recién detectado, o null si no hay pistas. */
 export function inferType(device: IdentityInput, adapterName?: string | null): DeviceType | null {
-  return deriveIdentity({ ...device, manualEdit: false }, adapterName).type.value;
+  return deriveIdentity({ ...device, manualEdit: false, identityManual: undefined }, adapterName).type.value;
 }

@@ -11,6 +11,7 @@ import {
   type IdentityFact,
 } from "@/lib/identity";
 import { cn } from "@/lib/utils";
+import { DeviceTypeIcon } from "./DeviceTypeIcon";
 
 /** Carga el catálogo IEEE local tras el primer render y vuelve a pintar al terminar. */
 export function useIdentity(device: Device) {
@@ -55,12 +56,22 @@ export function InventoryIdentityBadge({ device }: { device: Device }) {
   const id = useIdentity(device);
   return (
     <span
-      title={`Tipo: ${confidenceLabels[id.type.confidence]}${id.type.source ? ` (${sourceLabels[id.type.source]})` : ""}`}
+      title={`Tipo: ${id.type.value ? deviceTypeLabels[id.type.value] : "Desconocido"} · ${id.type.source === "legacy" ? sourceLabels.legacy : confidenceLabels[id.type.confidence]}`}
       className={cn("shrink-0 rounded-full border px-1.5 text-[10px] leading-4", tone[id.type.confidence])}
     >
-      {confidenceLabels[id.type.confidence]}
+      {id.type.source === "legacy" ? "Legado / no verificado" : confidenceLabels[id.type.confidence]}
     </span>
   );
+}
+
+export function InventoryIdentityIcon({ device }: { device: Device }) {
+  const id = useIdentity(device);
+  return <DeviceTypeIcon type={id.type.value ?? device.type} />;
+}
+
+export function InventoryDeviceBrand({ device }: { device: Device }) {
+  const id = useIdentity(device);
+  return <>{id.vendor.value ? `Marca: ${id.vendor.value}` : "Marca desconocida"}</>;
 }
 
 /** Bloque de la ficha: tipo, marca y adaptador con su procedencia. */
@@ -76,8 +87,8 @@ export function IdentityDetails({ device }: { device: Device }) {
           : null;
   const rows: Array<[string, string, IdentityFact<unknown>]> = [
     ["Tipo", id.type.value ? deviceTypeLabels[id.type.value] : "Desconocido", id.type],
-    ["Marca", id.vendor.value ?? "Desconocido", id.vendor],
-    ["Adaptador de red", id.adapterVendor.value ?? "Desconocido", id.adapterVendor],
+    ["Marca del aparato", id.vendor.value ?? "Desconocido", id.vendor],
+    ["Adaptador (OUI)", id.adapterVendor.value ?? "Desconocido", id.adapterVendor],
   ];
   return (
     <div className="rounded-md border border-border bg-muted/20 p-3">
@@ -93,7 +104,7 @@ export function IdentityDetails({ device }: { device: Device }) {
       </dl>
       {macNote && <p className="mt-2 text-[11px] text-muted-foreground">{macNote}</p>}
       <p className="mt-2 text-[10px] text-muted-foreground/70">
-        El adaptador es la empresa registrada para la tarjeta de red (catálogo IEEE local); puede no coincidir con la marca del aparato.
+        El OUI identifica al fabricante del adaptador, no la marca del aparato.
       </p>
     </div>
   );
