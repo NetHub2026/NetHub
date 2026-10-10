@@ -79,7 +79,7 @@ export const deviceTypeLabels = {
   "barcode-scanner": "Lector de códigos de barras",
   scanner: "Escáner de documentos",
   smartwatch: "Smartwatch / reloj inteligente",
-  clock: "Reloj digital",
+  clock: "Reloj digital de pared / mesa",
   sensor: "Sensor",
   doorbell: "Timbre inteligente",
   "smart-appliance": "Otro electrodoméstico",

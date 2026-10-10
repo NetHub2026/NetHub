@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ChevronDown, Check, Search, ListFilter } from "lucide-react";
 import { deviceTypeLabels, type DeviceType } from "@/lib/devices";
 import { searchDeviceTypes } from "@/lib/device-catalog";
@@ -17,6 +17,8 @@ export function DeviceTypePicker({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
   const label =
     value.length === 0
       ? "Todos los tipos"
@@ -28,12 +30,16 @@ export function DeviceTypePicker({
     <Popover
       open={open}
       onOpenChange={(next) => {
+        // Keep the list inside the dialog's scroll boundary when editing a device.
+        if (next)
+          setPortalContainer(triggerRef.current?.closest<HTMLElement>('[role="dialog"]') ?? null);
         setOpen(next);
         setQuery("");
       }}
     >
       <PopoverTrigger asChild>
         <Button
+          ref={triggerRef}
           type="button"
           variant="outline"
           className="max-w-full gap-2"
@@ -49,6 +55,7 @@ export function DeviceTypePicker({
         </Button>
       </PopoverTrigger>
       <PopoverContent
+        portalContainer={portalContainer}
         align={multiple ? "end" : "start"}
         className="w-80 max-w-[calc(100vw-2rem)] p-3"
       >
@@ -79,7 +86,11 @@ export function DeviceTypePicker({
             Todos los tipos
           </Button>
         )}
-        <div className="max-h-[min(22rem,50dvh)] overflow-y-auto overscroll-contain">
+        <div
+          role="region"
+          aria-label="Tipos disponibles"
+          className="max-h-[min(22rem,50dvh)] overflow-y-auto overscroll-contain"
+        >
           {groups.length === 0 && (
             <p className="p-2 text-sm text-muted-foreground">No hay tipos que coincidan.</p>
           )}

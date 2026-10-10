@@ -18,6 +18,12 @@ describe("Catálogo de dispositivos", () => {
     expect(normalizeDeviceType("toString")).toBe("other");
   });
   it("busca por nombre sin tildes y por familia", () => {
+    expect(deviceTypeGroups.find((group) => group.types.includes("clock"))?.label).toBe(
+      "Audio, vídeo y entretenimiento",
+    );
+    expect(deviceTypeGroups.find((group) => group.types.includes("smartwatch"))?.label).toBe(
+      "Ordenadores y móviles",
+    );
     expect(searchDeviceTypes("ventilador").flatMap((group) => group.types)).toEqual(["smart-fan"]);
     expect(searchDeviceTypes("smartwatch").flatMap((group) => group.types)).toEqual(["smartwatch"]);
     expect(searchDeviceTypes("reloj digital").flatMap((group) => group.types)).toEqual(["clock"]);

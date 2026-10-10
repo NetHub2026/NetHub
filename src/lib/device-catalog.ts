@@ -9,7 +9,6 @@ export const deviceTypeGroups: Array<{ label: string; types: DeviceType[] }> = [
       "smartphone",
       "tablet",
       "smartwatch",
-      "clock",
       "printer",
       "scanner",
       "barcode-scanner",
@@ -31,6 +30,7 @@ export const deviceTypeGroups: Array<{ label: string; types: DeviceType[] }> = [
       "radio",
       "photo-frame",
       "photo-camera",
+      "clock",
     ],
   },
   {

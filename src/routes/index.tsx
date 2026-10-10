@@ -226,7 +226,7 @@ function Dashboard() {
   const [filter, setFilter] = useState<DeviceType[]>([]);
   const [query, setQuery] = useState("");
   const [network, setNetwork] = useState<string>(ALL_NETWORKS);
-  const [onlyOnline, setOnlyOnline] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"all" | "online" | "offline">("all");
   /** Listas de personas y ubicaciones creadas por el usuario. */
   const [directory, setDirectory] = useState<Directory>(emptyDirectory);
   const [personFilter, setPersonFilter] = useState("all");
@@ -717,7 +717,7 @@ function Dashboard() {
     return items.filter((d) => {
       if (filter.length > 0 && !filter.includes(d.type)) return false;
       if (network !== ALL_NETWORKS && (networkOf(d) ?? "unknown") !== network) return false;
-      if (onlyOnline && d.status !== "online") return false;
+      if (statusFilter !== "all" && d.status !== statusFilter) return false;
       if (personFilter !== "all" && (d.person ?? "") !== personFilter) return false;
       if (locationFilter !== "all" && (d.location ?? "") !== locationFilter) return false;
       if (!q) return true;
@@ -726,7 +726,7 @@ function Dashboard() {
         .toLowerCase()
         .includes(q);
     });
-  }, [items, filter, network, onlyOnline, personFilter, locationFilter, query]);
+  }, [items, filter, network, statusFilter, personFilter, locationFilter, query]);
 
   const inventoryGroups = useMemo(
     () => arrangeInventory(visible, settings.inventorySort, settings.inventoryGroup),
@@ -1087,7 +1087,6 @@ function Dashboard() {
                 <h2 className="mr-auto text-base font-semibold">
                   Dispositivos <span className="text-muted-foreground">({visible.length})</span>
                 </h2>
-                <DeviceTypeFilter value={filter} onChange={setFilter} />
                 <label className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <input
@@ -1097,6 +1096,13 @@ function Dashboard() {
                     className="w-56 rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm outline-none focus:border-brand"
                   />
                 </label>
+                <DeviceTypeFilter value={filter} onChange={setFilter} />
+                <InventoryViewControls
+                  order={settings.inventorySort}
+                  grouping={settings.inventoryGroup}
+                  onChange={updateSettings}
+                />
+
                 <span className="flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm focus-within:border-brand">
                   <Users className="size-4 shrink-0 text-muted-foreground" />
                   <select
@@ -1147,22 +1153,19 @@ function Dashboard() {
                     </option>
                   </select>
                 </span>
-                <InventoryViewControls
-                  order={settings.inventorySort}
-                  grouping={settings.inventoryGroup}
-                  onChange={updateSettings}
-                />
-                <button
-                  onClick={() => setOnlyOnline((v) => !v)}
-                  className={cn(
-                    "rounded-md border px-3 py-2 text-sm transition-colors",
-                    onlyOnline
-                      ? "border-brand bg-brand/10 text-brand"
-                      : "border-border text-muted-foreground hover:bg-accent",
-                  )}
-                >
-                  Solo activos
-                </button>
+                <label className="flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm">
+                  <span className="text-muted-foreground">Estado</span>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+                    aria-label="Filtrar por estado"
+                    className="bg-popover text-popover-foreground outline-none"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="online">Activos</option>
+                    <option value="offline">Inactivos</option>
+                  </select>
+                </label>
               </div>
 
               {inventoryGroups.map((group) => (
