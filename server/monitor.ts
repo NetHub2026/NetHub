@@ -321,6 +321,7 @@ export class Monitor {
         usage: imported.usage,
         health: imported.health,
         speedHistory: imported.speedHistory,
+        floorPlan: imported.floorPlan ?? null,
         lastScanAt: null,
       });
       draft.settings = {

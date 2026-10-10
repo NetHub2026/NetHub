@@ -1,3 +1,4 @@
+import { FloorPlanView } from "@/components/network/FloorPlanView";
 import { evaluateWatches } from "@/lib/device-watch";
 import { SPEED_HISTORY_CHANGED } from "@/lib/speed-history";
 import { createFileRoute } from "@tanstack/react-router";
@@ -54,6 +55,8 @@ import {
   APP_VERSION,
   applyNativeSettings,
   getDbPath,
+  getRuntime,
+  writeSettingsFile,
   nativeScan,
   notifyNative,
   onDesktopScanRequest,
@@ -65,6 +68,7 @@ import {
   loadSettingsAnywhere,
   resolveDark,
   saveSettingsAnywhere,
+  saveSettings,
   type Settings,
 } from "@/lib/settings";
 import { SettingsModal } from "@/components/network/SettingsModal";
@@ -180,6 +184,7 @@ function Dashboard() {
   const [items, setItems] = useState<Device[]>([]);
   const [viewMode, setViewMode] = useState<
     | "inventory"
+    | "floorplan"
     | "performance"
     | "topology"
     | "activity"
@@ -850,6 +855,7 @@ function Dashboard() {
                 <LayoutGrid className="size-3.5" />
                 Inventario
               </button>
+              <button type="button" onClick={() => setViewMode("floorplan")} className={cn("inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors", viewMode === "floorplan" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}><MapPin className="size-3.5" />Plano y cobertura</button>
               <button
                 type="button"
                 onClick={() => setViewMode("performance")}
@@ -1007,6 +1013,14 @@ function Dashboard() {
           </section>
         )}
 
+        {viewMode === "floorplan" && <FloorPlanView devices={items} plan={settings.floorPlan ?? null} onSave={async (floorPlan) => {
+          const next = { ...settingsRef.current, floorPlan };
+          if (getRuntime() !== "web" && !await writeSettingsFile(next)) return false;
+          if (getRuntime() === "web") window.localStorage.setItem("nethub.settings.v1", JSON.stringify(next));
+          else saveSettings(next);
+          setSettings(next);
+          return true;
+        }} />}
         {showEmpty && viewMode === "inventory" && (
           <section className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
             <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-brand/15 text-brand">

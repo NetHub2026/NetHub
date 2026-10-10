@@ -296,6 +296,37 @@ describe("Authenticated HTTP API", () => {
       });
     return { monitor, request, base };
   }
+  it("persists authenticated floor plans, prevents conflicting edits and gates coverage transfers", async () => {
+    const { monitor, request } = await setup();
+    expect((await request("/api/coverage-payload")).status).toBe(401);
+    const login = await request("/api/login", { password: "synthetic-test-password-2026" });
+    const cookie = login.headers.get("set-cookie")!.split(";")[0]!;
+    const { csrf } = await login.json();
+    const headers = { cookie, "x-nethub-csrf": csrf };
+    const plan = { version: 1, updatedAt: "2026-10-10T12:00:00.000Z", name: "Generic test", image: "data:image/png;base64,aGVsbG8=", width: 800, height: 600, positions: {}, rooms: [], measurements: [] };
+    expect((await request("/api/floor-plan", { plan, expected: null }, { cookie })).status).toBe(403);
+    expect((await request("/api/floor-plan", { plan, expected: null }, headers)).status).toBe(200);
+    expect((await monitor.store.load()).floorPlan).toEqual(plan);
+    expect((await request("/api/floor-plan", { plan, expected: null }, headers)).status).toBe(409);
+    expect((await request("/api/floor-plan", { plan: { ...plan, image: "data:image/svg+xml;base64,aGVsbG8=" }, expected: plan.updatedAt }, headers)).status).toBe(400);
+    const compact = await (await request(`/api/state?planVersion=${encodeURIComponent(plan.updatedAt)}`, undefined, { cookie })).json();
+    expect(compact.floorPlan).toBeUndefined();
+    expect(monitor.state.floorPlan).toEqual(plan);
+    await monitor.store.backup();
+    expect((await request("/api/floor-plan", { plan: null, expected: plan.updatedAt }, headers)).status).toBe(200);
+    const copy = (await monitor.store.listBackups())[0]!;
+    await monitor.importData(await monitor.store.readBackup(copy.id));
+    expect(monitor.state.floorPlan).toEqual(plan);
+    expect((await request("/api/coverage-payload", undefined, { cookie })).status).toBe(400);
+    monitor.options.demo = false;
+    const payload = await request("/api/coverage-payload", undefined, { cookie });
+    expect(payload.status).toBe(200);
+    expect(payload.headers.get("cache-control")).toContain("no-store");
+    expect((await payload.arrayBuffer()).byteLength).toBe(4 * 1024 * 1024);
+    expect((await request("/api/coverage-ping", undefined, { cookie })).status).toBe(200);
+    for (let i = 0; i < 11; i++) await (await request("/api/coverage-payload", undefined, { cookie })).arrayBuffer();
+    expect((await request("/api/coverage-payload", undefined, { cookie })).status).toBe(429);
+  });
   it("requires authentication, CSRF and matching Origin; logout invalidates the session", async () => {
     const { monitor, request, base } = await setup();
     expect((await request("/api/state")).status).toBe(401);

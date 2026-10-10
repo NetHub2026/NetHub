@@ -7,6 +7,8 @@ import { Authentication } from "./auth";
 import { Monitor } from "./monitor";
 import { inSubnet, privateIp, ping } from "./network";
 import type { MergeChoices } from "../src/lib/device-unification";
+import { randomBytes } from "node:crypto";
+import { validateFloorPlan } from "../src/lib/floor-plan";
 type Options = {
   password: string;
   staticDirectory: string;
@@ -37,6 +39,8 @@ const string = (value: unknown) => {
 export function createHttpServer(monitor: Monitor, options: Options) {
   const authentication = new Authentication(options.password);
   const root = resolve(options.staticDirectory);
+  const coveragePayload = randomBytes(4 * 1024 * 1024);
+  const coverageLimits = new Map<string, { at: number; count: number }>();
   const json = (res: ServerResponse, status: number, value: unknown) => {
     res.statusCode = status;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -102,10 +106,28 @@ export function createHttpServer(monitor: Monitor, options: Options) {
             });
           if (req.method === "GET" && url.pathname === "/api/session")
             return json(res, 200, { csrf: session.csrf });
+          if (req.method === "GET" && ["/api/coverage-ping", "/api/coverage-payload"].includes(url.pathname)) {
+            if (monitor.options.demo) return json(res, 400, { error: "Mediciones desactivadas en la demostración." });
+            if (url.pathname.endsWith("payload")) {
+              const now = Date.now();
+              for (const [token, entry] of coverageLimits) if (now - entry.at > 60000) coverageLimits.delete(token);
+              const entry = coverageLimits.get(session.token) ?? { at: now, count: 0 };
+              if (++entry.count > 12) return json(res, 429, { error: "Espera un minuto antes de repetir las mediciones." });
+              coverageLimits.set(session.token, entry);
+            }
+            const payload = url.pathname.endsWith("payload") ? coveragePayload : Buffer.from("NetHub");
+            res.setHeader("Content-Type", "application/octet-stream");
+            res.setHeader("Cache-Control", "no-store, no-transform");
+            res.setHeader("Content-Length", payload.byteLength);
+            return res.end(payload);
+          }
           if (req.method === "GET" && url.pathname === "/api/backups")
             return json(res, 200, await monitor.store.listBackups());
-          if (req.method === "GET" && url.pathname === "/api/state")
-            return json(res, 200, monitor.snapshot());
+          if (req.method === "GET" && url.pathname === "/api/state") {
+            const snapshot = monitor.snapshot();
+            if (snapshot.floorPlan && url.searchParams.get("planVersion") === snapshot.floorPlan.updatedAt) delete snapshot.floorPlan;
+            return json(res, 200, snapshot);
+          }
           if (req.method === "GET" && url.pathname === "/api/export") {
             res.setHeader(
               "Content-Disposition",
@@ -116,7 +138,7 @@ export function createHttpServer(monitor: Monitor, options: Options) {
           if (req.method !== "POST") return json(res, 405, { error: "Método no permitido." });
           const input = await body(
             req,
-            url.pathname === "/api/import" ? 10 * 1024 * 1024 : 64 * 1024,
+            url.pathname === "/api/import" ? 10 * 1024 * 1024 : url.pathname === "/api/floor-plan" ? 3 * 1024 * 1024 : 64 * 1024,
           );
           if (url.pathname === "/api/import") {
             await monitor.importData(input["data"]);
@@ -128,7 +150,14 @@ export function createHttpServer(monitor: Monitor, options: Options) {
             );
             return json(res, 200, { ok: true });
           }
-          if (url.pathname === "/api/scan") await monitor.scan();
+          if (url.pathname === "/api/floor-plan") {
+            if (!Object.hasOwn(input, "plan")) throw new Error("Falta el plano.");
+            const plan = validateFloorPlan(input["plan"]);
+            await monitor.mutate(draft => {
+              if ((draft.floorPlan?.updatedAt ?? null) !== input["expected"]) throw Object.assign(new Error("Otra sesión ha cambiado el plano. Recarga la vista antes de editarlo."), { status: 409 });
+              draft.floorPlan = plan;
+            });
+          } else if (url.pathname === "/api/scan") await monitor.scan();
           else if (url.pathname === "/api/device") {
             if (
               !input["changes"] ||

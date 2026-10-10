@@ -4,6 +4,7 @@ import type { PatternState } from "../src/lib/patterns";
 import type { UsageState } from "../src/lib/usage";
 import type { HealthSample } from "../src/lib/health";
 import type { SpeedResult } from "../src/lib/speedtest";
+import type { FloorPlan } from "../src/lib/floor-plan";
 
 export interface ServerSettings {
   speedHistoryLimit: number;
@@ -22,6 +23,7 @@ export interface NetworkInterface {
   gateway: string | null;
 }
 export interface ServerState {
+  floorPlan?: FloorPlan | null;
   schema: 1;
   revision: number;
   devices: Device[];

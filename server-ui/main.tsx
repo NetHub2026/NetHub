@@ -1,3 +1,4 @@
+import { FloorPlanView } from "../src/components/network/FloorPlanView";
 import { BackupManager } from "../src/components/network/BackupManager";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -116,10 +117,11 @@ const editable = [
   "services",
   "servicesScannedAt",
 ] as const;
-type View = "inventory" | "home" | "activity" | "status" | "performance" | "usage" | "settings";
+type View = "floorplan" | "inventory" | "home" | "activity" | "status" | "performance" | "usage" | "settings";
 const views: Array<[View, string, typeof Server]> = [
   ["inventory", "Inventario", Network],
   ["home", "Casa", House],
+  ["floorplan", "Plano y cobertura", MapPin],
   ["activity", "Actividad", Activity],
   ["status", "Estado", ShieldCheck],
   ["performance", "Rendimiento", Gauge],
@@ -152,6 +154,7 @@ function App() {
   const mounted = useRef(true);
   const apply = (value: ServerSnapshot) => {
     const previous = latest;
+    if (value.floorPlan === undefined) value.floorPlan = previous?.floorPlan ?? null;
     latest = value;
     if (previous)
       for (const event of [...value.events].reverse()) {
@@ -163,7 +166,8 @@ function App() {
   };
   const refresh = async () => {
     try {
-      const value = await api<ServerSnapshot>("state");
+      const version = latest?.floorPlan?.updatedAt;
+      const value = await api<ServerSnapshot>("state" + (version ? `?planVersion=${encodeURIComponent(version)}` : ""));
       if (!pending.current && mounted.current) apply(value);
     } catch (error) {
       if (mounted.current) setConnected(false);
@@ -539,6 +543,7 @@ function App() {
                 onSettings={(patch) => void mutate("settings", patch)}
               />
             )}
+            {view === "floorplan" && <FloorPlanView devices={devices} plan={state.floorPlan ?? null} canMeasure demo={state.server.demo} onSave={(plan, expected) => mutate("floor-plan", { plan, expected })} />}
             {view === "settings" && (
               <section className="space-y-5">
                 <div className="rounded-xl border border-border bg-card p-5">

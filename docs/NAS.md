@@ -109,4 +109,12 @@ En la ficha de cada dispositivo puedes consultar hasta 50 eventos de presencia, 
 
 La vigilancia se activa por dispositivo: 1, 5, 10, 30 o 60 minutos sin respuesta, con aviso opcional al recuperarse. Se evalúa al completar un escaneo correcto y no repite la misma ausencia. Los intervalos reales de escaneo condicionan el momento del aviso; tras una pausa de más de 15 minutos se reinicia el margen de observación pendiente. La configuración y la ausencia ya avisada persisten en el JSON. En Windows hay aviso nativo y en la app; en NAS los eventos se registran sin navegador y se muestran en Actividad, con aviso visual para los navegadores conectados. No se envían mensajes externos ni notificaciones al móvil con el navegador cerrado.
 
-Exportar selección (CSV) utiliza los filtros activos del inventario, incluyendo personas, ubicaciones y tipos. Los valores que podrían interpretarse como fórmulas en una hoja de cálculo se exportan como texto.
+Exportar selección ofrece CSV y Excel (.xlsx) con resumen, tabla filtrable y cabeceras fijas. Utiliza los filtros activos del inventario, incluyendo personas, ubicaciones y tipos. Los valores que podrían interpretarse como fórmulas en una hoja de cálculo se exportan como texto.
+
+## Plano real y mediciones locales
+
+En «Plano y cobertura» puedes subir PNG/JPG (hasta 15 MB, convertido localmente a una imagen de hasta 2000 píxeles y 2 MB), colocar equipos, arrastrarlos y marcar habitaciones. Cambiar o eliminar el plano pide confirmación; descarga primero una copia si quieres conservar posiciones y mediciones. La copia JSON se puede importar en la misma sección vacía de PC o NAS. El JSON general y las copias del NAS incluyen el plano. El inventario se conserva al cambiarlo.
+
+Para medir, abre NetHub desde el móvil conectado a la red, pulsa «Medir cobertura», toca tu posición y nombra la visita. Se mide la ruta HTTP desde ese navegador al NAS (12 MB por prueba), no Internet ni señal Wi-Fi. Banda y medio de conexión se indican manualmente. Los puntos muestran descarga, latencia y variación; las visitas permiten distinguir antes/después y se conservan los últimos 200 puntos. No se colorean zonas sin mediciones. Un proxy/VPN puede influir en la ruta y el resultado. En PC sin servidor se prepara el plano; las mediciones requieren el NAS.
+
+El servicio exige sesión para servir los datos de medición, evita caché, limita las transferencias a cuatro pruebas por minuto y detecta ediciones simultáneas del plano. La imagen no se descarga de nuevo en cada actualización del inventario. La demostración usa un plano ficticio y desactiva transferencias; la validación en una vivienda real queda pendiente.

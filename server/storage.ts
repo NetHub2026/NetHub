@@ -9,6 +9,7 @@ import { sanitizeDevices } from "../src/lib/scanner";
 import { sanitizeSpeedHistory, speedHistoryLimit } from "../src/lib/speed-history";
 import type { Device } from "../src/lib/devices";
 import { activityLabels } from "../src/lib/activity";
+import { validateFloorPlan } from "../src/lib/floor-plan";
 function storedDevices(value: unknown): Device[] {
   if (!Array.isArray(value)) throw new Error("Inventario no válido.");
   let count = 0;
@@ -156,6 +157,7 @@ export function normalizeState(parsed: Record<string, any>): ServerState {
         ];
   return {
     ...base,
+    floorPlan: validateFloorPlan(parsed["floorPlan"]),
     revision:
       Number.isSafeInteger(parsed["revision"]) && parsed["revision"] >= 0 ? parsed["revision"] : 0,
     devices: storedDevices(parsed["devices"]),

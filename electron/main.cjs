@@ -158,7 +158,7 @@ let savedWindowState = null;
 function writeSettings(json) {
   try {
     const state = savedWindowState || readWindowState(readSettings());
-    fs.writeFileSync(settingsPath(), mergeWindowState(String(json ?? "{}"), state), "utf8");
+    backups.atomic(settingsPath(), mergeWindowState(String(json ?? "{}"), state));
     return { ok: true, path: settingsPath() };
   } catch (error) {
     return { ok: false, error: String(error) };
