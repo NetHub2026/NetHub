@@ -25,6 +25,7 @@ export const deviceTypeGroups: Array<{ label: string; types: DeviceType[] }> = [
       "media-player",
       "projector",
       "speaker",
+      "smart-display",
       "audio-player",
       "amplifier",
       "radio",
