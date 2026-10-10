@@ -4,6 +4,12 @@
  * notificaciones de Windows) se aplican a través del puente de Electron.
  */
 
+import {
+  inventorySortLabels,
+  inventoryGroupLabels,
+  type InventorySort,
+  type InventoryGroup,
+} from "./inventory-view";
 import { readSettingsFile, writeSettingsFile } from "./desktop";
 
 export type ThemeMode = "light" | "dark" | "auto";
@@ -18,6 +24,8 @@ export interface Settings {
   minimizeToTray: boolean;
   /* Apariencia */
   theme: ThemeMode;
+  inventorySort: InventorySort;
+  inventoryGroup: InventoryGroup;
   /* Red y telemetría */
   linkSpeedMbps: number;
   scanIntervalSeconds: number;
@@ -47,6 +55,8 @@ export const defaultSettings: Settings = {
   closeAction: "tray",
   minimizeToTray: true,
   theme: "dark",
+  inventorySort: "ip",
+  inventoryGroup: "none",
   linkSpeedMbps: 600,
   scanIntervalSeconds: 120,
   scanMode: "fast",
@@ -112,8 +122,13 @@ export function sanitizeSettings(value: Partial<Settings>): Settings {
     startMinimized: Boolean(value.startMinimized),
     closeAction: value.closeAction === "quit" ? "quit" : "tray",
     minimizeToTray: value.minimizeToTray !== false,
-    theme:
-      value.theme === "light" || value.theme === "auto" ? value.theme : "dark",
+    theme: value.theme === "light" || value.theme === "auto" ? value.theme : "dark",
+    inventorySort: Object.hasOwn(inventorySortLabels, value.inventorySort ?? "")
+      ? value.inventorySort!
+      : "ip",
+    inventoryGroup: Object.hasOwn(inventoryGroupLabels, value.inventoryGroup ?? "")
+      ? value.inventoryGroup!
+      : "none",
     linkSpeedMbps: number(value.linkSpeedMbps, defaultSettings.linkSpeedMbps),
     scanIntervalSeconds: scanIntervalOptions.some(
       (o) => o.value === Number(value.scanIntervalSeconds),

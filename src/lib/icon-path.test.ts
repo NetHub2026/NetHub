@@ -6,7 +6,9 @@ import { join } from "node:path";
 
 const { resolveIconPath } = createRequire(import.meta.url)("../../electron/icon-path.cjs");
 const roots: string[] = [];
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
 
 it("uses the external Windows icon even when app.asar also contains it", () => {
   const root = mkdtempSync(join(tmpdir(), "nethub-icon-"));
@@ -18,8 +20,9 @@ it("uses the external Windows icon even when app.asar also contains it", () => {
     for (const file of ["favicon.ico", "app-icon.png"]) writeFileSync(join(base, file), "test");
   }
   for (const file of ["favicon.ico", "app-icon.png"])
-    expect(resolveIconPath(file, { resourcesPath, appPath, electronDir: join(appPath, "electron") }))
-      .toBe(join(resourcesPath, "icons", file));
+    expect(
+      resolveIconPath(file, { resourcesPath, appPath, electronDir: join(appPath, "electron") }),
+    ).toBe(join(resourcesPath, "icons", file));
 });
 
 it("uses public icons in development without a packaged resources folder", () => {
@@ -27,6 +30,7 @@ it("uses public icons in development without a packaged resources folder", () =>
   roots.push(root);
   mkdirSync(join(root, "public"));
   writeFileSync(join(root, "public", "favicon.ico"), "test");
-  expect(resolveIconPath("favicon.ico", { appPath: root, electronDir: join(root, "electron") }))
-    .toBe(join(root, "public", "favicon.ico"));
+  expect(
+    resolveIconPath("favicon.ico", { appPath: root, electronDir: join(root, "electron") }),
+  ).toBe(join(root, "public", "favicon.ico"));
 });

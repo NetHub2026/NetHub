@@ -133,11 +133,15 @@ import {
 import { UpdateModal } from "@/components/network/UpdateModal";
 import { DirectoryManager } from "@/components/network/DirectoryManager";
 import { DeviceTypeFilter } from "@/components/network/DeviceTypeFilter";
-import {
-  InventoryIdentityIcon,
-  InventoryDeviceBrand,
-} from "@/components/network/IdentityBadge";
+import { InventoryIdentityIcon, InventoryDeviceBrand } from "@/components/network/IdentityBadge";
 
+import {
+  arrangeInventory,
+  inventorySortLabels,
+  inventoryGroupLabels,
+  type InventorySort,
+  type InventoryGroup,
+} from "@/lib/inventory-view";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -181,7 +185,15 @@ function visibleTags(device: Device): string[] {
 function Dashboard() {
   const [items, setItems] = useState<Device[]>([]);
   const [viewMode, setViewMode] = useState<
-    "inventory" | "performance" | "topology" | "activity" | "security" | "health" | "usage" | "sla" | "home"
+    | "inventory"
+    | "performance"
+    | "topology"
+    | "activity"
+    | "security"
+    | "health"
+    | "usage"
+    | "sla"
+    | "home"
   >("inventory");
   const [alerts, setAlerts] = useState<SentinelAlert[]>([]);
   const updateAlerts = (fn: (prev: SentinelAlert[]) => SentinelAlert[]) =>
@@ -716,14 +728,21 @@ function Dashboard() {
     });
   }, [items, filter, network, onlyOnline, personFilter, locationFilter, query]);
 
+  const inventoryGroups = useMemo(
+    () => arrangeInventory(visible, settings.inventorySort, settings.inventoryGroup),
+    [visible, settings.inventorySort, settings.inventoryGroup],
+  );
+
   const manageEntry = (kind: DirectoryKind, previous: string, replacement: string) => {
     try {
       const next = changeDirectoryEntry(items, directory, kind, previous, replacement);
       setDirectory(next.directory);
       setItems(next.devices);
       void saveDirectoryAnywhere(next.directory);
-      if (kind === "people" && personFilter.toLowerCase() === previous.toLowerCase()) setPersonFilter(replacement.trim() || "all");
-      if (kind === "locations" && locationFilter.toLowerCase() === previous.toLowerCase()) setLocationFilter(replacement.trim() || "all");
+      if (kind === "people" && personFilter.toLowerCase() === previous.toLowerCase())
+        setPersonFilter(replacement.trim() || "all");
+      if (kind === "locations" && locationFilter.toLowerCase() === previous.toLowerCase())
+        setLocationFilter(replacement.trim() || "all");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo actualizar el nombre.");
     }
@@ -1047,7 +1066,7 @@ function Dashboard() {
               />
             </section>
 
-<section className="mt-8">
+            <section className="mt-8">
               <h2 className="text-base font-semibold">Redes detectadas</h2>
               <p className="mt-1 text-xs text-muted-foreground">
                 Las subredes se detectan solas a partir de las IP encontradas; puedes cambiar la red
@@ -1141,79 +1160,131 @@ function Dashboard() {
                 </button>
               </div>
 
-              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                {visible.map((d) => (
-                  <button
-                    key={d.id}
-                    onClick={() => setSelectedId(d.id)}
-                    className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-brand"
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                  Ordenar por
+                  <select
+                    aria-label="Ordenar inventario"
+                    value={settings.inventorySort}
+                    onChange={(e) =>
+                      updateSettings({ inventorySort: e.target.value as InventorySort })
+                    }
+                    className="rounded-md border border-input bg-background px-3 py-2 text-foreground"
                   >
-                    <span
-                      className={cn(
-                        "flex size-10 shrink-0 items-center justify-center rounded-lg",
-                        d.status === "online"
-                          ? "bg-brand/15 text-brand"
-                          : "bg-muted text-muted-foreground",
-                      )}
-                    >
-                      <InventoryIdentityIcon device={d} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2">
-                        <span className="truncate font-medium">{d.name}</span>
+                    {Object.entries(inventorySortLabels).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                  Agrupar por
+                  <select
+                    aria-label="Agrupar inventario"
+                    value={settings.inventoryGroup}
+                    onChange={(e) =>
+                      updateSettings({ inventoryGroup: e.target.value as InventoryGroup })
+                    }
+                    className="rounded-md border border-input bg-background px-3 py-2 text-foreground"
+                  >
+                    {Object.entries(inventoryGroupLabels).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              {inventoryGroups.map((group) => (
+                <div key={group.key} className="mt-5">
+                  {group.label && (
+                    <h3 className="mb-3 text-sm font-semibold">
+                      {group.label}{" "}
+                      <span className="text-muted-foreground">({group.devices.length})</span>
+                    </h3>
+                  )}
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                    {group.devices.map((d) => (
+                      <button
+                        key={d.id}
+                        onClick={() => setSelectedId(d.id)}
+                        className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-brand"
+                      >
                         <span
                           className={cn(
-                            "size-1.5 shrink-0 rounded-full",
-                            d.status === "online" ? "bg-success" : "bg-muted-foreground",
+                            "flex size-10 shrink-0 items-center justify-center rounded-lg",
+                            d.status === "online"
+                              ? "bg-brand/15 text-brand"
+                              : "bg-muted text-muted-foreground",
                           )}
-                        />
-                      </span>
-                      <span className="mt-0.5 block truncate font-mono text-xs text-muted-foreground">
-                        {d.ip} · <InventoryDeviceBrand device={d} />
-                      </span>
-                      {(d.person || d.location) && (
-                        <span className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-                          {d.location && (
-                            <span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-muted-foreground">
-                              <MapPin className="size-3 shrink-0" />
-                              <span className="truncate">{d.location}</span>
-                            </span>
-                          )}
-                          {d.person && (
-                            <span className="inline-flex min-w-0 items-center gap-1 text-muted-foreground">
-                              <Users className="size-3 shrink-0" />
-                              <span className="truncate">{d.person}</span>
-                            </span>
-                          )}
+                        >
+                          <InventoryIdentityIcon device={d} />
                         </span>
-                      )}
-                      <span className="mt-1.5 flex flex-wrap gap-1.5">
-                        {d.isNew && !d.trusted && (
-                          <Badge className="bg-warning/15 text-warning">Nuevo</Badge>
-                        )}
-                        {d.blocked && (
-                          <Badge className="bg-destructive/15 text-destructive">Bloqueado</Badge>
-                        )}
-                        {d.prioritized && <Badge className="bg-warning/15 text-warning">QoS</Badge>}
-                        {visibleTags(d)
-                          .slice(0, 2)
-                          .map((t) => (
-                            <Badge key={t} className="bg-muted text-muted-foreground">
-                              {t}
-                            </Badge>
-                          ))}
-                      </span>
-                    </span>
-                    <span className="flex shrink-0 flex-col items-end gap-1.5 self-stretch">
-                      <ConnectionIcon device={d} />
-                      <span className="mt-auto text-right">
-                        <span className="block font-mono text-sm">{d.downstream.toFixed(1)}</span>
-                        <span className="block text-[11px] text-muted-foreground">Mbps</span>
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-2">
+                            <span className="truncate font-medium">{d.name}</span>
+                            <span
+                              className={cn(
+                                "size-1.5 shrink-0 rounded-full",
+                                d.status === "online" ? "bg-success" : "bg-muted-foreground",
+                              )}
+                            />
+                          </span>
+                          <span className="mt-0.5 block truncate font-mono text-xs text-muted-foreground">
+                            {d.ip} · <InventoryDeviceBrand device={d} />
+                          </span>
+                          {(d.person || d.location) && (
+                            <span className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                              {d.location && (
+                                <span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-muted-foreground">
+                                  <MapPin className="size-3 shrink-0" />
+                                  <span className="truncate">{d.location}</span>
+                                </span>
+                              )}
+                              {d.person && (
+                                <span className="inline-flex min-w-0 items-center gap-1 text-muted-foreground">
+                                  <Users className="size-3 shrink-0" />
+                                  <span className="truncate">{d.person}</span>
+                                </span>
+                              )}
+                            </span>
+                          )}
+                          <span className="mt-1.5 flex flex-wrap gap-1.5">
+                            {d.isNew && !d.trusted && (
+                              <Badge className="bg-warning/15 text-warning">Nuevo</Badge>
+                            )}
+                            {d.blocked && (
+                              <Badge className="bg-destructive/15 text-destructive">
+                                Bloqueado
+                              </Badge>
+                            )}
+                            {d.prioritized && (
+                              <Badge className="bg-warning/15 text-warning">QoS</Badge>
+                            )}
+                            {visibleTags(d)
+                              .slice(0, 2)
+                              .map((t) => (
+                                <Badge key={t} className="bg-muted text-muted-foreground">
+                                  {t}
+                                </Badge>
+                              ))}
+                          </span>
+                        </span>
+                        <span className="flex shrink-0 flex-col items-end gap-1.5 self-stretch">
+                          <ConnectionIcon device={d} />
+                          <span className="mt-auto text-right">
+                            <span className="block font-mono text-sm">
+                              {d.downstream.toFixed(1)}
+                            </span>
+                            <span className="block text-[11px] text-muted-foreground">Mbps</span>
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
 
               {visible.length === 0 && (
                 <p className="mt-8 text-center text-sm text-muted-foreground">
@@ -1359,8 +1430,24 @@ function Dashboard() {
 
       <SettingsModal
         directoryManagers={{
-          people: <DirectoryManager kind="people" names={options.people} devices={items} onCreate={createPerson} onChange={(previous, replacement) => manageEntry("people", previous, replacement)} />,
-          locations: <DirectoryManager kind="locations" names={options.locations} devices={items} onCreate={createLocation} onChange={(previous, replacement) => manageEntry("locations", previous, replacement)} />,
+          people: (
+            <DirectoryManager
+              kind="people"
+              names={options.people}
+              devices={items}
+              onCreate={createPerson}
+              onChange={(previous, replacement) => manageEntry("people", previous, replacement)}
+            />
+          ),
+          locations: (
+            <DirectoryManager
+              kind="locations"
+              names={options.locations}
+              devices={items}
+              onCreate={createLocation}
+              onChange={(previous, replacement) => manageEntry("locations", previous, replacement)}
+            />
+          ),
         }}
         open={settingsOpen}
         settings={settings}
