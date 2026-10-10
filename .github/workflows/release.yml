@@ -90,6 +90,9 @@ jobs:
             }
           }
 
+          node -e 'const path = require("node:path"); const { resolveIconPath } = require("./electron/icon-path.cjs"); const resourcesPath = path.resolve("dist-electron/win-unpacked/resources"); const appPath = path.join(resourcesPath, "app.asar"); for (const file of ["favicon.ico", "app-icon.png"]) { const actual = resolveIconPath(file, { resourcesPath, appPath, electronDir: path.join(appPath, "electron") }); if (actual !== path.join(resourcesPath, "icons", file)) throw new Error("Ruta de icono incorrecta: " + actual); }'
+          if ($LASTEXITCODE -ne 0) { throw "La app no selecciona los iconos externos" }
+
       - name: Renombrar ejecutable a NetHub.exe
         shell: pwsh
         run: |

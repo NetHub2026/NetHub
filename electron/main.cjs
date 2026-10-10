@@ -13,6 +13,7 @@ const {
   shell,
 } = require("electron");
 const path = require("node:path");
+const { resolveIconPath } = require("./icon-path.cjs");
 const fs = require("node:fs");
 const os = require("node:os");
 const http = require("node:http");
@@ -1031,8 +1032,6 @@ function staticRoots() {
     appPath = "";
   }
   const bases = [
-    // Native Windows icon loading needs a real file outside app.asar.
-    path.join(process.resourcesPath || "", "icons"),
     path.join(__dirname, ".."),
     appPath,
     process.resourcesPath || "",
@@ -1184,29 +1183,11 @@ function iconPath(file) {
   } catch {
     appPath = "";
   }
-  const names = file === "favicon.ico" ? ["favicon.ico", "app-icon.png"] : [file, "favicon.ico"];
-  const bases = [
-    path.join(__dirname, "..", "public"),
-    path.join(__dirname, "..", "dist", "client"),
-    path.join(__dirname, "..", "dist"),
-    appPath ? path.join(appPath, "public") : "",
-    appPath ? path.join(appPath, "dist", "client") : "",
-    appPath ? path.join(appPath, "dist") : "",
-    path.join(process.resourcesPath || "", "app", "public"),
-    path.join(process.resourcesPath || "", "app", "dist", "client"),
-    path.join(process.resourcesPath || "", "app", "dist"),
-    path.join(process.resourcesPath || "", "app.asar", "public"),
-    path.join(process.resourcesPath || "", "app.asar", "dist", "client"),
-    path.join(process.resourcesPath || "", "app.asar", "dist"),
-  ];
-  for (const base of bases) {
-    if (!base) continue;
-    for (const name of names) {
-      const candidate = path.join(base, name);
-      if (fs.existsSync(candidate)) return candidate;
-    }
-  }
-  return path.join(__dirname, "..", "public", file);
+  return resolveIconPath(file, {
+    resourcesPath: process.resourcesPath,
+    appPath,
+    electronDir: __dirname,
+  });
 }
 
 function trayIconImage() {
