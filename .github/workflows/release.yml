@@ -67,8 +67,13 @@ jobs:
           "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Host "Version: $version  Tag: $tag  Draft: $draft  Latest: $latest"
 
+      - name: Preparar Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+
       - name: Instalar dependencias
-        run: npm install
+        run: bun install --frozen-lockfile
 
       - name: Construir ejecutable portable
         run: npm run build:portable
