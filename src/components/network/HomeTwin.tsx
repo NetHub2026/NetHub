@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, cloneElement, isValidElement, type ReactNode, type ReactElement } from "react";
 import {
   AlertTriangle,
   Brain,
@@ -111,20 +111,21 @@ export function HomeTwin({
   }, [devices]);
   const online = devices.filter((d) => d.status === "online").length;
   const pulse = Math.min(1, rxMbps / 200);
+  const homeHeader = <div className="flex items-center gap-4">
+    <h2 className="flex items-center gap-2 text-base font-semibold"><Home className="size-4 text-primary" />Mi casa</h2>
+    {planView && <div className="flex gap-1 rounded-lg border border-border bg-muted/40 p-1" role="group" aria-label="Representación de Mi casa">
+      <Button size="sm" variant={homeView === "plan" ? "secondary" : "ghost"} aria-pressed={homeView === "plan"} onClick={() => setHomeView("plan")}>Plano</Button>
+      <Button size="sm" variant={homeView === "rooms" ? "secondary" : "ghost"} aria-pressed={homeView === "rooms"} onClick={() => setHomeView("rooms")}>Habitaciones</Button>
+    </div>}
+  </div>;
   return (
     <>
       {!planView && onSetupPlan && <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-base font-semibold">Mi casa</h2><Button variant="outline" onClick={onSetupPlan}>Añadir plano real</Button></div>}
       <div className={cn("grid gap-6", !(planView && homeView === "plan") && "xl:grid-cols-[1fr_380px]")}>
         <div className="min-w-0">
-          {planView && <div className="mb-3 flex justify-end" role="group" aria-label="Representación de Mi casa">
-            <div className="flex gap-1 rounded-lg border border-border bg-muted/40 p-1">
-              <Button size="sm" variant={homeView === "plan" ? "secondary" : "ghost"} aria-pressed={homeView === "plan"} onClick={() => setHomeView("plan")}>Plano</Button>
-              <Button size="sm" variant={homeView === "rooms" ? "secondary" : "ghost"} aria-pressed={homeView === "rooms"} onClick={() => setHomeView("rooms")}>Habitaciones</Button>
-            </div>
-          </div>}
-        {planView && homeView === "plan" ? planView : <section className="overflow-hidden rounded-xl border border-border bg-card">
-          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
-            <div className="flex items-center gap-3">
+        {planView && homeView === "plan" ? (isValidElement(planView) ? cloneElement(planView as ReactElement<{homeHeader?: ReactNode}>, {homeHeader}) : planView) : <section className="overflow-hidden rounded-xl border border-border bg-card">
+          <header className={`flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 ${planView ? "py-2" : "py-4"}`}>
+            {planView ? homeHeader : <div className="flex items-center gap-3">
               <span className="relative flex size-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
                 <Home className="size-4" />
                 <span
@@ -143,7 +144,7 @@ export function HomeTwin({
                   {trafficAvailable ? `${rxMbps.toFixed(1)} Mbps` : "sin datos"}
                 </p>
               </div>
-            </div>
+            </div>}
             <div className="flex items-center gap-3 text-xs">
               <Button
                 variant="outline"

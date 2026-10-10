@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import {
   MapPin,
   Upload,
@@ -49,6 +49,7 @@ type Props = {
   patterns?: PatternState;
   embedded?: boolean;
   onSelectDevice?: (id: string) => void;
+  homeHeader?: ReactNode;
 };
 const control =
   "rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-50";
@@ -68,6 +69,7 @@ export function FloorPlanView({
   patterns,
   embedded = false,
   onSelectDevice,
+  homeHeader,
 }: Props) {
   const anomalous = new Set(
     (patterns?.anomalies ?? [])
@@ -255,8 +257,8 @@ export function FloorPlanView({
   const sessions = [...new Set(draft?.measurements.map((m) => m.session) ?? [])];
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+      <div className={`flex flex-wrap items-center justify-between gap-3 ${homeHeader ? "border border-transparent px-5 py-2" : ""}`}>
+        {homeHeader ?? <div>
           <h2 className="flex items-center gap-2 text-lg font-semibold">
             <MapPin className="size-5 text-primary" />
             {embedded ? "Mi casa" : "Plano y cobertura"}
@@ -264,7 +266,7 @@ export function FloorPlanView({
           <p className="text-sm text-muted-foreground">
             Tu plano real, tus equipos y mediciones donde tú estás.
           </p>
-        </div>
+        </div>}
         <div className="flex flex-wrap gap-2">
           {draft && (
             <button
