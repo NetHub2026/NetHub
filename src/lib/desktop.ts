@@ -15,6 +15,7 @@ export type Runtime = "web" | "tauri" | "electron";
 /** API que debe exponer el preload de Electron (ver modal de empaquetado). */
 interface ElectronBridge {
   internetProvider?: () => Promise<unknown>;
+  shutdownPc?: (ip: string) => Promise<{ ok: boolean; error?: string }>;
   readDevices?: () => Promise<string | null>;
   writeDevices?: (json: string) => Promise<void>;
   scanNetwork?: () => Promise<unknown>;
@@ -46,6 +47,13 @@ export async function readInternetProvider(): Promise<unknown> {
     const response = await fetch("https://ipwho.is/?fields=success,ip,connection,city,region,country,timezone.id", { signal: AbortSignal.timeout(8000), credentials: "omit", referrerPolicy: "no-referrer" });
     return response.ok ? await response.json() : null;
   } catch { return null; }
+}
+
+export async function requestPcShutdown(ip: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    if (typeof window !== "undefined" && window.nethub?.shutdownPc) return await window.nethub.shutdownPc(ip);
+    return { ok: false, error: "Disponible en la app de Windows." };
+  } catch { return { ok: false, error: "No se pudo enviar la solicitud de apagado." }; }
 }
 
 /** Aplica al sistema las preferencias nativas (autoinicio, cierre, bandeja). */
@@ -176,7 +184,7 @@ export interface TrafficSample {
 }
 
 /** Versión de NetHub que se muestra en la interfaz (coincide con package.json). */
-export const APP_VERSION = "1.4.12";
+export const APP_VERSION = "1.4.13";
 
 /** Repositorio oficial; el antiguo solo como respaldo (GitHub redirige el repo transferido). */
 const GITHUB_REPOS = ["NetHub2026/NetHub", "oyogor1985/nethub"];

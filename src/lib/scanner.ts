@@ -1,5 +1,6 @@
 import { normalizeDeviceType, type Device, type DeviceType } from "./devices";
 import { deriveIdentity, inferType, isGenericName, loadIeeeRegistry } from "./identity";
+import { CONNECTION_TAGS } from "./connections";
 import {
   brandFromVendorName,
   lookupByHostname,
@@ -35,6 +36,7 @@ interface RawHost {
   status?: string;
   online?: boolean;
   tags?: string[] | string;
+  connectionSource?: Device["connectionSource"];
 }
 
 /**
@@ -99,30 +101,9 @@ function guessTypeFromName(name: string): DeviceType | null {
   return null;
 }
 
-const WIFI_ONLY_TYPES = new Set<DeviceType>([
-  "smartphone",
-  "tablet",
-  "smart-plug",
-  "smart-bulb",
-  "led-strip",
-  "speaker",
-]);
+export { CONNECTION_TAGS } from "./connections";
 
-export const CONNECTION_TAGS = [
-  "Wi-Fi",
-  "Wi-Fi 2.4GHz",
-  "Wi-Fi 5GHz",
-  "Wi-Fi 6",
-  "Cableado / Ethernet",
-];
-
-function hasConnectionTag(tags: string[]): boolean {
-  return tags.some((tag) => CONNECTION_TAGS.includes(tag));
-}
-
-function defaultTagsForType(type: DeviceType, tags: string[]): string[] {
-  if (hasConnectionTag(tags)) return tags;
-  if (WIFI_ONLY_TYPES.has(type)) return [...tags, "Wi-Fi"];
+function defaultTagsForType(_type: DeviceType, tags: string[]): string[] {
   return tags;
 }
 
@@ -149,6 +130,7 @@ function makeDevice(ip: string, mac: string, extra: Partial<Device> = {}): Devic
     downstream: extra.downstream ?? 0,
     upstream: extra.upstream ?? 0,
     tags,
+    ...(extra.connectionSource ? { connectionSource: extra.connectionSource } : {}),
   };
 }
 
@@ -172,6 +154,7 @@ export function sanitizeDevices(devices: Device[]): Device[] {
       ...device,
       type,
       tags: defaultTagsForType(type, sanitizeTags(device.tags)),
+      connectionSource: ["local", "manual", "router"].includes(device.connectionSource ?? "") ? device.connectionSource : undefined,
     };
   });
 }
@@ -245,6 +228,7 @@ export function parseHostsJson(input: unknown): Device[] {
     if (raw.type) extra.type = raw.type as DeviceType;
     if (Array.isArray(raw.tags)) extra.tags = raw.tags;
     if (typeof raw.tags === "string") extra.tags = [raw.tags];
+    if (raw.connectionSource === "local" || raw.connectionSource === "manual" || raw.connectionSource === "router") extra.connectionSource = raw.connectionSource;
     const device = makeDevice(ip, mac, extra);
     found.set(device.id, device);
   }
@@ -325,6 +309,10 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
       isNew: old.trusted ? false : (old.isNew ?? false),
       ...(brand ? { brand } : {}),
     };
+    if (old.connectionSource !== "manual" && fresh.connectionSource) {
+      result.tags = [...sanitizeTags(old.tags).filter(t => !CONNECTION_TAGS.includes(t)), ...fresh.tags.filter(t => CONNECTION_TAGS.includes(t))];
+      result.connectionSource = fresh.connectionSource;
+    }
     return result;
   });
 

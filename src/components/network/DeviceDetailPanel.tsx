@@ -34,8 +34,9 @@ import {
 import { VendorIcon } from "./VendorIcon";
 import { IdentityDetails, InventoryIdentityIcon } from "./IdentityBadge";
 import { cn } from "@/lib/utils";
+import { CONNECTION_TAGS } from "@/lib/connections";
 
-const connectionTags = ["Cableado / Ethernet", "Wi-Fi", "Wi-Fi 2.4GHz", "Wi-Fi 5GHz", "Wi-Fi 6"];
+const connectionTags = CONNECTION_TAGS.filter(t => t !== "Wi-Fi 6");
 
 const quickTagGroups: Array<{ label: string; tags: string[] }> = [
   { label: "Ubicaciones", tags: ["Salón", "Dormitorio", "Cocina", "Despacho", "Entrada"] },
@@ -141,19 +142,20 @@ export function DeviceDetailPanel({
   const addTag = () => {
     const tag = tagDraft.trim();
     if (!tag || device.tags.includes(tag)) return;
-    onUpdate({ ...device, tags: [...device.tags, tag] });
+    onUpdate({ ...device, tags: [...device.tags, tag], ...(CONNECTION_TAGS.includes(tag) ? { connectionSource: "manual" as const } : {}) });
     setTagDraft("");
   };
 
   const toggleTag = (tag: string) => {
-    const active = device.tags.includes(tag);
     const isConnection = connectionTags.includes(tag);
+    const active = device.tags.includes(tag) && (!isConnection || device.connectionSource === "manual");
     onUpdate({
       ...device,
+      ...(isConnection ? { connectionSource: "manual" as const } : {}),
       tags: active
         ? device.tags.filter((t) => t !== tag)
         : isConnection
-          ? [...device.tags.filter((t) => !connectionTags.includes(t)), tag]
+          ? [...device.tags.filter((t) => !CONNECTION_TAGS.includes(t)), tag]
           : [...device.tags, tag],
     });
   };
@@ -348,6 +350,7 @@ export function DeviceDetailPanel({
             Editar dispositivo
           </h3>
           <div className="mt-3 space-y-3 rounded-xl border border-border p-4">
+            <p className="text-xs text-muted-foreground">Conexión: {device.connectionSource === "local" ? "detectada en este equipo" : device.connectionSource === "manual" ? "indicada manualmente" : device.connectionSource === "router" ? "informada por el router" : "sin confirmar"}. Elige cable o una banda Wi-Fi para confirmar la conexión. Wi-Fi 6 es una generación, no una banda de 6 GHz.</p>
             <label className="block">
               <span className="text-xs text-muted-foreground">Nombre</span>
               <input
@@ -747,7 +750,7 @@ export function DeviceDetailPanel({
             {device.tags.map((tag) => (
               <button
                 key={tag}
-                onClick={() => onUpdate({ ...device, tags: device.tags.filter((t) => t !== tag) })}
+                onClick={() => onUpdate({ ...device, tags: device.tags.filter((t) => t !== tag), ...(CONNECTION_TAGS.includes(tag) ? { connectionSource: "manual" as const } : {}) })}
                 className="group inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs transition-colors hover:border-destructive hover:text-destructive"
                 title="Quitar etiqueta"
               >

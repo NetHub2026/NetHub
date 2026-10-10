@@ -4,6 +4,9 @@ import { deviceTypeGroups, searchDeviceTypes } from "./device-catalog";
 import { deriveIdentity } from "./identity";
 
 describe("Catálogo de dispositivos", () => {
+  it("incluye robot de cocina como tipo genérico del hogar", () => {
+    expect(deviceTypeGroups.find(g => g.types.includes("kitchen-robot"))?.label).toBe("Hogar y domótica");
+  });
   it("incluye cada tipo una sola vez y conserva todos los valores al cargar", () => {
     const types = deviceTypeGroups.flatMap((group) => group.types);
     expect(new Set(types).size).toBe(types.length);
