@@ -3,6 +3,8 @@
  * redes domésticas: móviles, PCs, consolas, Smart TVs, operadoras, routers e IoT.
  */
 
+import { ieeeVendor, loadIeeeRegistry } from "./identity";
+
 export type VendorBrand =
   | "apple"
   | "sony"
@@ -745,6 +747,9 @@ const PRIVATE_MAC_ENTRY: OuiEntry = { vendor: PRIVATE_MAC_LABEL, brand: "unknown
 
 export function lookupOui(mac: string, hostname?: string | null): OuiEntry {
   const normalized = normalizeMac(mac);
+  if (isRandomizedMac(normalized)) return lookupByHostname(hostname) ?? PRIVATE_MAC_ENTRY;
+  const ieee = ieeeVendor(normalized);
+  if (ieee) return { vendor: ieee, brand: brandFromVendorName(ieee) };
   const local = OUI[prefix(normalized)];
   if (local) return local;
   const cached = readCache()[cacheKey(normalized)];
@@ -761,6 +766,7 @@ export function lookupOui(mac: string, hostname?: string | null): OuiEntry {
  * administrada localmente no identifica fabricante.
  */
 export async function resolveVendor(mac: string, hostname?: string | null): Promise<OuiEntry> {
+  await loadIeeeRegistry();
   const local = lookupOui(mac, hostname);
   if (local.brand !== "unknown") return local;
 
@@ -770,8 +776,6 @@ export async function resolveVendor(mac: string, hostname?: string | null): Prom
   }
   if (local.vendor !== UNKNOWN_VENDOR.vendor) return local;
 
-  const { loadIeeeRegistry, ieeeVendor } = await import("./identity");
-  await loadIeeeRegistry();
   const ieee = ieeeVendor(normalized);
   if (ieee) return { vendor: ieee, brand: brandFromVendorName(ieee) };
   return lookupByHostname(hostname) ?? local;

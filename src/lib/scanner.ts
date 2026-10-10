@@ -1,5 +1,5 @@
 import { normalizeDeviceType, type Device, type DeviceType } from "./devices";
-import { inferType, isGenericName } from "./identity";
+import { inferType, isGenericName, loadIeeeRegistry } from "./identity";
 import {
   brandFromVendorName,
   lookupByHostname,
@@ -177,14 +177,29 @@ export function sanitizeDevices(devices: Device[]): Device[] {
 }
 
 export async function enrichDevicesWithResolvedVendors(devices: Device[]): Promise<Device[]> {
+  await loadIeeeRegistry();
   return devices.map((device) => {
-    if (device.manualEdit || (device.brand && device.brand !== "unknown")) return device;
-    const resolved = lookupOui(device.mac, device.name);
+    if (device.manualEdit || device.identityManual?.vendor) return device;
+    const automaticName = isAutomaticDeviceName(device);
+    const resolved = lookupOui(device.mac, automaticName ? undefined : device.name);
     if (resolved.brand === "unknown" && resolved.vendor === "Fabricante desconocido") {
       return device;
     }
-    return { ...device, vendor: resolved.vendor, brand: resolved.brand };
+    return {
+      ...device,
+      vendor: resolved.vendor,
+      brand: resolved.brand,
+      ...(automaticName ? { name: suggestedName(device.mac, device.ip) } : {}),
+    };
   });
+}
+
+/** Reconoce las etiquetas generadas por versiones anteriores sin tocar nombres manuales. */
+export function isAutomaticDeviceName(device: Pick<Device, "name" | "vendor" | "manualEdit">): boolean {
+  if (device.manualEdit) return false;
+  if (isGenericName(device.name, device.vendor)) return true;
+  const prefix = device.name.match(/^(.+)\s\d{1,3}$/)?.[1];
+  return Boolean(prefix && brandFromVendorName(prefix) !== "unknown");
 }
 
 /** Convierte la salida de `arp -a` (Windows o Linux/macOS) en dispositivos. */
@@ -294,7 +309,7 @@ export function mergeScan(previous: Device[], scanned: Device[]): Device[] {
       status: fresh.status,
       lastSeen: fresh.lastSeen,
       // El nombre, tipo y fabricante editados a mano nunca se sobrescriben.
-      name: old.name,
+      name: isAutomaticDeviceName(old) ? fresh.name : old.name,
       type: old.type,
       vendor,
       firstSeenAt: old.firstSeenAt ?? now,

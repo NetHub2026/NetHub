@@ -35,7 +35,7 @@ jobs:
         run: bunx --package @typescript/native-preview tsgo --noEmit
 
       - name: Run Device Identity tests
-        run: bunx vitest run src/lib/identity.test.ts
+        run: bunx vitest run
 
       - name: Build application
         run: bun run build
