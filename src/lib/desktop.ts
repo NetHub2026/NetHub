@@ -173,10 +173,12 @@ export interface TrafficSample {
   rxMbps: number;
   txMbps: number;
   totalMbps: number;
+  available?: boolean;
+  at?: number;
 }
 
 /** Versión de NetHub que se muestra en la interfaz (coincide con package.json). */
-export const APP_VERSION = "1.4.16";
+export const APP_VERSION = "1.4.17";
 
 /** Repositorio oficial; el antiguo solo como respaldo (GitHub redirige el repo transferido). */
 const GITHUB_REPOS = ["NetHub2026/NetHub", "oyogor1985/nethub"];
@@ -585,45 +587,23 @@ function toSample(value: unknown): TrafficSample | null {
   const rx = Number(raw["rxMbps"]);
   const tx = Number(raw["txMbps"]);
   if (!Number.isFinite(rx) || !Number.isFinite(tx)) return null;
-  return { rxMbps: Math.max(0, rx), txMbps: Math.max(0, tx), totalMbps: rx + tx };
+  return { rxMbps: Math.max(0, rx), txMbps: Math.max(0, tx), totalMbps: Math.max(0, rx) + Math.max(0, tx), available: raw["available"] !== false, at: Date.now() };
 }
 
-/** Simulación suave para el navegador: varía a partir de la muestra anterior. */
-function simulateTraffic(previous?: TrafficSample): TrafficSample {
-  const drift = (base: number, spread: number) => {
-    const next = base + (Math.random() - 0.45) * spread;
-    return Math.max(0.2, Math.min(600, next));
-  };
-  const rx = drift(previous?.rxMbps || 24, 18);
-  const tx = drift(previous?.txMbps || 6, 5);
-  return { rxMbps: rx, txMbps: tx, totalMbps: rx + tx };
+/** Reads real native/agent traffic; unavailable readings never become simulated values. */
+export async function readLiveTraffic(): Promise<TrafficSample> {
+  if (typeof window !== "undefined" && window.nethub?.traffic) {
+    try { return toSample(await window.nethub.traffic()) ?? unavailableTraffic(); }
+    catch { return unavailableTraffic(); }
+  }
+  try {
+    const response = await fetch(AGENT_TRAFFIC_URL, { signal: AbortSignal.timeout(900) });
+    if (response.ok) return toSample(await response.json()) ?? unavailableTraffic();
+  } catch { /* no real source available */ }
+  return unavailableTraffic();
 }
-
-/**
- * Lee el tráfico actual: proceso nativo → agente local → simulación.
- * Nunca lanza: siempre devuelve una muestra para que la gráfica avance.
- */
-export async function readLiveTraffic(previous?: TrafficSample): Promise<TrafficSample> {
-  try {
-    if (window.nethub?.traffic) {
-      const sample = toSample(await window.nethub.traffic());
-      if (sample) return sample;
-    }
-  } catch {
-    /* seguimos con el agente */
-  }
-  try {
-    const response = await fetch(AGENT_TRAFFIC_URL, {
-      signal: AbortSignal.timeout(900),
-    });
-    if (response.ok) {
-      const sample = toSample(await response.json());
-      if (sample) return sample;
-    }
-  } catch {
-    /* sin agente: simulamos */
-  }
-  return simulateTraffic(previous);
+function unavailableTraffic(): TrafficSample {
+  return { rxMbps: 0, txMbps: 0, totalMbps: 0, available: false, at: Date.now() };
 }
 
 /** Ruta informativa del fichero de datos para mostrar en la interfaz. */

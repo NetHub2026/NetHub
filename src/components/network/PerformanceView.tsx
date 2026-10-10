@@ -17,17 +17,17 @@ export function PerformanceView({ traffic, linkSpeedMbps, isp, ispAuto, onProvid
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-xl border border-border bg-card p-4">
             <p className="text-xs text-muted-foreground">Descarga y subida actuales</p>
-            <p className="mt-2 font-mono text-lg">↓ {traffic.rxMbps.toFixed(1)} · ↑ {traffic.txMbps.toFixed(1)} Mbps</p>
+            <p className="mt-2 font-mono text-lg">{traffic.available === false ? "Sin datos" : `↓ ${traffic.rxMbps.toFixed(1)} · ↑ ${traffic.txMbps.toFixed(1)} Mbps`}</p>
           </div>
           <div className="rounded-xl border border-border bg-card p-4">
             <p className="text-xs text-muted-foreground">Uso del enlace</p>
-            <p className="mt-2 font-mono text-lg">{linkUsage}%</p>
+            <p className="mt-2 font-mono text-lg">{traffic.available === false ? "—" : `${linkUsage}%`}</p>
             <p className="mt-1 text-xs text-muted-foreground">Sobre {linkSpeedMbps} Mbps contratados</p>
           </div>
         </div>
         <section className="rounded-xl border border-border bg-card p-4 sm:p-6">
-          <h2 className="mb-4 text-base font-semibold">Tráfico en tiempo real (últimos 60 s)</h2>
-          <BandwidthChart />
+          <h2 title="Incluye Internet, tráfico local y todas las interfaces del PC. El test mide solo las transferencias hacia Cloudflare." className="mb-4 text-base font-semibold">Tráfico de este PC (últimos 60 s)</h2>
+          <BandwidthChart sample={traffic} />
         </section>
         <SpeedTestPanel />
     </section>

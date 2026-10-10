@@ -1,67 +1,60 @@
-import { useEffect, useRef, useState } from "react";
-import { readLiveTraffic, type TrafficSample } from "@/lib/desktop";
+import { useEffect, useState } from "react";
+import { type TrafficSample } from "@/lib/desktop";
 
-const POINTS = 60;
-
-/**
- * Gráfica en vivo del tráfico de red: historial rodante de 60 segundos,
- * con muestreo cada segundo desde el proceso nativo, el agente local
- * o una simulación suave cuando se ejecuta en el navegador.
- */
-export function BandwidthChart() {
-  const [rx, setRx] = useState<number[]>([]);
-  const [tx, setTx] = useState<number[]>([]);
-  const lastRef = useRef<TrafficSample>({ rxMbps: 0, txMbps: 0, totalMbps: 0 });
-
+/** Uses the shared PC sample; never performs a second counter read. */
+export function BandwidthChart({ sample }: { sample: TrafficSample }) {
+  const [history, setHistory] = useState<TrafficSample[]>([]);
   useEffect(() => {
-    let cancelled = false;
-
-    const tick = async () => {
-      const sample = await readLiveTraffic(lastRef.current);
-      if (cancelled) return;
-      lastRef.current = sample;
-      setRx((prev) => [...prev, sample.rxMbps].slice(-POINTS));
-      setTx((prev) => [...prev, sample.txMbps].slice(-POINTS));
-    };
-
-    void tick();
-    const id = window.setInterval(() => void tick(), 1000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, []);
-
+    if (!sample.at) return;
+    setHistory(prev => [...prev.filter(p => p.at! > sample.at! - 60_000 && p.at !== sample.at), sample]);
+  }, [sample]);
+  const now = sample.at ?? Date.now();
+  const valid = history.filter(p => p.available !== false);
+  const rx = valid.map(p => p.rxMbps);
+  const tx = valid.map(p => p.txMbps);
   const width = 100;
   const height = 34;
   const max = Math.max(...rx, ...tx, 1);
 
-  const buildPath = (data: number[]) => {
-    if (data.length === 0) return { line: "", area: "" };
-    const points = data.map((v, i) => {
-      const x = (i / Math.max(POINTS - 1, 1)) * width;
-      const y = height - (v / max) * height;
-      return `${x.toFixed(2)},${y.toFixed(2)}`;
-    });
-    const line = `M ${points.join(" L ")}`;
-    const lastX = ((data.length - 1) / Math.max(POINTS - 1, 1)) * width;
-    return { line, area: `${line} L ${lastX.toFixed(2)},${height} L 0,${height} Z` };
+  const buildPath = (field: "rxMbps" | "txMbps") => {
+    let line = "";
+    let area = "";
+    let segment: string[] = [];
+    let startX = 0;
+    let lastX = 0;
+    let lastAt = 0;
+    const finish = () => {
+      if (!segment.length) return;
+      line += `M ${segment.join(" L ")} `;
+      area += `M ${segment.join(" L ")} L ${lastX},${height} L ${startX},${height} Z `;
+      segment = [];
+    };
+    for (const p of history) {
+      if (p.available === false || (lastAt && p.at! - lastAt > 2500)) finish();
+      lastAt = p.at!;
+      if (p.available === false) continue;
+      const x = Math.max(0, Math.min(width, (p.at! - now + 60_000) / 60_000 * width));
+      if (!segment.length) startX = x;
+      lastX = x;
+      segment.push(`${x.toFixed(2)},${(height - p[field] / max * height).toFixed(2)}`);
+    }
+    finish();
+    return { line, area };
   };
-
-  const down = buildPath(rx);
-  const up = buildPath(tx);
-  const current = rx.at(-1) ?? 0;
-  const currentUp = tx.at(-1) ?? 0;
+  const down = buildPath("rxMbps");
+  const up = buildPath("txMbps");
+  const current = sample.rxMbps;
+  const currentUp = sample.txMbps;
   const peak = rx.length > 0 ? Math.max(...rx) : 0;
   const avg = rx.length > 0 ? rx.reduce((a, b) => a + b, 0) / rx.length : 0;
 
   return (
     <div className="relative">
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <LiveMetric label="Descarga" value={`↓ ${current.toFixed(1)} Mbps`} accent />
-        <LiveMetric label="Subida" value={`↑ ${currentUp.toFixed(1)} Mbps`} />
-        <LiveMetric label="Pico (60 s)" value={`${peak.toFixed(1)} Mbps`} />
-        <LiveMetric label="Media (60 s)" value={`${avg.toFixed(1)} Mbps`} />
+        <LiveMetric label="Descarga" value={sample.available === false ? "Sin datos" : `↓ ${current.toFixed(1)} Mbps`} accent />
+        <LiveMetric label="Subida" value={sample.available === false ? "Sin datos" : `↑ ${currentUp.toFixed(1)} Mbps`} />
+        <LiveMetric label="Pico de descarga (60 s)" value={rx.length ? `${peak.toFixed(1)} Mbps` : "—"} />
+        <LiveMetric label="Media de descarga (60 s)" value={rx.length ? `${avg.toFixed(1)} Mbps` : "—"} />
       </div>
 
       <svg

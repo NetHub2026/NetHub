@@ -12,9 +12,9 @@ export interface SpeedResult {
   download: number;
   /** Mbps */
   upload: number;
-  /** Velocidad máxima alcanzada durante la fase de descarga (Mbps) */
+  /** Máxima media acumulada registrada durante la fase de descarga (Mbps) */
   peakDownload: number;
-  /** Velocidad máxima alcanzada durante la fase de subida (Mbps) */
+  /** Máxima media acumulada registrada durante la fase de subida (Mbps) */
   peakUpload: number;
 }
 
@@ -43,7 +43,7 @@ export interface SpeedProgress {
   totalProgress: number;
   /** Segundos restantes aproximados del test completo. */
   secondsLeft: number;
-  /** Pico alcanzado hasta el momento en la fase de transferencia actual (Mbps). */
+  /** Máxima media acumulada hasta el momento en la fase actual (Mbps). */
   peak: number;
 }
 
