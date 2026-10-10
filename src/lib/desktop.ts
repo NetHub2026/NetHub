@@ -17,7 +17,7 @@ interface ElectronBridge {
   internetProvider?: () => Promise<unknown>;
   shutdownPc?: (ip: string) => Promise<{ ok: boolean; error?: string }>;
   readDevices?: () => Promise<string | null>;
-  writeDevices?: (json: string) => Promise<void>;
+  writeDevices?: (json: string) => Promise<boolean | void>;
   scanNetwork?: () => Promise<unknown>;
   dbPath?: () => Promise<string>;
   ping?: (ip: string) => Promise<{ ok: boolean; rtt: number | null }>;
@@ -184,7 +184,7 @@ export interface TrafficSample {
 }
 
 /** Versión de NetHub que se muestra en la interfaz (coincide con package.json). */
-export const APP_VERSION = "1.4.15";
+export const APP_VERSION = "1.4.16";
 
 /** Repositorio oficial; el antiguo solo como respaldo (GitHub redirige el repo transferido). */
 const GITHUB_REPOS = ["NetHub2026/NetHub", "oyogor1985/nethub"];
@@ -361,6 +361,8 @@ export interface DbPayload {
   sla?: unknown[];
   /** Rutinas aprendidas y anomalías */
   patterns?: unknown;
+  speedHistory?: unknown[];
+  speedHistoryLimit?: number;
 }
 
 async function readDbRaw(): Promise<string | null> {
@@ -398,6 +400,8 @@ export async function readDbFile(): Promise<DbPayload | null> {
       away: obj.away ?? null,
       sla: Array.isArray(obj.sla) ? obj.sla : [],
       patterns: obj.patterns ?? null,
+      ...(Array.isArray(obj.speedHistory) ? { speedHistory: obj.speedHistory } : {}),
+      ...(typeof obj.speedHistoryLimit === "number" ? { speedHistoryLimit: obj.speedHistoryLimit } : {}),
     };
   } catch {
     return null;
@@ -409,8 +413,7 @@ export async function writeDbFile(payload: DbPayload): Promise<boolean> {
   const json = JSON.stringify({ app: "NetHub", savedAt: new Date().toISOString(), ...payload }, null, 2);
   try {
     if (runtime === "electron" && window.nethub?.writeDevices) {
-      await window.nethub.writeDevices(json);
-      return true;
+      return (await window.nethub.writeDevices(json)) !== false;
     }
     if (runtime === "tauri") {
       const fs = await optionalImport("@tauri-apps/plugin-fs");
