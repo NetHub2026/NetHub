@@ -1270,7 +1270,7 @@ function Dashboard() {
           />
         )}
         {viewMode === "performance" && (
-          <PerformanceView traffic={traffic} linkSpeedMbps={settings.linkSpeedMbps} />
+          <PerformanceView traffic={traffic} linkSpeedMbps={settings.linkSpeedMbps} isp={settings.ispName} ispAuto={settings.ispAuto} onProviderDetected={(name) => { if (settingsRef.current.ispAuto) updateSettings({ ispName: name }); }} />
         )}
 
         {viewMode === "security" && (
@@ -1383,6 +1383,8 @@ function Dashboard() {
             contracted={settings.linkSpeedMbps}
             isp={settings.ispName}
             running={slaRunning}
+            ispAuto={settings.ispAuto}
+            onProviderDetected={(name) => { if (settingsRef.current.ispAuto) updateSettings({ ispName: name }); }}
             intervalMinutes={settings.slaIntervalMinutes}
             onTestNow={() => void runSlaTest()}
             onIntervalChange={(minutes) => updateSettings({ slaIntervalMinutes: minutes })}

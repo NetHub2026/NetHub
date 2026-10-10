@@ -41,6 +41,7 @@ export interface Settings {
   alertSound: boolean;
   healthIntervalSeconds: number;
   ispName: string;
+  ispAuto: boolean;
   /* SLA del operador: test de velocidad automático (minutos; 0 = desactivado) */
   slaIntervalMinutes: number;
   /* Modo Ausente: armar automáticamente cuando nadie esté en casa */
@@ -69,6 +70,7 @@ export const defaultSettings: Settings = {
   alertSound: true,
   healthIntervalSeconds: 30,
   ispName: "tu operador",
+  ispAuto: true,
   slaIntervalMinutes: 0,
   awayAutoArm: true,
   checkUpdatesOnStart: true,
@@ -146,7 +148,8 @@ export function sanitizeSettings(value: Partial<Settings>): Settings {
     healthIntervalSeconds: [0, 15, 30, 60].includes(Number(value.healthIntervalSeconds))
       ? Number(value.healthIntervalSeconds)
       : defaultSettings.healthIntervalSeconds,
-    ispName: String(value.ispName || defaultSettings.ispName).slice(0, 40),
+    ispName: String(value.ispName || defaultSettings.ispName).slice(0, 120),
+    ispAuto: typeof value.ispAuto === "boolean" ? value.ispAuto : !value.ispName || value.ispName === "tu operador",
     slaIntervalMinutes: [0, 120, 360, 720].includes(Number(value.slaIntervalMinutes))
       ? Number(value.slaIntervalMinutes)
       : defaultSettings.slaIntervalMinutes,
