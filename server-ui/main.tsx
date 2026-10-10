@@ -526,6 +526,8 @@ function App() {
             )}
             {view === "home" && (
               <HomeTwin
+                onSetupPlan={() => setView("floorplan")}
+                planView={state.floorPlan ? <FloorPlanView embedded onSelectDevice={setSelected} patterns={state.patterns} devices={devices} plan={state.floorPlan} canMeasure demo={state.server.demo} onSave={(plan, expected) => mutate("floor-plan", {plan, expected})} /> : undefined}
                 monitoringHost="este NAS"
                 trafficAvailable={state.server.traffic.available}
                 devices={devices}

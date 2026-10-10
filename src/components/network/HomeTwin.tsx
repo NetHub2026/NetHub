@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   Brain,
@@ -52,10 +52,14 @@ export function HomeTwin({
   onOpenPerformance,
   monitoringHost = "este PC",
   trafficAvailable = true,
+  planView,
+  onSetupPlan,
 }: {
   devices: Device[];
   monitoringHost?: string;
   trafficAvailable?: boolean;
+  planView?: ReactNode;
+  onSetupPlan?: () => void;
   onUpdateDevice?: (device: Device) => void;
   patterns: PatternState;
   rxMbps: number;
@@ -108,8 +112,9 @@ export function HomeTwin({
   const pulse = Math.min(1, rxMbps / 200);
   return (
     <>
+      {!planView && onSetupPlan && <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-base font-semibold">Mi casa</h2><Button variant="outline" onClick={onSetupPlan}>Añadir plano real</Button></div>}
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
-        <section className="overflow-hidden rounded-xl border border-border bg-card">
+        {planView ?? <section className="overflow-hidden rounded-xl border border-border bg-card">
           <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
             <div className="flex items-center gap-3">
               <span className="relative flex size-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
@@ -369,7 +374,7 @@ export function HomeTwin({
                 : "Asigna habitaciones desde la ficha de cada equipo."}
             </span>
           </footer>
-        </section>
+        </section>}
         <aside className="rounded-xl border border-border bg-card">
           <header className="flex items-center gap-3 border-b border-border px-5 py-4">
             <span className="flex size-9 items-center justify-center rounded-lg bg-primary/15 text-primary">

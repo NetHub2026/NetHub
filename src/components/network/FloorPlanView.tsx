@@ -46,6 +46,8 @@ type Props = {
   canMeasure?: boolean;
   demo?: boolean;
   patterns?: PatternState;
+  embedded?: boolean;
+  onSelectDevice?: (id: string) => void;
 };
 const control =
   "rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-50";
@@ -63,6 +65,8 @@ export function FloorPlanView({
   canMeasure = false,
   demo = false,
   patterns,
+  embedded = false,
+  onSelectDevice,
 }: Props) {
   const anomalous = new Set(
     (patterns?.anomalies ?? [])
@@ -245,7 +249,7 @@ export function FloorPlanView({
         <div>
           <h2 className="flex items-center gap-2 text-lg font-semibold">
             <MapPin className="size-5 text-primary" />
-            Plano y cobertura
+            {embedded ? "Mi casa" : "Plano y cobertura"}
           </h2>
           <p className="text-sm text-muted-foreground">
             Tu plano real, tus equipos y mediciones donde tú estás.
@@ -471,7 +475,7 @@ export function FloorPlanView({
               </span>
             )}
           </div>
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className={`grid gap-4 ${embedded ? "" : "xl:grid-cols-[minmax(0,1fr)_320px]"}`}>
             <div
               ref={viewport}
               className="self-start overflow-auto rounded-2xl border border-border bg-background"
@@ -636,7 +640,8 @@ export function FloorPlanView({
                           title={`${d.name}${!d.trusted && d.isNew ? " · Intruso" : anomalous.has(d.id) ? " · Anomalía" : ""}`}
                           className={`absolute z-20 flex size-7 -translate-x-1/2 -translate-y-1/2 touch-none items-center justify-center rounded-full border-2 border-white shadow-lg ${d.status === "online" ? "bg-sky-600 text-white" : "bg-slate-500 text-white"}`}
                           style={{ left: `${p.x}%`, top: `${p.y}%` }}
-                          disabled={busy || draft.locked}
+                          disabled={busy}
+                          onClick={() => { if (draft.locked) onSelectDevice?.(d.id); }}
                           onPointerDown={(event) => {
                             if (draft.locked) return;
                             event.stopPropagation();
@@ -693,7 +698,7 @@ export function FloorPlanView({
                 )}
               </div>
             </div>
-            <aside className="space-y-4 rounded-2xl border border-border bg-card p-4">
+            {(!embedded || mode === "measure") && <aside className="space-y-4 rounded-2xl border border-border bg-card p-4">
               <div
                 className="flex flex-wrap gap-3 text-xs text-muted-foreground"
                 aria-label="Estados de equipos"
@@ -848,7 +853,7 @@ export function FloorPlanView({
                   </div>
                 </>
               )}
-            </aside>
+            </aside>}
           </div>
           {!!points.length && (
             <div className="overflow-x-auto rounded-xl border border-border">
