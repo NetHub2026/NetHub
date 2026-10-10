@@ -1,26 +1,17 @@
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useDocumentScrollLock } from "@/hooks/use-document-scroll-lock";
 import { BandwidthChart } from "./BandwidthChart";
 import { SpeedTestPanel } from "./SpeedTestPanel";
 import type { TrafficSample } from "@/lib/desktop";
-import type { RefObject } from "react";
 
-export function PerformanceModal({ open, onClose, traffic, linkSpeedMbps, triggerRef }: {
-  open: boolean; onClose: () => void; traffic: TrafficSample; linkSpeedMbps: number;
-  triggerRef: RefObject<HTMLButtonElement | null>;
+export function PerformanceView({ traffic, linkSpeedMbps }: {
+  traffic: TrafficSample; linkSpeedMbps: number;
 }) {
-  useDocumentScrollLock(open);
   const linkUsage = Math.min(100, Math.round((traffic.rxMbps / Math.max(1, linkSpeedMbps)) * 100));
   return (
-    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-      <DialogContent
-        className="max-h-[90dvh] w-[95vw] max-w-5xl overflow-y-auto overscroll-contain rounded-2xl"
-        onCloseAutoFocus={(event) => { event.preventDefault(); triggerRef.current?.focus(); }}
-      >
-        <DialogHeader>
-          <DialogTitle>Rendimiento de la red</DialogTitle>
-          <DialogDescription>Consulta el tráfico de este equipo y mide la velocidad de tu conexión.</DialogDescription>
-        </DialogHeader>
+    <section className="space-y-6">
+        <div>
+          <h2 className="text-lg font-semibold">Rendimiento de la red</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Consulta el tráfico de este equipo y mide la velocidad de tu conexión.</p>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-xl border border-border bg-card p-4">
             <p className="text-xs text-muted-foreground">Descarga y subida actuales</p>
@@ -37,7 +28,6 @@ export function PerformanceModal({ open, onClose, traffic, linkSpeedMbps, trigge
           <BandwidthChart />
         </section>
         <SpeedTestPanel />
-      </DialogContent>
-    </Dialog>
+    </section>
   );
 }
