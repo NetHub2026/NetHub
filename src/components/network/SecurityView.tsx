@@ -18,7 +18,7 @@ interface Props {
 }
 
 const levelClass: Record<RiskLevel, string> = {
-  critical: "border-destructive/50 bg-destructive/10 text-destructive",
+  critical: "border-warning/50 bg-warning/10 text-warning",
   high: "border-warning/50 bg-warning/10 text-warning",
   medium: "border-brand/40 bg-brand/10 text-brand",
   low: "border-border bg-muted/50 text-muted-foreground",
@@ -138,7 +138,7 @@ export function SecurityView({ devices, alerts, gatewayIp, onSelectDevice, onTru
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
           Compara la respuesta del DNS de tu router con la de 8.8.8.8 para un dominio conocido.
-          Si difieren, alguien está manipulando las direcciones de tu red (phishing o bloqueo).
+          Las respuestas pueden variar por caché, ubicación o filtros; una diferencia no demuestra manipulación.
         </p>
         {dns && (
           <div
@@ -157,16 +157,15 @@ export function SecurityView({ devices, alerts, gatewayIp, onSelectDevice, onTru
               <p>{dns.error}</p>
             ) : dns.hijacked ? (
               <>
-                <p className="font-medium">¡Posible DNS secuestrado!</p>
+                <p className="font-medium">Respuestas DNS diferentes</p>
                 <p className="mt-1 text-xs">
                   {dns.domain} resuelve en tu router a {dns.gatewayIps.join(", ")} pero en 8.8.8.8
-                  a {dns.publicIps.join(", ")}. Revisa el DNS del router y los equipos con
-                  software sospechoso.
+                  a {dns.publicIps.join(", ")}. Puede deberse a caché, distribución de servidores o filtros. Si no lo esperabas, revisa la configuración DNS.
                 </p>
               </>
             ) : dns.ok ? (
               <p>
-                DNS íntegro: tu router y 8.8.8.8 responden lo mismo
+                Las respuestas de tu router y 8.8.8.8 tienen direcciones en común
                 {dns.gatewayRtt !== null ? ` (${dns.gatewayRtt} ms)` : ""}.
               </p>
             ) : (
