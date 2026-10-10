@@ -28,6 +28,8 @@ import {
 } from "./away";
 import { loadStoredPatterns, sanitizePatterns, saveStoredPatterns, type PatternState, emptyPatternState } from "./patterns";
 import { loadStoredSla, sanitizeSla, saveStoredSla, type SlaSample } from "./sla";
+import type { SpeedResult } from "./speedtest";
+import { loadStoredSpeedHistory, loadStoredSpeedHistoryLimit, saveStoredSpeedHistory, sanitizeSpeedHistory, speedHistoryLimit, SPEED_HISTORY_CHANGED } from "./speed-history";
 
 /**
  * Persistencia unificada: en escritorio guarda en `devices-db.json` dentro del
@@ -45,6 +47,51 @@ let lastUsage: UsageState = emptyUsageState();
 let lastAway: AwayState = emptyAwayState();
 let lastSla: SlaSample[] = [];
 let lastPatterns: PatternState = emptyPatternState();
+let lastSpeedHistory: SpeedResult[] = [];
+let lastSpeedHistoryLimit = 10;
+let speedHistoryReady: Promise<void> | null = null;
+let speedHistorySaveError: string | null = null;
+
+function ensureSpeedHistory(): Promise<void> {
+  return speedHistoryReady ??= (async () => {
+    lastSpeedHistory = loadStoredSpeedHistory();
+    lastSpeedHistoryLimit = loadStoredSpeedHistoryLimit();
+    if (isDesktop()) {
+      const payload = await readDbFile();
+      if (payload?.speedHistory !== undefined) lastSpeedHistory = sanitizeSpeedHistory(payload.speedHistory);
+      if (payload?.speedHistoryLimit !== undefined) lastSpeedHistoryLimit = speedHistoryLimit(payload.speedHistoryLimit);
+    }
+  })();
+}
+export async function loadSpeedHistoryAnywhere() {
+  await ensureSpeedHistory();
+  return { history: [...lastSpeedHistory], limit: lastSpeedHistoryLimit, error: speedHistorySaveError };
+}
+function notifySpeedHistory() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(SPEED_HISTORY_CHANGED));
+}
+export async function saveSpeedHistoryAnywhere(history: SpeedResult[]): Promise<void> {
+  await ensureSpeedHistory();
+  lastSpeedHistory = sanitizeSpeedHistory(history);
+  await persistSpeedHistory();
+}
+async function persistSpeedHistory(): Promise<void> {
+  const saved = await flush();
+  speedHistorySaveError = saved ? null : "El test está en la copia local, pero no se pudo guardar en el JSON. Comprueba que la carpeta de datos permita escribir.";
+  notifySpeedHistory();
+}
+export async function appendSpeedHistoryAnywhere(result: SpeedResult): Promise<void> {
+  await ensureSpeedHistory();
+  lastSpeedHistory = sanitizeSpeedHistory([result, ...lastSpeedHistory]);
+  await persistSpeedHistory();
+}
+export async function saveSpeedHistoryLimitAnywhere(limit: number): Promise<void> {
+  await ensureSpeedHistory();
+  lastSpeedHistoryLimit = speedHistoryLimit(limit);
+  const saved = await flush();
+  speedHistorySaveError = saved ? null : "No se pudo guardar la preferencia del historial en el JSON.";
+  notifySpeedHistory();
+}
 
 /** Alertas del guardián Sentinel. */
 export async function loadAlertsAnywhere(): Promise<SentinelAlert[]> {
@@ -171,7 +218,14 @@ export async function loadDirectoryAnywhere(devices: Device[] = []): Promise<Dir
   return lastDirectory;
 }
 
-async function flush() {
+let flushQueue: Promise<unknown> = Promise.resolve();
+function flush(): Promise<boolean> {
+  const write = flushQueue.then(flushState, flushState);
+  flushQueue = write;
+  return write;
+}
+async function flushState(): Promise<boolean> {
+  await ensureSpeedHistory();
   saveToLocalStorage(lastDevices);
   saveStoredDirectory(lastDirectory);
   saveStoredEvents(lastEvents);
@@ -181,8 +235,9 @@ async function flush() {
   saveStoredAway(lastAway);
   saveStoredSla(lastSla);
   saveStoredPatterns(lastPatterns);
+  saveStoredSpeedHistory(lastSpeedHistory, lastSpeedHistoryLimit);
   if (isDesktop()) {
-    await writeDbFile({
+    return await writeDbFile({
       devices: lastDevices,
       people: lastDirectory.people,
       locations: lastDirectory.locations,
@@ -193,8 +248,11 @@ async function flush() {
       away: lastAway,
       sla: lastSla,
       patterns: lastPatterns,
+      speedHistory: lastSpeedHistory,
+      speedHistoryLimit: lastSpeedHistoryLimit,
     });
   }
+  return true;
 }
 
 export async function saveDevicesAnywhere(devices: Device[]): Promise<void> {

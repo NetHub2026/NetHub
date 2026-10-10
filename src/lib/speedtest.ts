@@ -1,4 +1,4 @@
-const HISTORY_KEY = "nethub.speedtest.v1";
+import { appendSpeedHistoryAnywhere, loadSpeedHistoryAnywhere, saveSpeedHistoryAnywhere } from "./persistence";
 /** Servidores públicos de Cloudflare (Internet real, no el propio PC). */
 const CF = "https://speed.cloudflare.com";
 
@@ -213,34 +213,17 @@ export async function runSpeedTest(
       secondsLeft: 0,
       peak: result.peakDownload,
     });
-    saveResult(result);
+    await appendSpeedHistoryAnywhere(result);
     return result;
   } finally {
     runningTest = false;
   }
 }
 
-export function loadSpeedHistory(): SpeedResult[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(HISTORY_KEY);
-    return raw ? (JSON.parse(raw) as SpeedResult[]) : [];
-  } catch {
-    return [];
-  }
+export async function loadSpeedHistory(): Promise<SpeedResult[]> {
+  return (await loadSpeedHistoryAnywhere()).history;
 }
 
-function saveResult(result: SpeedResult) {
-  if (typeof window === "undefined") return;
-  try {
-    const next = [result, ...loadSpeedHistory()].slice(0, 12);
-    window.localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
-  } catch {
-    /* almacenamiento no disponible */
-  }
-}
-
-export function clearSpeedHistory() {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(HISTORY_KEY);
+export async function clearSpeedHistory() {
+  await saveSpeedHistoryAnywhere([]);
 }

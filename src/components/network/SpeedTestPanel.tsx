@@ -8,6 +8,8 @@ import {
   type SpeedResult,
 } from "@/lib/speedtest";
 import { cn } from "@/lib/utils";
+import { loadSpeedHistoryAnywhere, saveSpeedHistoryLimitAnywhere } from "@/lib/persistence";
+import { SPEED_HISTORY_CHANGED, SPEED_HISTORY_LIMITS } from "@/lib/speed-history";
 
 const phaseLabels: Record<SpeedPhase, string> = {
   idle: "Listo para medir",
@@ -83,14 +85,27 @@ export function SpeedTestPanel() {
   const [progress, setProgress] = useState({ total: 0, secondsLeft: 0 });
   const [result, setResult] = useState<SpeedResult | null>(null);
   const [history, setHistory] = useState<SpeedResult[]>([]);
+  const [historyLimit, setHistoryLimit] = useState(10);
   const [error, setError] = useState<string | null>(null);
   const rafRef = useRef(0);
 
   useEffect(() => {
-    const stored = loadSpeedHistory();
-    setHistory(stored);
-    if (stored[0]) setResult(stored[0]);
-    return () => cancelAnimationFrame(rafRef.current);
+    let cancelled = false;
+    const refresh = async () => {
+      const stored = await loadSpeedHistoryAnywhere();
+      if (cancelled) return;
+      setHistory(stored.history);
+      setHistoryLimit(stored.limit);
+      if (stored.history[0]) setResult(stored.history[0]);
+      setError(stored.error);
+    };
+    void refresh();
+    window.addEventListener(SPEED_HISTORY_CHANGED, refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(SPEED_HISTORY_CHANGED, refresh);
+      cancelAnimationFrame(rafRef.current);
+    };
   }, []);
 
   const start = async () => {
@@ -114,7 +129,7 @@ export function SpeedTestPanel() {
         });
       });
       setResult(final);
-      setHistory(loadSpeedHistory());
+      setHistory(await loadSpeedHistory());
       setPhase("done");
       setPeak(final.peakDownload);
     } catch {
@@ -215,11 +230,12 @@ export function SpeedTestPanel() {
 
       {history.length > 0 && (
         <div className="mt-6">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Historial de tests
-          </h3>
-          <div className="mt-2 divide-y divide-border rounded-xl border border-border">
-            {history.slice(0, 6).map((item) => (
+          </h3><label className="flex items-center gap-2 text-xs text-muted-foreground">Mostrar<select aria-label="Cantidad de tests del historial" value={historyLimit} onChange={(e) => { const limit = Number(e.target.value); setHistoryLimit(limit); void saveSpeedHistoryLimitAnywhere(limit); }} className="rounded-md border border-input bg-background px-2 py-1.5 text-foreground">{SPEED_HISTORY_LIMITS.map(limit => <option key={limit} value={limit}>Últimos {limit}</option>)}</select></label></div>
+          <p className="mt-1 text-[11px] text-muted-foreground">{Math.min(history.length, historyLimit)} de {history.length} guardados · se conservan hasta 100 resultados</p>
+          <div className="mt-2 max-h-80 divide-y divide-border overflow-y-auto rounded-xl border border-border">
+            {history.slice(0, historyLimit).map((item) => (
               <div
                 key={item.at}
                 className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-xs"
@@ -228,6 +244,7 @@ export function SpeedTestPanel() {
                   {new Date(item.at).toLocaleString("es-ES", {
                     day: "2-digit",
                     month: "2-digit",
+                    year: "numeric",
                     hour: "2-digit",
                     minute: "2-digit",
                   })}
