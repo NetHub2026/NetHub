@@ -1293,10 +1293,17 @@ function createWindow() {
     },
   });
   if (isWindows) {
+    // The portable launcher survives extraction cleanup and application updates.
+    // Never give Windows a pinned relaunch icon/command inside the temporary payload.
+    const portableExe = process.env.PORTABLE_EXECUTABLE_FILE;
+    const relaunchExe = portableExe || (app.isPackaged ? process.execPath : "");
     win.setAppDetails({
       appId: WINDOWS_APP_ID,
-      appIconPath: iconPath("favicon.ico"),
+      appIconPath: relaunchExe || iconPath("favicon.ico"),
       appIconIndex: 0,
+      ...(relaunchExe
+        ? { relaunchCommand: `"${relaunchExe}"`, relaunchDisplayName: "NetHub" }
+        : {}),
     });
     const image = nativeImage.createFromPath(iconPath("app-icon.png"));
     if (!image.isEmpty()) win.setIcon(image);
