@@ -16,8 +16,8 @@
 - Los scripts Python y PowerShell añaden el endpoint `/wol` que construye y envía el paquete por UDP al puerto 9 en difusión.
 
 ## 4. Redes y topología
-- Pestañas de red sobre el listado: **Todas las redes**, las subredes detectadas en el inventario de cada usuario, con el número de equipos en cada una.
-- Asignación automática por subred (rango de IP configurado en cada red) y selector manual de red en la ficha de detalle, que se guarda y se respeta en escaneos posteriores.
+- Pestañas de red sobre el listado: **Todas las redes** y las subredes detectadas en el inventario de cada usuario, con el número de equipos en cada una. Sin routers, operadores ni topologías predefinidos.
+- Asignación automática a partir de la IP de cada dispositivo y selector manual de red en la ficha de detalle, que se guarda y se respeta en escaneos posteriores. No se atribuye un fabricante, operador o función doméstica a una subred por su rango de IP.
 - El contador de dispositivos y los filtros existentes (tipo, búsqueda, solo conectados) se combinan con la red seleccionada.
 
 ## 5. Copia de seguridad
