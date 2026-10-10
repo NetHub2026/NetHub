@@ -22,6 +22,7 @@ export interface CoveragePoint extends PlanPosition {
 }
 export interface FloorPlan {
   version: 1;
+  locked?: boolean;
   updatedAt: string;
   image: string;
   name: string;
@@ -126,6 +127,7 @@ export function validateFloorPlan(value: unknown): FloorPlan | null {
   if (
     !p ||
     p.version !== 1 ||
+    (p.locked !== undefined && typeof p.locked !== "boolean") ||
     !text(p.name, 150) ||
     !text(p.updatedAt, 40) ||
     !Number.isFinite(Date.parse(p.updatedAt)) ||
@@ -205,6 +207,7 @@ export function validateFloorPlan(value: unknown): FloorPlan | null {
   });
   return {
     version: 1,
+    ...(p.locked === undefined ? {} : { locked: p.locked }),
     updatedAt: p.updatedAt,
     name: p.name,
     image: p.image,

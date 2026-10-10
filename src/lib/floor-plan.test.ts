@@ -77,6 +77,12 @@ describe("real floor plan", () => {
     ])
       expect(() => polygonRoom("r", "Room", points)).toThrow();
   });
+  it("preserves the plan lock through JSON and desktop settings", () => {
+    const locked = { ...example, locked: true };
+    expect(validateFloorPlan(JSON.parse(JSON.stringify(locked)))).toEqual(locked);
+    expect(sanitizeSettings({ floorPlan: locked }).floorPlan).toEqual(locked);
+    expect(() => validateFloorPlan({ ...example, locked: "yes" })).toThrow();
+  });
   it("rejects invented invalid measurement values and bounds history", () => {
     const m = {
       id: "point",
