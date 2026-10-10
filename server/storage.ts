@@ -1,4 +1,4 @@
-import { mkdir, readFile, open, rename, copyFile, readdir, unlink } from "node:fs/promises";
+import { mkdir, readFile, open, rename, copyFile, readdir, unlink, lstat } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { ServerState } from "./types";
@@ -245,6 +245,47 @@ export class StateStore {
     });
     this.queue = write.catch(() => {});
     return write;
+  }
+  async listBackups() {
+    await this.queue;
+    const directory = join(this.directory, "backups");
+    let names: string[];
+    try {
+      names = await readdir(directory);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+      throw error;
+    }
+    const entries = [];
+    for (const id of names
+      .filter((n) => /^state-[0-9TZ-]+-[a-f0-9-]{36}\.json$/.test(n))
+      .sort()
+      .reverse()) {
+      try {
+        const data = JSON.parse(await readFile(join(directory, id), "utf8"));
+        const info = await lstat(join(directory, id));
+        if (!info.isFile()) continue;
+        if (Array.isArray(data.devices))
+          entries.push({
+            id,
+            at: info.mtime.toISOString(),
+            devices: data.devices.length,
+            bytes: info.size,
+          });
+      } catch {
+        /* Damaged versions are not offered for restoration. */
+      }
+    }
+    return entries;
+  }
+  async readBackup(id: string): Promise<unknown> {
+    if (!/^state-[0-9TZ-]+-[a-f0-9-]{36}\.json$/.test(id)) throw new Error("Copia no válida.");
+    await this.queue;
+    const filename = join(this.directory, "backups", id);
+    if (!(await lstat(filename)).isFile()) throw new Error("Copia no válida.");
+    const parsed = JSON.parse(await readFile(filename, "utf8"));
+    normalizeState(parsed);
+    return parsed;
   }
   backup(): Promise<void> {
     const copy = this.queue.then(async () => {

@@ -67,16 +67,49 @@ describe("Durable continuous monitor", () => {
     const archive = join(directory, "backups");
     const files = (await readdir(archive)).sort();
     expect(files).toHaveLength(7);
-    const values = await Promise.all(files.map(async (file) =>
-      JSON.parse(await readFile(join(archive, file), "utf8")).settings.contractedMbps,
-    ));
+    expect(await monitor.store.listBackups()).toHaveLength(7);
+    await expect(monitor.store.readBackup("../server-state.json")).rejects.toThrow();
+    const values = await Promise.all(
+      files.map(
+        async (file) =>
+          JSON.parse(await readFile(join(archive, file), "utf8")).settings.contractedMbps,
+      ),
+    );
     expect(values).toEqual([300, 400, 500, 600, 700, 800, 900]);
     await monitor.settings({ contractedMbps: 1000 });
     expect(await readdir(archive)).toHaveLength(7);
     const restored = JSON.parse(await readFile(join(archive, files[0]!), "utf8"));
+    expect(await monitor.store.readBackup(files[0]!)).toEqual(restored);
     await monitor.importData(restored);
     expect(monitor.state.devices).toHaveLength(3);
     expect((await monitor.store.load()).settings.contractedMbps).toBe(1000);
+  });
+  it("persists watch settings and waits through successful scans without repeating absence alerts", async () => {
+    const { monitor, directory } = await fixture();
+    await monitor.scan();
+    const d = monitor.state.devices[0]!;
+    await monitor.editDevice(
+      d.id,
+      { watch: { offlineMinutes: 5, recovery: true } },
+      { watch: null },
+    );
+    monitor.options.demo = false;
+    monitor.options.scan = async () => [];
+    monitor.options.now = () => new Date("2026-10-10T10:00:00Z");
+    await monitor.scan();
+    monitor.options.now = () => new Date("2026-10-10T10:05:00Z");
+    await monitor.scan();
+    expect(monitor.state.events.filter((e) => e.kind === "watch_offline")).toHaveLength(1);
+    await monitor.scan();
+    expect(monitor.state.events.filter((e) => e.kind === "watch_offline")).toHaveLength(1);
+    expect((await monitor.store.load()).devices[0]!.watchState?.alerted).toBe(true);
+    monitor.options.demo = true;
+    await monitor.scan();
+    expect(monitor.state.events.filter((e) => e.kind === "watch_recovered")).toHaveLength(1);
+    expect((await new StateStore(directory).load()).devices[0]!.watch).toEqual({
+      offlineMinutes: 5,
+      recovery: true,
+    });
   });
   it("serializes concurrent backups and updates without truncating either JSON", async () => {
     const { monitor, directory } = await fixture();
@@ -288,6 +321,18 @@ describe("Authenticated HTTP API", () => {
       (await request("/api/settings", { contractedMbps: 500 }, { ...headers, origin: base }))
         .status,
     ).toBe(200);
+    expect(monitor.state.settings.contractedMbps).toBe(500);
+    expect((await request("/api/backups")).status).toBe(401);
+    expect((await request("/api/backup", {}, headers)).status).toBe(200);
+    const copies = await (await request("/api/backups", undefined, { cookie })).json();
+    expect(copies).toHaveLength(1);
+    expect((await request("/api/backup-read", { id: copies[0].id }, headers)).status).toBe(200);
+    expect((await request("/api/restore", { id: copies[0].id }, { cookie })).status).toBe(403);
+    expect((await request("/api/restore", { id: "../server-state.json" }, headers)).status).toBe(
+      400,
+    );
+    expect((await request("/api/restore", { id: copies[0].id }, headers)).status).toBe(200);
+    expect(monitor.state.devices).toHaveLength(3);
     expect(monitor.state.settings.contractedMbps).toBe(500);
     expect((await request("/api/ping", { ip: "8.8.8.8" }, headers)).status).toBe(400);
     expect((await request("/api/speed", {}, headers)).status).toBe(400);

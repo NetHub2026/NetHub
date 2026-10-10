@@ -1,3 +1,4 @@
+import { evaluateWatches, normalizeWatch } from "../src/lib/device-watch";
 import type { Device } from "../src/lib/devices";
 import { deviceTypeLabels } from "../src/lib/devices";
 import { loadIeeeRegistry } from "../src/lib/identity";
@@ -12,6 +13,7 @@ import { discoverInterfaces, scanNetwork, ping, TrafficSampler } from "./network
 import type { ServerState, ServerSnapshot, NetworkInterface, ServerSettings } from "./types";
 import { measureSpeed } from "./speed";
 export const EDITABLE_FIELDS = [
+  "watch",
   "name",
   "vendor",
   "type",
@@ -190,9 +192,16 @@ export class Monitor {
         self.type = "nas"; /* A LAN scan cannot infer cable versus Wi-Fi. */
       }
       await this.mutate((draft) => {
-        const merged = mergeScan(draft.devices, scanned);
+        const watched = evaluateWatches(
+          mergeScan(draft.devices, scanned),
+          this.options.now?.() ?? new Date(),
+        );
+        const merged = watched.devices;
         const now = this.options.now?.() ?? new Date();
-        draft.events = appendEvents(draft.events, diffActivity(draft.devices, merged));
+        draft.events = appendEvents(draft.events, [
+          ...diffActivity(draft.devices, merged),
+          ...watched.events,
+        ]);
         draft.devices = merged;
         draft.usage = recordUsageScan(merged, draft.usage, now);
         draft.patterns = evaluatePatterns(
@@ -284,6 +293,7 @@ export class Monitor {
           );
       validateDeviceChanges(changes);
       Object.assign(device, changes);
+      if (keys.includes("watch")) delete device.watchState;
       for (const key of ["person", "location"] as const)
         if (device[key]?.trim()) {
           const directory = key === "person" ? "people" : "locations";
@@ -430,6 +440,8 @@ export class Monitor {
 }
 function validateDeviceChanges(changes: Record<string, unknown>) {
   for (const [key, value] of Object.entries(changes)) {
+    if (key === "watch" && value !== null && !normalizeWatch(value))
+      throw new Error("Vigilancia no válida.");
     if (
       [
         "name",

@@ -102,6 +102,8 @@ export function createHttpServer(monitor: Monitor, options: Options) {
             });
           if (req.method === "GET" && url.pathname === "/api/session")
             return json(res, 200, { csrf: session.csrf });
+          if (req.method === "GET" && url.pathname === "/api/backups")
+            return json(res, 200, await monitor.store.listBackups());
           if (req.method === "GET" && url.pathname === "/api/state")
             return json(res, 200, monitor.snapshot());
           if (req.method === "GET" && url.pathname === "/api/export") {
@@ -169,6 +171,8 @@ export function createHttpServer(monitor: Monitor, options: Options) {
             await monitor.mutate((draft) => {
               draft.events = [];
             });
+          else if (url.pathname === "/api/backup-read") return json(res, 200, await monitor.store.readBackup(string(input["id"])));
+          else if (url.pathname === "/api/restore") await monitor.importData(await monitor.store.readBackup(string(input["id"])));
           else if (url.pathname === "/api/backup") await monitor.store.backup();
           else if (url.pathname === "/api/speed") {
             if (monitor.speedRunning)

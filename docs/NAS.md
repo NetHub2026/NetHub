@@ -100,3 +100,13 @@ bunx vitest run
 Para iniciar una demostración local, establece `NETHUB_PASSWORD_FILE` apuntando a un archivo de contraseña de pruebas, `NETHUB_DEMO_MODE=true`, `NETHUB_BIND_ADDRESS=127.0.0.1`, `NETHUB_PORT=8087`, y ejecuta `bun run start:server`.
 
 El workflow **Validate NetHub Server** construye la imagen Linux, verifica autenticación, monitorización sin navegador y persistencia después de reiniciar el contenedor, sin acceso a ninguna red real. La prueba ARP de una instalación física queda pendiente hasta disponer del NAS.
+
+## Mejoras compartidas con Windows
+
+En Configuración → Datos y copias puedes listar las siete copias, descargarlas y restaurarlas con confirmación. Se guarda una copia previa al reemplazo. La restauración conserva contraseña, interfaz y tareas del servidor; restaura inventario e historiales compatibles. Las preferencias locales de Windows también se conservan. Windows crea una copia automáticamente al guardar si la última tiene más de 24 horas; el servidor tiene además su tarea continua diaria.
+
+En la ficha de cada dispositivo puedes consultar hasta 50 eventos de presencia, cambios de IP y conexión, y tiempo conectado observado en los últimos 30 días. El tiempo solo procede de escaneos y no cubre periodos en que el monitor estuvo detenido.
+
+La vigilancia se activa por dispositivo: 1, 5, 10, 30 o 60 minutos sin respuesta, con aviso opcional al recuperarse. Se evalúa al completar un escaneo correcto y no repite la misma ausencia. Los intervalos reales de escaneo condicionan el momento del aviso; tras una pausa de más de 15 minutos se reinicia el margen de observación pendiente. La configuración y la ausencia ya avisada persisten en el JSON. En Windows hay aviso nativo y en la app; en NAS los eventos se registran sin navegador y se muestran en Actividad, con aviso visual para los navegadores conectados. No se envían mensajes externos ni notificaciones al móvil con el navegador cerrado.
+
+Exportar selección (CSV) utiliza los filtros activos del inventario, incluyendo personas, ubicaciones y tipos. Los valores que podrían interpretarse como fórmulas en una hoja de cálculo se exportan como texto.

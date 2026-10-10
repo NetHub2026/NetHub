@@ -1,3 +1,4 @@
+import { BackupManager } from "../src/components/network/BackupManager";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Toaster, toast } from "sonner";
@@ -42,6 +43,7 @@ import { slaCsv } from "../src/lib/sla";
 import { connectionOf, wifiBand } from "../src/lib/connections";
 import type { ServerSnapshot, ServerSettings } from "../server/types";
 import "./style.css";
+import { exportInventoryCsv } from "../src/lib/backup";
 import { commonServices, serviceUrl } from "../src/lib/services";
 
 let csrf = "";
@@ -94,6 +96,7 @@ const serverProbe: typeof import("../src/lib/services").detectServices = async (
   return { hits, native: true };
 };
 const editable = [
+  "watch",
   "name",
   "vendor",
   "type",
@@ -135,6 +138,7 @@ function App() {
   const [state, setState] = useState<ServerSnapshot | null>(null);
   const [connected, setConnected] = useState(false);
   const [view, setView] = useState<View>("inventory");
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [types, setTypes] = useState<DeviceType[]>([]);
@@ -147,7 +151,13 @@ function App() {
   const pending = useRef(0);
   const mounted = useRef(true);
   const apply = (value: ServerSnapshot) => {
+    const previous = latest;
     latest = value;
+    if (previous)
+      for (const event of [...value.events].reverse()) {
+        if (event.kind.startsWith("watch_") && !previous.events.some((e) => e.id === event.id))
+          toast.warning(`${event.name}: ${event.detail}`);
+      }
     setState(value);
     setConnected(true);
   };
@@ -311,15 +321,13 @@ function App() {
             <h1 className="font-semibold">
               NetHub{" "}
               <span className="text-xs font-normal text-muted-foreground">
-                Server {state?.server.version ?? ""}
+                v{state?.server.version ?? ""}
               </span>
             </h1>
-            <p className="text-[11px] text-muted-foreground">
-              Monitorización 24 horas desde el NAS
-            </p>
           </div>
           <span className={`text-xs ${connected ? "text-success" : "text-warning"}`}>
-            {connected ? "Conectado" : "Sin conexión"}
+            <span className="hidden sm:inline">{connected ? "Conectado" : "Sin conexión"}</span>
+            <span aria-label={connected ? "Conectado" : "Sin conexión"} className="inline-block size-2 rounded-full bg-current sm:hidden" />
           </span>
           <button
             onClick={() => void mutate("scan", {})}
@@ -432,6 +440,12 @@ function App() {
                     <option value="online">Activos</option>
                     <option value="offline">Inactivos</option>
                   </select>
+                  <button
+                    className="rounded-lg border border-border px-3 py-2 text-xs"
+                    onClick={() => exportInventoryCsv(filtered)}
+                  >
+                    Exportar selección (CSV)
+                  </button>
                 </div>
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>
@@ -620,10 +634,30 @@ function App() {
                   ))}
                 </div>
                 <div className="rounded-xl border border-border bg-card p-5">
+                  <button
+                    className="mb-4 rounded-lg border border-border px-3 py-2 text-sm"
+                    onClick={() => setAboutOpen(true)}
+                  >
+                    Acerca de NetHub
+                  </button>
                   <h2 className="text-lg font-semibold">Datos y copias</h2>
+                  <BackupManager
+                    adapter={{
+                      list: () => api("backups"),
+                      create: async () => {
+                        await api("backup", {});
+                      },
+                      read: (id) => api("backup-read", { id }),
+                      restore: async (id) => {
+                        await api("restore", { id });
+                        await refresh();
+                      },
+                    }}
+                  />
                   <p className="mt-2 text-sm text-muted-foreground">
                     Inventario, posiciones, actividad, rutinas y hasta 100 pruebas de velocidad se
-                    guardan en el NAS. Se crea una copia cada 24 horas y se conservan las siete últimas versiones.
+                    guardan en el NAS. Se crea una copia cada 24 horas y se conservan las siete
+                    últimas versiones.
                   </p>
                   <div className="mt-4 flex flex-wrap gap-3">
                     <label className="cursor-pointer rounded-lg border border-border px-3 py-2 text-sm">
@@ -661,17 +695,7 @@ function App() {
                       className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
                     >
                       <Download className="size-4" />
-                      Descargar copia
-                    </button>
-                    <button
-                      onClick={() =>
-                        void mutate("backup", {}).then((ok) => {
-                          if (ok) toast.message("Copia creada en el NAS.");
-                        })
-                      }
-                      className="rounded-lg border border-border px-3 py-2 text-sm"
-                    >
-                      Crear copia en el NAS
+                      Descargar estado actual
                     </button>
                   </div>
                   <p className="mt-4 text-xs text-muted-foreground">
@@ -685,6 +709,18 @@ function App() {
           </>
         )}
       </main>
+      <Dialog open={aboutOpen} onOpenChange={setAboutOpen}>
+        <DialogContent>
+          <DialogTitle>Acerca de NetHub</DialogTitle>
+          <DialogDescription>
+            NetHub Server {state?.server.version} · Monitorización continua desde el NAS · © 2026
+            oyogor
+          </DialogDescription>
+          <a href="mailto:nethub2026@outlook.es" className="text-sm text-primary">
+            nethub2026@outlook.es
+          </a>
+        </DialogContent>
+      </Dialog>
       <DeviceDetailPanel
         measurePing={serverPing}
         sendWake={serverWake}
@@ -698,6 +734,7 @@ function App() {
         people={state?.settings.people ?? []}
         locations={state?.settings.locations ?? []}
         events={state?.events ?? []}
+        usage={state?.usage}
         onClose={() => setSelected(null)}
         onUpdate={update}
         onDelete={(device) => {

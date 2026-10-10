@@ -1,3 +1,4 @@
+import { evaluateWatches } from "@/lib/device-watch";
 import { SPEED_HISTORY_CHANGED } from "@/lib/speed-history";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -432,9 +433,14 @@ function Dashboard() {
     const wasOnline = new Set(
       itemsRef.current.filter((d) => d.status === "online").map((d) => d.id),
     );
-    const merged = mergeScan(itemsRef.current, resolved);
+    const watched = evaluateWatches(mergeScan(itemsRef.current, resolved));
+    const merged = watched.devices;
     const changes = diffActivity(itemsRef.current, merged);
-    recordEvents(changes);
+    recordEvents([...changes, ...watched.events]);
+    for (const event of watched.events) {
+      toast.warning(`${event.name}: ${event.detail}`);
+      void notifyNative("NetHub · Vigilancia", `${event.name}: ${event.detail}`);
+    }
     const changed = changes.filter(e => e.kind.endsWith("_changed"));
     if (changed.length) toast.message(`${changed.length} cambios en dispositivos conocidos`, { description: "Consulta los detalles en Actividad." });
     setItems(merged);
@@ -459,7 +465,7 @@ function Dashboard() {
     if (settingsRef.current.alertCriticalOffline) {
       for (const device of merged) {
         const critical = device.tags.some((t) => /24\/7|cr[ií]tico/i.test(t));
-        if (critical && device.status !== "online" && wasOnline.has(device.id)) {
+        if (critical && !device.watch?.offlineMinutes && device.status !== "online" && wasOnline.has(device.id)) {
           toast.error(`«${device.name}» ha dejado de responder`, {
             description: `${device.ip} · marcado como equipo crítico 24/7`,
             duration: 12000,
@@ -958,15 +964,15 @@ function Dashboard() {
             )}
             <button
               onClick={() => {
-                exportInventoryCsv(items);
+                exportInventoryCsv(visible);
                 setNotice(
-                  `Inventario exportado en CSV con ${items.length} dispositivos, listo para hoja de cálculo.`,
+                  `Inventario exportado en CSV con ${visible.length} dispositivos, listo para hoja de cálculo.`,
                 );
               }}
               className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               <FileSpreadsheet className="size-3.5" />
-              Exportar inventario (CSV)
+              Exportar selección (CSV)
             </button>
           </div>
         </section>
@@ -1383,6 +1389,7 @@ function Dashboard() {
         onUnify={(otherId, choices) => { if (selected) setItems(prev => unifyDevices(prev, selected.id, otherId, choices)); }}
         onSeparate={() => { if (selected) setItems(prev => separateDevice(prev, selected.id)); }}
         events={events}
+        usage={usageState}
         device={selected}
         onClose={() => setSelectedId(null)}
         onUpdate={update}

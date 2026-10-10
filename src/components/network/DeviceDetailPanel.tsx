@@ -1,3 +1,5 @@
+import { secondsInLastDays, type UsageState } from "@/lib/usage";
+import { watchDelays } from "@/lib/device-watch";
 import type { MergeChoices, MergeField } from "@/lib/device-unification";
 import { useEffect, useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
@@ -72,6 +74,7 @@ interface DeviceDetailPanelProps {
   onCreatePerson?: (name: string) => void;
   onCreateLocation?: (name: string) => void;
   events?: ActivityEvent[];
+  usage?: UsageState | undefined;
   devices?: Device[];
   onUnify?: (otherId: string, choices: MergeChoices) => void;
   onSeparate?: () => void;
@@ -94,6 +97,7 @@ export function DeviceDetailPanel({
   onCreatePerson,
   onCreateLocation,
   events = [],
+  usage,
   devices = [],
   onUnify,
   onSeparate,
@@ -628,11 +632,28 @@ export function DeviceDetailPanel({
               )}
             </div>
           </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Tiempo conectado observado (30 días): {usage ? `${Math.round(secondsInLastDays(usage.devices[device.id], 30) / 60)} min` : "Sin datos"}.
+            Solo se contabiliza mientras NetHub monitoriza.
+          </p>
+          <div className="mt-4 rounded-xl border border-border p-3">
+            <label className="text-sm font-medium" htmlFor="watch-delay">Vigilar este dispositivo</label>
+            <select id="watch-delay" className="ml-3 rounded-md border border-border bg-background p-2 text-xs"
+              value={device.watch?.offlineMinutes ?? 0}
+              onChange={e => onUpdate({ ...device, watchState: undefined, watch: { offlineMinutes: Number(e.target.value), recovery: device.watch?.recovery ?? true } })}>
+              {watchDelays.map(m => <option key={m} value={m}>{m ? `Avisar tras ${m} min sin respuesta` : "Desactivado"}</option>)}
+            </select>
+            {!!device.watch?.offlineMinutes && <label className="mt-3 flex items-center gap-2 text-xs">
+              <input type="checkbox" checked={device.watch.recovery} onChange={e => onUpdate({ ...device, watchState: undefined, watch: { ...device.watch!, recovery: e.target.checked } })} />
+              Avisar cuando vuelva a conectarse
+            </label>}
+            <p className="mt-2 text-xs text-muted-foreground">Los avisos quedan en Actividad. Se evalúan con escaneos correctos; sin respuesta no implica que el equipo esté apagado.</p>
+          </div>
           {(() => {
             const ids = new Set([device.id, ...(device.networkEntries?.map((d) => d.id) ?? [])]);
-            const recent = events.filter((e) => ids.has(e.deviceId ?? "")).slice(0, 5);
+            const recent = events.filter((e) => ids.has(e.deviceId ?? "")).slice(0, 50);
             return (
-              <ul className="mt-3 space-y-1.5">
+              <ul className="mt-3 max-h-64 space-y-1.5 overflow-y-auto">
                 {recent.length === 0 && (
                   <li className="text-xs text-muted-foreground">Sin eventos recientes.</li>
                 )}

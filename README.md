@@ -26,3 +26,7 @@ npm run dev
 ## NetHub Server para NAS
 
 Edición Docker con monitorización continua y una interfaz compartida para PC, móvil y tablet. Consulta [instalación, alcance y copias de seguridad](docs/NAS.md). El monitor del NAS funciona sin navegadores abiertos y guarda sus datos en un volumen persistente.
+
+### Funciones comunes de PC y NAS
+
+Ambas ediciones incluyen selección filtrada del inventario para CSV, historial de presencia con tiempo conectado observado, vigilancia por dispositivo con margen configurable y aviso de recuperación, y un gestor para descargar o restaurar las siete últimas copias. La restauración pide confirmación y guarda previamente el estado actual. Los avisos se registran en Actividad; Windows puede mostrarlos como notificaciones del sistema y el NAS los muestra a los navegadores conectados, sin enviar mensajes a servicios externos.

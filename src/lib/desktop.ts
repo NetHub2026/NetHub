@@ -14,6 +14,9 @@ export type Runtime = "web" | "tauri" | "electron";
 
 /** API que debe exponer el preload de Electron (ver modal de empaquetado). */
 interface ElectronBridge {
+  listBackups?: () => Promise<import("../components/network/BackupManager").BackupEntry[]>;
+  readBackup?: (id: string) => Promise<unknown>;
+  restoreBackup?: (id: string) => Promise<{ ok: boolean }>;
   internetProvider?: () => Promise<unknown>;
   readDevices?: () => Promise<string | null>;
   writeDevices?: (json: string) => Promise<boolean | void>;
@@ -651,3 +654,17 @@ export async function nativeScanPorts(
     return null;
   }
 }
+
+export const desktopBackups: import("../components/network/BackupManager").BackupAdapter = {
+  async list() { return window.nethub?.listBackups ? window.nethub.listBackups() : []; },
+  async create() { const result = await backupDataFile(); if (!result.ok) throw new Error(result.error ?? "No se pudo crear la copia."); },
+  async read(id) { if (!window.nethub?.readBackup) throw new Error("Disponible en la aplicación Windows."); return window.nethub.readBackup(id); },
+  async restore(id) {
+    if (!window.nethub?.restoreBackup) throw new Error("Disponible en la aplicación Windows.");
+    await window.nethub.restoreBackup(id);
+    for (const key of ["nethub.devices.v1", "nethub.activity.v1", "nethub.sentinel.v1", "nethub.health.v1", "nethub.usage.v1", "nethub.away.v1", "nethub.patterns.v1", "nethub.sla.v1", "nethub.directory.v1", "nethub.scan-meta.v1", "nethub.speedtest.v1", "nethub.speedtest.limit", "nethub.speedtest.unified"]) {
+      try { window.localStorage.removeItem(key); } catch {}
+    }
+    window.location.reload();
+  },
+};

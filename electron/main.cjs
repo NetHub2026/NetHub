@@ -1,3 +1,6 @@
+const backups = require("./backups.cjs");
+let restoringDb = false;
+let lastAutoBackup = 0;
 // Proceso principal de NetHub portable (Electron).
 // - Guarda y lee devices-db.json junto al ejecutable.
 // - Escaneo ARP nativo, ping ICMP real y Wake-on-LAN por UDP.
@@ -176,7 +179,13 @@ function readDevices() {
 
 function writeDevices(json) {
   try {
-    fs.writeFileSync(dbPath(), json, "utf8");
+    if (restoringDb) return false;
+    backups.atomic(dbPath(), json);
+    if (Date.now() - lastAutoBackup >= 24 * 3600_000) {
+      const existing = backups.entries(baseDir())[0];
+      if (!existing || Date.now() - Date.parse(existing.at) >= 24 * 3600_000) backups.create(baseDir(), dbPath());
+      lastAutoBackup = Date.now();
+    }
     return true;
   } catch {
     return false;
@@ -732,9 +741,7 @@ function backupDb() {
     if (!fs.existsSync(dbPath())) {
       return { ok: false, error: "Todavía no hay datos guardados que copiar." };
     }
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-    const target = path.join(baseDir(), `devices-db-${stamp}.json`);
-    fs.copyFileSync(dbPath(), target);
+    const target = backups.create(baseDir(), dbPath());
     return { ok: true, path: target };
   } catch (error) {
     return { ok: false, error: String(error) };
@@ -762,6 +769,14 @@ ipcMain.handle("nethub:read-settings", () => readSettings());
 ipcMain.handle("nethub:write-settings", (_e, json) => writeSettings(json));
 ipcMain.handle("nethub:open-data-folder", () => openDataFolder());
 ipcMain.handle("nethub:backup-db", () => backupDb());
+ipcMain.handle("nethub:list-backups", () => backups.entries(baseDir()));
+ipcMain.handle("nethub:read-backup", (_e, id) => backups.read(baseDir(), String(id)));
+ipcMain.handle("nethub:restore-backup", (event, id) => {
+  backups.restore(baseDir(), dbPath(), String(id));
+  restoringDb = true;
+  event.sender.once("did-finish-load", () => { restoringDb = false; });
+  return { ok: true };
+});
 ipcMain.handle("nethub:notify", (_e, payload) => notifyNative(payload));
 ipcMain.handle("nethub:open-external", async (_e, url) => {
   let target;

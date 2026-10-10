@@ -11,6 +11,8 @@ import { DeviceTypeIcon } from "./DeviceTypeIcon";
 import { cn } from "@/lib/utils";
 
 const kindStyle: Record<ActivityKind, { icon: typeof Wifi; cls: string }> = {
+  watch_offline: { icon: WifiOff, cls: "bg-warning/15 text-warning" },
+  watch_recovered: { icon: Wifi, cls: "bg-success/15 text-success" },
   connected: { icon: Wifi, cls: "bg-success/15 text-success" },
   disconnected: { icon: WifiOff, cls: "bg-destructive/15 text-destructive" },
   new_device: { icon: Sparkles, cls: "bg-brand/15 text-brand" },
@@ -22,6 +24,8 @@ const kindStyle: Record<ActivityKind, { icon: typeof Wifi; cls: string }> = {
 type Filter = "all" | ActivityKind;
 const filters: Array<[Filter, string]> = [
   ["all", "Todos"],
+  ["watch_offline", "Avisos de ausencia"],
+  ["watch_recovered", "Recuperados"],
   ["connected", "Conexiones"],
   ["disconnected", "Desconexiones"],
   ["new_device", "Nuevos"],

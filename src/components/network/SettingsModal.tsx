@@ -1,3 +1,5 @@
+import { BackupManager } from "./BackupManager";
+import { desktopBackups } from "@/lib/desktop";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
@@ -6,7 +8,6 @@ import {
   Bell,
   Info,
   FolderOpen,
-  HardDriveDownload,
   Monitor,
   MapPin,
   Users,
@@ -24,7 +25,7 @@ import {
   scanIntervalOptions,
   type Settings,
 } from "@/lib/settings";
-import { APP_VERSION, backupDataFile, getRuntime, isDesktop, openDataFolder, runtimeLabels } from "@/lib/desktop";
+import { APP_VERSION, getRuntime, isDesktop, openDataFolder, runtimeLabels } from "@/lib/desktop";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -119,14 +120,7 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset, dire
     );
   };
 
-  const backup = async () => {
-    const result = await backupDataFile();
-    setMessage(
-      result.ok
-        ? `Copia de seguridad creada: ${result.path ?? ""}`
-        : result.error || "No se ha podido crear la copia.",
-    );
-  };
+
 
   return (
     <DialogPrimitive.Root
@@ -462,16 +456,9 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset, dire
                       <FolderOpen className="size-4" />
                       Abrir carpeta de datos
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => void backup()}
-                      className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                    >
-                      <HardDriveDownload className="size-4" />
-                      Crear copia de seguridad
-                    </Button>
+
                   </div>
+                  {desktop && <BackupManager adapter={desktopBackups} />}
                   <p className="text-xs text-muted-foreground">
                     En esa carpeta se guardan el inventario (devices-db.json) y tus preferencias
                     (settings.json), junto al ejecutable de NetHub.
