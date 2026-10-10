@@ -6,4 +6,11 @@ function shutdownArgs(ip, localIps = []) {
   // Zero timeout does not imply /f. Never force applications to close.
   return ["/s", "/m", `\\\\${ip}`, "/t", "0"];
 }
-module.exports = { shutdownArgs };
+function shutdownError(error, stderr = "", stdout = "") {
+  if (error?.killed || error?.code === "ETIMEDOUT") return "Windows no respondió a tiempo. No se ha confirmado el apagado; comprueba el estado del PC antes de volver a solicitarlo.";
+  const detail = String(stderr || stdout).replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 600);
+  return detail
+    ? `Windows rechazó la solicitud: ${detail}. El PC de destino debe permitir el apagado remoto con tu cuenta de Windows.`
+    : "Windows rechazó la solicitud. Comprueba que el PC sea Windows, tenga permisos de apagado remoto y permita la administración remota.";
+}
+module.exports = { shutdownArgs, shutdownError };

@@ -4,7 +4,7 @@ import { connectionOf, wifiBand, connectionSummary } from "./connections";
 import { parseHostsJson, mergeScan } from "./scanner";
 const require = createRequire(import.meta.url);
 const { interfaceConnectionTag, wifiTagForMac } = require("../../electron/local-connection.cjs");
-const { shutdownArgs } = require("../../electron/remote-power.cjs");
+const { shutdownArgs, shutdownError } = require("../../electron/remote-power.cjs");
 const fixture = () => parseHostsJson([{ ip: "192.168.50.20", mac: "02:00:00:00:00:01", type: "smartphone", name: "Example" }])[0]!;
 describe("Conexión y resumen", () => {
   it("no deduce Wi-Fi por tipo ni por etiquetas antiguas", () => {
@@ -30,6 +30,11 @@ describe("Conexión y resumen", () => {
   });
 });
 describe("Apagado remoto: validación sin ejecutar órdenes", () => {
+  it("conserva el motivo devuelto por Windows y distingue una espera agotada", () => {
+    expect(shutdownError({ code: 1 }, "Acceso denegado. (5)\r\n")).toContain("Acceso denegado. (5)");
+    expect(shutdownError({ killed: true }, "")).toContain("No se ha confirmado el apagado");
+    expect(shutdownError({ code: 1 }, "x".repeat(1000)).length).toBeLessThan(800);
+  });
   it("rechaza el equipo local, IP públicas, broadcast y argumentos inyectados", () => {
     for (const ip of ["127.0.0.1", "203.0.113.42", "192.168.50.255", "192.168.50.20 /f", "192.168.050.20"]) expect(shutdownArgs(ip)).toBeNull();
     expect(shutdownArgs("192.168.50.20", ["192.168.50.20"])).toBeNull();

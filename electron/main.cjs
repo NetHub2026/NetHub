@@ -17,7 +17,7 @@ const { readWindowState, windowSize, mergeWindowState } = require("./window-stat
 const path = require("node:path");
 const { resolveIconPath } = require("./icon-path.cjs");
 const { interfaceConnectionTag, wifiTagForMac } = require("./local-connection.cjs");
-const { shutdownArgs } = require("./remote-power.cjs");
+const { shutdownArgs, shutdownError } = require("./remote-power.cjs");
 const fs = require("node:fs");
 const os = require("node:os");
 const http = require("node:http");
@@ -974,8 +974,8 @@ ipcMain.handle("nethub:shutdown-pc", (_e, ip) => {
     if (!Array.isArray(records) || !records.some(d => d.ip === target && ["pc", "laptop"].includes(d.type))) return { ok: false, error: "El destino debe ser un PC del inventario." };
   } catch { return { ok: false, error: "No se pudo validar el PC en el inventario." }; }
   return new Promise(resolve => {
-    execFile("shutdown.exe", args, { timeout: 10_000, windowsHide: true }, (error) => {
-      resolve(error ? { ok: false, error: "Windows rechazó la solicitud. Comprueba que el PC sea Windows, tenga permisos de apagado remoto y permita la administración remota." } : { ok: true });
+    execFile("shutdown.exe", args, { timeout: 10_000, windowsHide: true }, (error, stdout, stderr) => {
+      resolve(error ? { ok: false, error: shutdownError(error, stderr, stdout) } : { ok: true });
     });
   });
 });
