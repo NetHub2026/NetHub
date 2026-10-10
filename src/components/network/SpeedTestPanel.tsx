@@ -209,7 +209,7 @@ export function SpeedTestPanel() {
           <Metric
             icon={<Gauge className="size-4" />}
             label={running ? "Máxima media (fase actual)" : "Máxima media de descarga"}
-            value={running && peak > 0 ? `${peak.toFixed(1)} Mbps` : result ? `${result.peakDownload.toFixed(1)} Mbps` : "—"}
+            value={running && peak > 0 ? `${peak.toFixed(1)} Mbps` : result && !result.migratedSla ? `${result.peakDownload.toFixed(1)} Mbps` : "—"}
           />
           <button
             onClick={start}

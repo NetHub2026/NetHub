@@ -60,3 +60,24 @@ describe("Historial de velocidad en JSON", () => {
     expect(sanitizeSpeedHistory([null, { ...sample(2), download: -1 }, legacy, legacy])).toEqual([{ ...legacy, peakDownload: legacy.download, peakUpload: legacy.upload }]);
   });
 });
+
+describe("Historial común", () => {
+  it("migra pruebas del contrato, evita duplicados y comparte los nuevos resultados", async () => {
+    const old = sample(1), recent = sample(2);
+    store.disk["sla"] = [old, recent]; store.disk["speedHistory"] = [recent];
+    const api = await import("./persistence");
+    expect((await api.loadSpeedHistoryAnywhere()).history).toHaveLength(2);
+    expect((await api.loadSpeedHistoryAnywhere()).history[0]).toEqual(recent);
+    expect((await api.loadSpeedHistoryAnywhere()).history[1]?.migratedSla).toBe(true);
+    await api.appendSpeedHistoryAnywhere(sample(3));
+    expect((await api.loadSlaAnywhere()).map(r => r.at)).toEqual([old.at, recent.at, sample(3).at]);
+    expect(store.disk["speedHistoryUnified"]).toBe(true);
+    local.clear(); vi.resetModules();
+    expect((await (await import("./persistence")).loadSlaAnywhere())).toHaveLength(3);
+  });
+  it("respeta el vaciado sin volver a importar el historial antiguo", async () => {
+    store.disk["speedHistoryUnified"] = true; store.disk["speedHistory"] = []; store.disk["sla"] = [sample(1)];
+    const api = await import("./persistence");
+    expect(await api.loadSlaAnywhere()).toEqual([]);
+  });
+});

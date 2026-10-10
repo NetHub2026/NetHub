@@ -1,3 +1,4 @@
+import { SPEED_HISTORY_CHANGED } from "@/lib/speed-history";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -87,7 +88,7 @@ import {
   evaluateAway,
   type AwayState,
 } from "@/lib/away";
-import { appendSlaSample, type SlaSample } from "@/lib/sla";
+import { type SlaSample } from "@/lib/sla";
 import { runSpeedTest, speedTestBusy } from "@/lib/speedtest";
 import {
   loadUsageAnywhere,
@@ -256,6 +257,11 @@ function Dashboard() {
   settingsRef.current = settings;
   const awayRef = useRef<AwayState>(awayState);
   awayRef.current = awayState;
+  useEffect(() => {
+    const sync = () => { void loadSlaAnywhere().then(setSlaSamples); };
+    window.addEventListener(SPEED_HISTORY_CHANGED, sync);
+    return () => window.removeEventListener(SPEED_HISTORY_CHANGED, sync);
+  }, []);
   const slaRunningRef = useRef(false);
 
   /** Test de velocidad para el informe SLA (manual o programado). */
@@ -267,17 +273,8 @@ function Dashboard() {
     slaRunningRef.current = true;
     setSlaRunning(true);
     try {
-      const r = await runSpeedTest();
-      setSlaSamples((prev) => {
-        const next = appendSlaSample(prev, {
-          at: r.at,
-          download: r.download,
-          upload: r.upload,
-          ping: r.ping,
-        });
-        void saveSlaAnywhere(next);
-        return next;
-      });
+      await runSpeedTest();
+      setSlaSamples(await loadSlaAnywhere());
     } catch {
       toast.error("No se pudo completar el test de velocidad");
     } finally {
@@ -427,7 +424,7 @@ function Dashboard() {
   const applyScan = async (devices: Device[], source: NonNullable<ScanMeta["source"]>) => {
     const filtered = settingsRef.current.skipRandomMac
       ? devices.filter(
-          (d) => !isRandomizedMac(d.mac) || itemsRef.current.some((k) => k.id === d.id),
+          (d) => !isRandomizedMac(d.mac) || itemsRef.current.some((k) => k.id === d.id || k.networkEntries?.some(entry => entry.id === d.id)),
         )
       : devices;
     const resolved = await enrichDevicesWithResolvedVendors(filtered);
@@ -436,7 +433,10 @@ function Dashboard() {
       itemsRef.current.filter((d) => d.status === "online").map((d) => d.id),
     );
     const merged = mergeScan(itemsRef.current, resolved);
-    recordEvents(diffActivity(itemsRef.current, merged));
+    const changes = diffActivity(itemsRef.current, merged);
+    recordEvents(changes);
+    const changed = changes.filter(e => e.kind.endsWith("_changed"));
+    if (changed.length) toast.message(`${changed.length} cambios en dispositivos conocidos`, { description: "Consulta los detalles en Actividad." });
     setItems(merged);
     void saveDevicesAnywhere(merged);
     const next = { lastScanAt: new Date().toISOString(), source, detectedCount: devices.length };
@@ -1334,6 +1334,7 @@ function Dashboard() {
         {viewMode === "home" && (
           <HomeTwin
             devices={items}
+            onUpdateDevice={update}
             patterns={patterns}
             onReviewAnomaly={(id, reviewed) => {
               const next = reviewAnomaly(patternsRef.current, id, reviewed);
@@ -1379,7 +1380,7 @@ function Dashboard() {
 
       <DeviceDetailPanel
         devices={items}
-        onUnify={otherId => { if (selected) setItems(prev => unifyDevices(prev, selected.id, otherId)); }}
+        onUnify={(otherId, choices) => { if (selected) setItems(prev => unifyDevices(prev, selected.id, otherId, choices)); }}
         onSeparate={() => { if (selected) setItems(prev => separateDevice(prev, selected.id)); }}
         events={events}
         device={selected}

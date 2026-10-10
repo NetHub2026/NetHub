@@ -48,6 +48,7 @@ export interface Device {
   person?: string;
   /** Ubicación / habitación donde está el dispositivo (opcional) */
   location?: string;
+  roomPosition?: { room: string; x: number; y: number };
   /** Network identities explicitly unified by the user, retained for scan matching and undo. */
   networkEntries?: Device[];
 }

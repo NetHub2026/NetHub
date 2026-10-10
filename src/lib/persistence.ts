@@ -56,11 +56,17 @@ function ensureSpeedHistory(): Promise<void> {
   return speedHistoryReady ??= (async () => {
     lastSpeedHistory = loadStoredSpeedHistory();
     lastSpeedHistoryLimit = loadStoredSpeedHistoryLimit();
+    let legacy = loadStoredSla();
+    let unified = false;
+    try { unified = window.localStorage.getItem("nethub.speedtest.unified") === "true"; } catch {}
     if (isDesktop()) {
       const payload = await readDbFile();
+      legacy = sanitizeSla(payload?.sla ?? legacy);
+      if (payload) unified = payload.speedHistoryUnified === true;
       if (payload?.speedHistory !== undefined) lastSpeedHistory = sanitizeSpeedHistory(payload.speedHistory);
       if (payload?.speedHistoryLimit !== undefined) lastSpeedHistoryLimit = speedHistoryLimit(payload.speedHistoryLimit);
     }
+    if (!unified) lastSpeedHistory = sanitizeSpeedHistory([...lastSpeedHistory, ...legacy.map(r => ({ ...r, jitter: 0, peakDownload: r.download, peakUpload: r.upload, migratedSla: true }))]);
   })();
 }
 export async function loadSpeedHistoryAnywhere() {
@@ -188,18 +194,14 @@ export async function saveAwayAnywhere(away: AwayState): Promise<void> {
 
 /** Historial del SLA del operador (archivo local + navegador). */
 export async function loadSlaAnywhere(): Promise<SlaSample[]> {
-  let sla = loadStoredSla();
-  if (isDesktop()) {
-    const payload = await readDbFile();
-    if (payload?.sla && payload.sla.length > 0) sla = sanitizeSla(payload.sla);
-  }
-  lastSla = sla;
-  return sla;
+  await ensureSpeedHistory();
+  return [...lastSpeedHistory].reverse().map(({ at, download, upload, ping }) => ({ at, download, upload, ping }));
 }
 
 export async function saveSlaAnywhere(samples: SlaSample[]): Promise<void> {
-  lastSla = sanitizeSla(samples);
-  await flush();
+  await ensureSpeedHistory();
+  lastSpeedHistory = sanitizeSpeedHistory(samples.map(r => lastSpeedHistory.find(s => s.at === r.at) ?? { ...r, jitter: 0, peakDownload: r.download, peakUpload: r.upload, migratedSla: true }));
+  await persistSpeedHistory();
 }
 
 /** Listas de personas y ubicaciones guardadas (archivo local + navegador). */
@@ -233,7 +235,9 @@ async function flushState(): Promise<boolean> {
   saveStoredHealth(lastHealth);
   saveStoredUsage(lastUsage);
   saveStoredAway(lastAway);
+  lastSla = await loadSlaAnywhere();
   saveStoredSla(lastSla);
+  try { window.localStorage.setItem("nethub.speedtest.unified", "true"); } catch {}
   saveStoredPatterns(lastPatterns);
   saveStoredSpeedHistory(lastSpeedHistory, lastSpeedHistoryLimit);
   if (isDesktop()) {
@@ -250,6 +254,7 @@ async function flushState(): Promise<boolean> {
       patterns: lastPatterns,
       speedHistory: lastSpeedHistory,
       speedHistoryLimit: lastSpeedHistoryLimit,
+      speedHistoryUnified: true,
     });
   }
   return true;
