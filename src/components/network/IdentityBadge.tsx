@@ -4,6 +4,7 @@ import { deviceTypeLabels } from "@/lib/devices";
 import {
   confidenceLabels,
   deriveIdentity,
+  identityManufacturerLabel,
   isRegistryLoaded,
   loadIeeeRegistry,
   onRegistryLoaded,
@@ -82,7 +83,7 @@ export function InventoryIdentityIcon({ device }: { device: Device }) {
 
 export function InventoryDeviceBrand({ device }: { device: Device }) {
   const id = useIdentity(device);
-  return <>{id.vendor.value ? `Marca: ${id.vendor.value}` : "Marca desconocida"}</>;
+  return <span title={id.vendor.value ? "Marca deducida o indicada manualmente" : "Fabricante del adaptador; la marca del aparato aún no está identificada"}>{identityManufacturerLabel(id)}</span>;
 }
 
 /** Bloque de la ficha: tipo, marca y adaptador con su procedencia. */

@@ -39,4 +39,15 @@ describe("Actualización de identidad automática", () => {
   it("no usa OUI para atribuir fabricante a una MAC privada", () => {
     expect(lookupOui("02:BB:3A:11:22:33").brand).toBe("unknown");
   });
+  it("actualiza un tipo automático antiguo en el inventario", async () => {
+    const old = { ...device(), type: "iot" as const };
+    const fresh = (await enrichDevicesWithResolvedVendors([old]))[0]!;
+    expect(fresh.type).toBe("router");
+    expect(mergeScan([old], [fresh])[0]!.type).toBe("router");
+  });
+  it("no sustituye el tipo conocido por un escaneo sin pistas", () => {
+    const old = { ...device(), type: "tv" as const };
+    const fresh = { ...old, name: "Dispositivo 21", mac: "02:00:00:00:00:01", type: "other" as const };
+    expect(mergeScan([old], [fresh])[0]!.type).toBe("tv");
+  });
 });
