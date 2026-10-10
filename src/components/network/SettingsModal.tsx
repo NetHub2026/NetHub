@@ -1,3 +1,5 @@
+import { BackupManager } from "./BackupManager";
+import { desktopBackups } from "@/lib/desktop";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
@@ -6,7 +8,6 @@ import {
   Bell,
   Info,
   FolderOpen,
-  HardDriveDownload,
   Monitor,
   MapPin,
   Users,
@@ -24,7 +25,7 @@ import {
   scanIntervalOptions,
   type Settings,
 } from "@/lib/settings";
-import { APP_VERSION, backupDataFile, getRuntime, isDesktop, openDataFolder, runtimeLabels } from "@/lib/desktop";
+import { APP_VERSION, getRuntime, isDesktop, openDataFolder, runtimeLabels } from "@/lib/desktop";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -34,6 +35,8 @@ interface Props {
   onChange: (patch: Partial<Settings>) => void;
   onReset: () => void;
   directoryManagers: { people: React.ReactNode; locations: React.ReactNode };
+  overrides?: Partial<Record<SectionId, React.ReactNode>>;
+  platform?: { label: string; version: string; description: string };
 }
 
 type SectionId = "system" | "appearance" | "network" | "alerts" | "data" | "people" | "locations";
@@ -49,7 +52,7 @@ const sections: Array<{ id: SectionId; label: string; icon: React.ReactNode }> =
 ];
 
 /** Panel de preferencias de NetHub, organizado por secciones. */
-export function SettingsModal({ open, settings, onClose, onChange, onReset, directoryManagers }: Props) {
+export function SettingsModal({ open, settings, onClose, onChange, onReset, directoryManagers, overrides, platform }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
@@ -119,14 +122,7 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset, dire
     );
   };
 
-  const backup = async () => {
-    const result = await backupDataFile();
-    setMessage(
-      result.ok
-        ? `Copia de seguridad creada: ${result.path ?? ""}`
-        : result.error || "No se ha podido crear la copia.",
-    );
-  };
+
 
   return (
     <DialogPrimitive.Root
@@ -154,7 +150,7 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset, dire
                 Configuración de NetHub
               </DialogPrimitive.Title>
               <DialogPrimitive.Description className="mt-1 text-xs text-muted-foreground">
-                {desktop
+                {platform ? platform.description : desktop
                   ? "Las opciones del sistema se aplican al instante en la app de escritorio."
                   : "Algunas opciones del sistema solo funcionan en la app de escritorio."}
               </DialogPrimitive.Description>
@@ -205,6 +201,7 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset, dire
               tabIndex={0}
               className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-none p-4 [scrollbar-gutter:stable] sm:p-6"
             >
+              {overrides?.[section] ?? <>
               {section === "system" && (
                 <div className="space-y-5">
                   <Toggle
@@ -462,16 +459,9 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset, dire
                       <FolderOpen className="size-4" />
                       Abrir carpeta de datos
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => void backup()}
-                      className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                    >
-                      <HardDriveDownload className="size-4" />
-                      Crear copia de seguridad
-                    </Button>
+
                   </div>
+                  {desktop && <BackupManager adapter={desktopBackups} />}
                   <p className="text-xs text-muted-foreground">
                     En esa carpeta se guardan el inventario (devices-db.json) y tus preferencias
                     (settings.json), junto al ejecutable de NetHub.
@@ -522,6 +512,7 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset, dire
                   )}
                 </div>
               )}
+              </>}
             </div>
           </div>
         </DialogPrimitive.Content>
@@ -533,8 +524,8 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset, dire
             <DialogPrimitive.Title className="text-lg font-semibold">Acerca de NetHub</DialogPrimitive.Title>
             <DialogPrimitive.Description className="mt-2 text-sm text-muted-foreground">Panel de red doméstica</DialogPrimitive.Description>
             <div className="mt-4 space-y-2 text-sm">
-              <p>Versión {APP_VERSION}</p>
-              <p className="text-muted-foreground">{runtimeLabels[getRuntime()]}</p>
+              <p>Versión {platform?.version ?? APP_VERSION}</p>
+              <p className="text-muted-foreground">{platform?.label ?? runtimeLabels[getRuntime()]}</p>
               <p className="text-muted-foreground">© 2026 oyogor</p>
               <a href="mailto:nethub2026@outlook.es" className="block text-brand hover:underline">nethub2026@outlook.es</a>
             </div>

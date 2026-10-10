@@ -15,15 +15,15 @@ export function InventorySummary({ devices, networks }: { devices: Device[]; net
   ];
   return (
     <section aria-label="Resumen del inventario">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-xl border border-border bg-card p-3 sm:grid-cols-4 lg:grid-cols-8">
         {cards.map(({ label, value, hint, Icon }) => (
-          <div key={label} className="min-w-0 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div key={label} className="min-w-0 px-1" title={hint}>
             <div className="flex items-center justify-between gap-1.5">
               <p className="truncate text-[11px] text-muted-foreground">{label}</p>
               <Icon className="size-3.5 shrink-0 text-brand" />
             </div>
             <p className="mt-1 text-xl font-semibold leading-6">{value}</p>
-            <p title={hint} className="mt-0.5 truncate text-[10px] text-muted-foreground">{hint}</p>
+
           </div>
         ))}
       </div>

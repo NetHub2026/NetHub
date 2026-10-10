@@ -19,6 +19,9 @@ contextBridge.exposeInMainWorld("nethub", {
   writeSettings: (json) => ipcRenderer.invoke("nethub:write-settings", json),
   openDataFolder: () => ipcRenderer.invoke("nethub:open-data-folder"),
   notify: (payload) => ipcRenderer.invoke("nethub:notify", payload),
+  listBackups: () => ipcRenderer.invoke("nethub:list-backups"),
+  readBackup: id => ipcRenderer.invoke("nethub:read-backup", id),
+  restoreBackup: id => ipcRenderer.invoke("nethub:restore-backup", id),
   backupDb: () => ipcRenderer.invoke("nethub:backup-db"),
   openExternal: (url) => ipcRenderer.invoke("nethub:open-external", url),
   // Petición de escaneo desde el menú del área de notificación.

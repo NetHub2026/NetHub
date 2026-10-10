@@ -21,8 +21,9 @@ const CSV_COLUMNS = [
 ] as const;
 
 function csvCell(value: unknown): string {
-  const text = value === undefined || value === null ? "" : String(value);
-  return /[",;\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  let text = value === undefined || value === null ? "" : String(value);
+  if (/^[\s]*[=+@-]/.test(text)) text = "'" + text;
+  return /[",;\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
 export function devicesToCsv(devices: Device[]): string {

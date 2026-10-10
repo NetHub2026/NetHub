@@ -1,7 +1,7 @@
 import { connectionOf, wifiBand } from "./connections";
 import type { Device, DeviceType } from "./devices";
 
-export type ActivityKind = "connected" | "disconnected" | "new_device" | "ip_changed" | "connection_changed" | "mac_changed";
+export type ActivityKind = "connected" | "disconnected" | "new_device" | "ip_changed" | "connection_changed" | "mac_changed" | "watch_offline" | "watch_recovered";
 
 export interface ActivityEvent {
   id: string;
@@ -19,6 +19,8 @@ export const MAX_EVENTS = 300;
 const STORAGE_KEY = "nethub.activity.v1";
 
 export const activityLabels: Record<ActivityKind, string> = {
+  watch_offline: "Aviso de ausencia",
+  watch_recovered: "Recuperado",
   connected: "Conectado",
   disconnected: "Desconectado",
   new_device: "Nuevo dispositivo",

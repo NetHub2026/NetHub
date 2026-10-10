@@ -1,6 +1,6 @@
 {
   "name": "nethub",
-  "version": "1.4.18",
+  "version": "1.4.19",
   "description": "NetHub - Monitor y control de red doméstica",
   "author": "oyogor",
   "license": "UNLICENSED",
@@ -16,7 +16,9 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "ensure:index": "node scripts/ensure-index-html.mjs",
-    "build:portable": "npm run build && npm run ensure:index && electron-builder --win portable"
+    "build:portable": "npm run build && npm run ensure:index && electron-builder --win portable",
+    "build:server": "node scripts/build-server.mjs",
+    "start:server": "node dist-server/server.mjs"
   },
   "build": {
     "appId": "dev.lovable.nethub",
@@ -90,6 +92,7 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
+    "exceljs": "4.4.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.575.0",
     "react": "^19.2.0",

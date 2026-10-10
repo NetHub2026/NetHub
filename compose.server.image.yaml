@@ -1,0 +1,39 @@
+services:
+  nethub:
+    image: nethub-server:0.1.0
+    pull_policy: never
+    network_mode: host
+    restart: unless-stopped
+    stop_grace_period: 60s
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_RAW]
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp]
+    volumes:
+      - nethub_data:/data
+    secrets:
+      - admin_password
+    environment:
+      NETHUB_PASSWORD_FILE: /run/secrets/admin_password
+      NETHUB_PORT: ${NETHUB_PORT:-8080}
+      NETHUB_ALLOWED_HOSTS: ${NETHUB_ALLOWED_HOSTS:-}
+      NETHUB_SECURE_COOKIES: ${NETHUB_SECURE_COOKIES:-false}
+      TZ: ${TZ:-UTC}
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:'+(process.env.NETHUB_PORT||8080)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+secrets:
+  admin_password:
+    file: ./secrets/admin-password.txt
+
+volumes:
+  nethub_data:

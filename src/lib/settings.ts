@@ -11,12 +11,14 @@ import {
   type InventoryGroup,
 } from "./inventory-view";
 import { readSettingsFile, writeSettingsFile } from "./desktop";
+import { validateFloorPlan, type FloorPlan } from "./floor-plan";
 
 export type ThemeMode = "light" | "dark" | "auto";
 export type CloseAction = "tray" | "quit";
 export type ScanMode = "fast" | "deep";
 
 export interface Settings {
+  floorPlan?: FloorPlan | null;
   /* Sistema y arranque */
   startWithWindows: boolean;
   startMinimized: boolean;
@@ -115,11 +117,14 @@ export function loadSettings(): Settings {
 }
 
 export function sanitizeSettings(value: Partial<Settings>): Settings {
+  let floorPlan: FloorPlan | null = null;
+  try { floorPlan = validateFloorPlan(value.floorPlan); } catch { /* Ignore invalid imported plans. */ }
   const number = (input: unknown, fallback: number) => {
     const n = Number(input);
     return Number.isFinite(n) && n > 0 ? n : fallback;
   };
   return {
+    floorPlan,
     startWithWindows: Boolean(value.startWithWindows),
     startMinimized: Boolean(value.startMinimized),
     closeAction: value.closeAction === "quit" ? "quit" : "tray",

@@ -10,6 +10,7 @@ interface Props {
   probing: boolean;
   intervalSeconds: number;
   onProbeNow: () => void;
+  monitoringHost?: string;
 }
 
 const icons: Record<HopId, React.ReactNode> = {
@@ -19,7 +20,7 @@ const icons: Record<HopId, React.ReactNode> = {
 };
 
 /** Diagnóstico de caídas y microcortes en 3 puntos. */
-export function HealthRadar({ samples, targets, isp, probing, intervalSeconds, onProbeNow }: Props) {
+export function HealthRadar({ samples, targets, isp, probing, intervalSeconds, onProbeNow, monitoringHost = "Este equipo" }: Props) {
   const last = samples[samples.length - 1];
   const dx = diagnose(last, isp);
   const stats = healthStats(samples.slice(-120));
@@ -47,7 +48,7 @@ export function HealthRadar({ samples, targets, isp, probing, intervalSeconds, o
         {dx.detail && <p className="mt-1 text-sm text-muted-foreground">{dx.detail}</p>}
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
-          <Hop icon={<Laptop className="size-5" />} label="Este equipo" state="ok" />
+          <Hop icon={<Laptop className="size-5" />} label={monitoringHost} state="ok" />
           {targets.map((t, i) => {
             const state = hopState(i);
             const value = last?.[t.id];

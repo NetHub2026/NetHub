@@ -48,6 +48,8 @@ export interface Device {
   person?: string;
   /** Ubicación / habitación donde está el dispositivo (opcional) */
   location?: string;
+  watch?: { offlineMinutes: number; recovery: boolean } | undefined;
+  watchState?: { since: string; alerted: boolean; checkedAt?: string } | undefined;
   roomPosition?: { room: string; x: number; y: number };
   /** Network identities explicitly unified by the user, retained for scan matching and undo. */
   networkEntries?: Device[];

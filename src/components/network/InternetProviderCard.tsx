@@ -3,8 +3,8 @@ import { Globe, RefreshCw } from "lucide-react";
 import { readInternetProvider } from "@/lib/desktop";
 import { parseInternetProvider, providerLogo, type InternetProvider } from "@/lib/internet-provider";
 
-export function InternetProviderCard({ name, automatic, onDetected, onEnable, compact = false }: {
-  name: string; automatic: boolean; onDetected: (name: string) => void; onEnable: () => void; compact?: boolean;
+export function InternetProviderCard({ name, automatic, onDetected, onEnable, compact = false, readProvider = readInternetProvider }: {
+  name: string; automatic: boolean; onDetected: (name: string) => void; onEnable: () => void; compact?: boolean; readProvider?: () => Promise<unknown>;
 }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -19,7 +19,7 @@ export function InternetProviderCard({ name, automatic, onDetected, onEnable, co
     active.current = true;
     const current = generation.current;
     setBusy(true);
-    const provider = parseInternetProvider(await readInternetProvider());
+    const provider = parseInternetProvider(await readProvider().catch(() => null));
     active.current = false;
     if (current !== generation.current) return;
     setBusy(false);

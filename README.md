@@ -22,3 +22,17 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+## NetHub Server para NAS
+
+Edición Docker con monitorización continua y una interfaz compartida para PC, móvil y tablet. Consulta [instalación, alcance y copias de seguridad](docs/NAS.md). El monitor del NAS funciona sin navegadores abiertos y guarda sus datos en un volumen persistente.
+
+### Funciones comunes de PC y NAS
+
+Ambas ediciones incluyen selección filtrada del inventario para CSV y Excel con formato, historial de presencia con tiempo conectado observado, vigilancia por dispositivo con margen configurable y aviso de recuperación, y un gestor para descargar o restaurar las siete últimas copias. La restauración pide confirmación y guarda previamente el estado actual. Los avisos se registran en Actividad; Windows puede mostrarlos como notificaciones del sistema y el NAS los muestra a los navegadores conectados, sin enviar mensajes a servicios externos.
+
+### Plano y cobertura (primera versión)
+
+PC y NAS comparten un plano PNG/JPG con equipos arrastrables, habitaciones marcadas mediante dos esquinas y copia JSON portable. Windows lo guarda en settings.json; el NAS, en el volumen persistente y en sus copias. Los planos personales no forman parte del repositorio ni se envían a terceros.
+
+Desde el navegador conectado al NAS se puede tocar la posición actual y medir descarga, latencia HTTP y variación contra el servidor. Cada prueba transfiere 12 MB, conserva hasta 200 puntos y permite filtrar visitas para comparar configuraciones. Los colores corresponden a puntos medidos, sin interpolación a través de paredes. Conexión y banda son indicaciones manuales: no se deducen del navegador. Estas mediciones no sustituyen un test de Internet ni miden señal en dBm; incluyen el navegador, servidor y cualquier proxy en el camino. La demostración desactiva las pruebas. PDF, recorte, comparación visual superpuesta y validación física con móvil/NAS siguen pendientes.

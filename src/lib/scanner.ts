@@ -1,4 +1,5 @@
 import { normalizeDeviceType, type Device, type DeviceType } from "./devices";
+import { normalizeWatch } from "./device-watch";
 import { networkEntries, unifiedDevice } from "./device-unification";
 import { deriveIdentity, inferType, isGenericName, loadIeeeRegistry } from "./identity";
 import { CONNECTION_TAGS } from "./connections";
@@ -154,6 +155,7 @@ export function sanitizeDevices(devices: Device[]): Device[] {
     return {
       ...device,
       type,
+      watch: normalizeWatch(device.watch),
       tags: defaultTagsForType(type, sanitizeTags(device.tags)),
       connectionSource: ["local", "manual", "router"].includes(device.connectionSource ?? "") ? device.connectionSource : undefined,
     };

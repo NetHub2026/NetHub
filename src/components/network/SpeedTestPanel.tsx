@@ -4,7 +4,6 @@ import {
   loadSpeedHistory,
   runSpeedTest,
   type SpeedPhase,
-  type SpeedProgress,
   type SpeedResult,
 } from "@/lib/speedtest";
 import { cn } from "@/lib/utils";
@@ -77,19 +76,45 @@ function Speedometer({ value, unit, label }: { value: number; unit: string; labe
   );
 }
 
-export function SpeedTestPanel() {
-  const [running, setRunning] = useState(false);
-  const [phase, setPhase] = useState<SpeedPhase>("idle");
-  const [live, setLive] = useState(0);
-  const [peak, setPeak] = useState(0);
-  const [progress, setProgress] = useState({ total: 0, secondsLeft: 0 });
-  const [result, setResult] = useState<SpeedResult | null>(null);
-  const [history, setHistory] = useState<SpeedResult[]>([]);
-  const [historyLimit, setHistoryLimit] = useState(10);
-  const [error, setError] = useState<string | null>(null);
+export interface SpeedTestController {
+  running: boolean;
+  phase: SpeedPhase;
+  live: number;
+  peak: number;
+  progress: { total: number; secondsLeft: number };
+  result: SpeedResult | null;
+  history: SpeedResult[];
+  historyLimit: number;
+  error: string | null;
+  phaseText?: string | undefined;
+  durationSeconds?: number;
+  disabled?: boolean;
+  onStart: () => void;
+  onLimit: (limit: number) => void;
+}
+export function SpeedTestPanel({ controller }: { controller?: SpeedTestController }) {
+  const [localRunning, setRunning] = useState(false);
+  const [localPhase, setPhase] = useState<SpeedPhase>("idle");
+  const [localLive, setLive] = useState(0);
+  const [localPeak, setPeak] = useState(0);
+  const [localProgress, setProgress] = useState({ total: 0, secondsLeft: 0 });
+  const [localResult, setResult] = useState<SpeedResult | null>(null);
+  const [localHistory, setHistory] = useState<SpeedResult[]>([]);
+  const [localHistoryLimit, setHistoryLimit] = useState(10);
+  const [localError, setError] = useState<string | null>(null);
   const rafRef = useRef(0);
 
+  const running = controller ? controller.running : localRunning;
+  const phase = controller ? controller.phase : localPhase;
+  const live = controller ? controller.live : localLive;
+  const peak = controller ? controller.peak : localPeak;
+  const progress = controller ? controller.progress : localProgress;
+  const result = controller ? controller.result : localResult;
+  const history = controller ? controller.history : localHistory;
+  const historyLimit = controller ? controller.historyLimit : localHistoryLimit;
+  const error = controller ? controller.error : localError;
   useEffect(() => {
+    if (controller) return;
     let cancelled = false;
     const refresh = async () => {
       const stored = await loadSpeedHistoryAnywhere();
@@ -109,6 +134,10 @@ export function SpeedTestPanel() {
   }, []);
 
   const start = async () => {
+    if (controller) {
+      controller.onStart();
+      return;
+    }
     setRunning(true);
     setError(null);
     setResult(null);
@@ -152,7 +181,9 @@ export function SpeedTestPanel() {
           <Gauge className="size-4 text-brand" />
           Test de velocidad
         </h2>
-        <p className="text-xs text-muted-foreground">{phaseLabels[phase]}</p>
+        <p className="text-xs text-muted-foreground">
+          {controller?.phaseText ?? phaseLabels[phase]}
+        </p>
       </div>
 
       {running && (
@@ -164,7 +195,7 @@ export function SpeedTestPanel() {
             />
           </div>
           <p className="mt-1 text-right font-mono text-xs text-muted-foreground">
-            {pct}% · quedan ~{progress.secondsLeft} s
+            {pct}%{progress.secondsLeft > 0 ? ` · quedan ~${progress.secondsLeft} s` : ""}
           </p>
         </div>
       )}
@@ -176,9 +207,7 @@ export function SpeedTestPanel() {
           <Metric
             icon={<Timer className="size-4" />}
             label="Latencia / jitter"
-            value={
-              result ? `${result.ping} ms · ${result.jitter} ms` : running ? "midiendo…" : "—"
-            }
+            value={result ? `${result.ping} ms · ${result.jitter} ms` : running ? "midiendo…" : "—"}
           />
           <Metric
             icon={<ArrowDown className="size-4" />}
@@ -209,15 +238,23 @@ export function SpeedTestPanel() {
           <Metric
             icon={<Gauge className="size-4" />}
             label={running ? "Máxima media (fase actual)" : "Máxima media de descarga"}
-            value={running && peak > 0 ? `${peak.toFixed(1)} Mbps` : result && !result.migratedSla ? `${result.peakDownload.toFixed(1)} Mbps` : "—"}
+            value={
+              running && peak > 0
+                ? `${peak.toFixed(1)} Mbps`
+                : result && !result.migratedSla
+                  ? `${result.peakDownload.toFixed(1)} Mbps`
+                  : "—"
+            }
           />
           <button
             onClick={start}
-            disabled={running}
+            disabled={running || controller?.disabled}
             className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-brand-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
           >
             {running ? <Loader2 className="size-4 animate-spin" /> : <Gauge className="size-4" />}
-            {running ? "Midiendo…" : "Iniciar test de velocidad (~47 s)"}
+            {running
+              ? "Midiendo…"
+              : `Iniciar test de velocidad (~${controller?.durationSeconds ?? 47} s)`}
           </button>
         </div>
       </div>
@@ -230,10 +267,37 @@ export function SpeedTestPanel() {
 
       {history.length > 0 && (
         <div className="mt-6">
-          <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Historial de tests
-          </h3><label className="flex items-center gap-2 text-xs text-muted-foreground">Mostrar<select aria-label="Cantidad de tests del historial" value={historyLimit} onChange={(e) => { const limit = Number(e.target.value); setHistoryLimit(limit); void saveSpeedHistoryLimitAnywhere(limit); }} className="rounded-md border border-input bg-background px-2 py-1.5 text-foreground">{SPEED_HISTORY_LIMITS.map(limit => <option key={limit} value={limit}>Últimos {limit}</option>)}</select></label></div>
-          <p className="mt-1 text-[11px] text-muted-foreground">{Math.min(history.length, historyLimit)} de {history.length} guardados · se conservan hasta 100 resultados</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Historial de tests
+            </h3>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              Mostrar
+              <select
+                aria-label="Cantidad de tests del historial"
+                value={historyLimit}
+                onChange={(e) => {
+                  const limit = Number(e.target.value);
+                  if (controller) controller.onLimit(limit);
+                  else {
+                    setHistoryLimit(limit);
+                    void saveSpeedHistoryLimitAnywhere(limit);
+                  }
+                }}
+                className="rounded-md border border-input bg-background px-2 py-1.5 text-foreground"
+              >
+                {SPEED_HISTORY_LIMITS.map((limit) => (
+                  <option key={limit} value={limit}>
+                    Últimos {limit}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {Math.min(history.length, historyLimit)} de {history.length} guardados · se conservan
+            hasta 100 resultados
+          </p>
           <div className="mt-2 max-h-80 divide-y divide-border overflow-y-auto rounded-xl border border-border">
             {history.slice(0, historyLimit).map((item) => (
               <div
@@ -263,15 +327,7 @@ export function SpeedTestPanel() {
   );
 }
 
-function Metric({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
+function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-border px-4 py-3">
       <span className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">

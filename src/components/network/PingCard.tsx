@@ -7,6 +7,9 @@ import { cn } from "@/lib/utils";
 
 interface PingCardProps {
   device: Device;
+  nativeSourceLabel?: string;
+  measurePing?: typeof pingIp;
+  sendWake?: typeof wakeDevice;
   onUpdate: (device: Device) => void;
 }
 
@@ -17,7 +20,13 @@ const sourceLabels: Record<PingResult["source"], string> = {
   none: "sin origen",
 };
 
-export function PingCard({ device, onUpdate }: PingCardProps) {
+export function PingCard({
+  device,
+  onUpdate,
+  nativeSourceLabel,
+  measurePing = pingIp,
+  sendWake = wakeDevice,
+}: PingCardProps) {
   const [pinging, setPinging] = useState(false);
   const [last, setLast] = useState<PingResult | null>(null);
   const [waking, setWaking] = useState(false);
@@ -28,18 +37,34 @@ export function PingCard({ device, onUpdate }: PingCardProps) {
 
   const doPing = async () => {
     setPinging(true);
-    const result = await pingIp(device.ip);
-    setLast(result);
-    onUpdate({ ...device, latency: pushSample(device.latency, result) });
-    setPinging(false);
+    try {
+      const result = await measurePing(device.ip);
+      setLast(result);
+      onUpdate({ ...device, latency: pushSample(device.latency, result) });
+    } catch (error) {
+      setLast({
+        rtt: null,
+        reachable: false,
+        at: new Date().toISOString(),
+        source: "none",
+        note: (error as Error).message,
+      });
+    } finally {
+      setPinging(false);
+    }
   };
 
   const doWake = async () => {
     setWaking(true);
     setWolNote(null);
-    const result = await wakeDevice(device.mac);
-    setWolNote(result.message);
-    setWaking(false);
+    try {
+      const result = await sendWake(device.mac);
+      setWolNote(result.message);
+    } catch (error) {
+      setWolNote((error as Error).message);
+    } finally {
+      setWaking(false);
+    }
   };
 
   return (
@@ -67,7 +92,9 @@ export function PingCard({ device, onUpdate }: PingCardProps) {
             >
               {last.reachable ? "Alcanzable" : "Sin respuesta"} ·{" "}
               <span className="font-normal text-muted-foreground">
-                {sourceLabels[last.source]}
+                {last.source === "native" && nativeSourceLabel
+                  ? nativeSourceLabel
+                  : sourceLabels[last.source]}
               </span>
             </p>
           )}
@@ -82,20 +109,14 @@ export function PingCard({ device, onUpdate }: PingCardProps) {
           disabled={pinging}
           className="inline-flex shrink-0 items-center gap-2 rounded-md bg-brand px-3 py-2 text-sm font-medium text-brand-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
         >
-          {pinging ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Activity className="size-4" />
-          )}
+          {pinging ? <Loader2 className="size-4 animate-spin" /> : <Activity className="size-4" />}
           {pinging ? "Midiendo…" : "Hacer Ping"}
         </button>
       </div>
 
       {history.length > 0 && (
         <div className="mt-4">
-          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            Histórico
-          </p>
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Histórico</p>
           <div className="mt-2 flex h-16 items-end gap-1.5">
             {history.map((sample, i) => (
               <span

@@ -15,6 +15,7 @@ interface Props {
   onTrust: (id: string) => void;
   onResolveAlert: (id: string) => void;
   onClearAlerts: () => void;
+  measureDns?: typeof checkDns;
 }
 
 const levelClass: Record<RiskLevel, string> = {
@@ -25,7 +26,7 @@ const levelClass: Record<RiskLevel, string> = {
 };
 
 /** Auditoría de seguridad (0-100) + guardián Sentinel + DNS. */
-export function SecurityView({ devices, alerts, gatewayIp, onSelectDevice, onTrust, onResolveAlert, onClearAlerts }: Props) {
+export function SecurityView({ devices, alerts, gatewayIp, onSelectDevice, onTrust, onResolveAlert, onClearAlerts, measureDns = checkDns }: Props) {
   const report = useMemo(() => auditNetwork(devices), [devices]);
   const [open, setOpen] = useState<string | null>(null);
   const [dns, setDns] = useState<DnsCheckResult | null>(null);
@@ -33,7 +34,7 @@ export function SecurityView({ devices, alerts, gatewayIp, onSelectDevice, onTru
   const runDnsCheck = async () => {
     setDnsBusy(true);
     try {
-      setDns(await checkDns(gatewayIp));
+      setDns(await measureDns(gatewayIp));
     } finally {
       setDnsBusy(false);
     }
@@ -138,7 +139,7 @@ export function SecurityView({ devices, alerts, gatewayIp, onSelectDevice, onTru
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
           Compara la respuesta del DNS de tu router con la de 8.8.8.8 para un dominio conocido.
-          Si difieren, alguien está manipulando las direcciones de tu red (phishing o bloqueo).
+          Una diferencia puede deberse a caché, CDN o filtrado; por sí sola no demuestra una manipulación.
         </p>
         {dns && (
           <div
