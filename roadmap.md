@@ -1,5 +1,10 @@
 # NetHub — Hoja de ruta
 
+## Correcciones acotadas Device Identity v1 (1.3.2 sin release)
+- [ ] Bloqueo reversible del fondo en la ficha, scroll interior y accesibilidad sin romper Configuración.
+- [ ] Procedencia por campo: tipo manual explícito, tipo legado sin confirmar y OUI separado de marca.
+- [ ] Ocho tests de identidad, comprobaciones automáticas y pruebas de scroll en navegador.
+
 ## Pulido UI — primera fase hacia v1.4.0 (sin cambio de versión)
 - [x] Configuración: dimensiones constantes, scroll contenido, bloqueo del fondo, foco y confirmación anidada.
 - [x] Inventario: frecuencia solo en Configuración, sin contador ni banda de éxito; último escaneo simplificado.
