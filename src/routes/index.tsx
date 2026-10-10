@@ -104,7 +104,7 @@ import {
 } from "@/lib/persistence";
 import { exportInventoryCsv } from "@/lib/backup";
 import { ALL_NETWORKS, countByNetwork, detectNetworks, networkOf } from "@/lib/networks";
-import { PerformanceModal } from "@/components/network/PerformanceModal";
+import { PerformanceView } from "@/components/network/PerformanceView";
 import { DeviceDetailPanel } from "@/components/network/DeviceDetailPanel";
 import { NetworkTabs } from "@/components/network/NetworkTabs";
 import { NetworkTopology } from "@/components/network/NetworkTopology";
@@ -187,7 +187,7 @@ function visibleTags(device: Device): string[] {
 function Dashboard() {
   const [items, setItems] = useState<Device[]>([]);
   const [viewMode, setViewMode] = useState<
-    "inventory" | "topology" | "activity" | "security" | "health" | "usage" | "sla" | "home"
+    "inventory" | "performance" | "topology" | "activity" | "security" | "health" | "usage" | "sla" | "home"
   >("inventory");
   const [alerts, setAlerts] = useState<SentinelAlert[]>([]);
   const updateAlerts = (fn: (prev: SentinelAlert[]) => SentinelAlert[]) =>
@@ -247,8 +247,6 @@ function Dashboard() {
   const [runtime, setRuntime] = useState<Runtime>("web");
   const [dbPath, setDbPath] = useState("Almacenamiento del navegador (localStorage)");
   const [updateOpen, setUpdateOpen] = useState(false);
-  const [performanceOpen, setPerformanceOpen] = useState(false);
-  const performanceTriggerRef = useRef<HTMLButtonElement>(null);
   const [, setCountdown] = useState(120);
   const [autoScanning, setAutoScanning] = useState(false);
   /** Evita escaneos solapados (manual + automático). */
@@ -759,14 +757,6 @@ function Dashboard() {
           </div>
           <StatusPill status={status} />
           <button
-            ref={performanceTriggerRef}
-            onClick={() => setPerformanceOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <Gauge className="size-4" />
-            Rendimiento
-          </button>
-          <button
             onClick={() => setUpdateOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
@@ -835,6 +825,19 @@ function Dashboard() {
               >
                 <LayoutGrid className="size-3.5" />
                 Inventario
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("performance")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  viewMode === "performance"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Gauge className="size-3.5" />
+                Rendimiento
               </button>
               <button
                 type="button"
@@ -991,7 +994,7 @@ function Dashboard() {
           </section>
         )}
 
-        {showEmpty && (
+        {showEmpty && viewMode === "inventory" && (
           <section className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
             <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-brand/15 text-brand">
               <Radar className="size-7" />
@@ -1242,6 +1245,10 @@ function Dashboard() {
             onSelectDevice={setSelectedId}
           />
         )}
+        {viewMode === "performance" && (
+          <PerformanceView traffic={traffic} linkSpeedMbps={settings.linkSpeedMbps} />
+        )}
+
         {viewMode === "security" && (
           <div className="space-y-8">
             <AwayMode
@@ -1362,7 +1369,6 @@ function Dashboard() {
         onCreateLocation={createLocation}
       />
 
-      <PerformanceModal open={performanceOpen} onClose={() => setPerformanceOpen(false)} traffic={traffic} linkSpeedMbps={settings.linkSpeedMbps} triggerRef={performanceTriggerRef} />
       <UpdateModal open={updateOpen} onClose={() => setUpdateOpen(false)} />
 
       <SettingsModal
