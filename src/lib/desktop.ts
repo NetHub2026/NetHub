@@ -178,7 +178,7 @@ export interface TrafficSample {
 }
 
 /** Versión de NetHub que se muestra en la interfaz (coincide con package.json). */
-export const APP_VERSION = "1.4.18";
+export const APP_VERSION = "1.4.19";
 
 /** Repositorio oficial; el antiguo solo como respaldo (GitHub redirige el repo transferido). */
 const GITHUB_REPOS = ["NetHub2026/NetHub", "oyogor1985/nethub"];
@@ -509,7 +509,7 @@ export interface DnsCheckResult {
 
 /**
  * Compara la respuesta DNS del router con la de 8.8.8.8 para un dominio
- * conocido: si difieren, alguien está manipulando el DNS de la red.
+ * conocido. Las diferencias no prueban una manipulación del DNS.
  */
 export async function checkDns(
   gatewayIp: string | null,
