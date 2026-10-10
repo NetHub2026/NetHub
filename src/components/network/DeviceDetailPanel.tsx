@@ -1,4 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { Button } from "@/components/ui/button";
+import { useDocumentScrollLock } from "@/hooks/use-document-scroll-lock";
 import {
   Check,
   Copy,
@@ -29,7 +32,7 @@ import {
 import { Globe } from "lucide-react";
 import { detectServices, likelyServices, type PortScanProgress, type ServiceHit } from "@/lib/services";
 import { VendorIcon } from "./VendorIcon";
-import { IdentityDetails } from "./IdentityBadge";
+import { IdentityDetails, useIdentity } from "./IdentityBadge";
 import { cn } from "@/lib/utils";
 
 const connectionTags = ["Cableado / Ethernet", "Wi-Fi", "Wi-Fi 2.4GHz", "Wi-Fi 5GHz", "Wi-Fi 6"];
@@ -83,6 +86,8 @@ export function DeviceDetailPanel({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [vendorLookup, setVendorLookup] = useState(false);
   const [vendorNote, setVendorNote] = useState<string | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  useDocumentScrollLock(Boolean(device));
 
   useEffect(() => {
     setTagDraft("");
@@ -93,12 +98,6 @@ export function DeviceDetailPanel({
     setConfirmDelete(false);
     setVendorNote(null);
   }, [device?.id]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
 
   if (!device) return null;
 
@@ -228,9 +227,9 @@ export function DeviceDetailPanel({
     setVendorNote(null);
     const resolved = await resolveVendor(device.mac, device.name);
     setVendorLookup(false);
-    if (resolved.vendor && resolved.vendor !== device.vendor) {
+    if (!device.manualEdit && !device.identityManual?.vendor && resolved.vendor && resolved.vendor !== device.vendor) {
       onUpdate({ ...device, vendor: resolved.vendor, brand: resolved.brand });
-      setVendorNote(`Fabricante actualizado: ${resolved.vendor}.`);
+      setVendorNote(`Adaptador (OUI): ${resolved.vendor}.`);
       return;
     }
     setVendorNote(
@@ -250,13 +249,14 @@ export function DeviceDetailPanel({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <button
-        aria-label="Cerrar detalle"
-        onClick={onClose}
-        className="absolute inset-0 bg-background/70 backdrop-blur-sm"
-      />
-      <aside className="relative flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-border bg-card p-6 shadow-2xl">
+    <DialogPrimitive.Root open={Boolean(device)} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogPrimitive.Portal>
+      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm overscroll-none" />
+      <DialogPrimitive.Content aria-describedby={undefined} className="fixed right-0 top-0 z-50 flex h-dvh w-full max-w-md flex-col overflow-y-auto overscroll-none border-l border-border bg-card p-6 shadow-2xl outline-none"
+        onOpenAutoFocus={() => { returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; }}
+        onCloseAutoFocus={(event) => { event.preventDefault(); returnFocusRef.current?.focus({ preventScroll: true }); }}
+        onEscapeKeyDown={(event) => { if (confirmDelete) { event.preventDefault(); setConfirmDelete(false); } }}
+      >
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -287,19 +287,19 @@ export function DeviceDetailPanel({
                 </span>
               )}
             </div>
-            <h2 className="mt-3 flex items-center gap-2 text-2xl font-semibold">
+            <DialogPrimitive.Title className="mt-3 flex items-center gap-2 text-2xl font-semibold">
               <DeviceTypeIcon type={device.type} className="size-6 text-brand" />
               {device.name}
-            </h2>
+            </DialogPrimitive.Title>
             <p className="font-mono text-sm text-muted-foreground">{device.ip}</p>
           </div>
-          <button
+          <Button variant="ghost" size="icon"
             onClick={onClose}
             className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             aria-label="Cerrar"
           >
             <X className="size-4" />
-          </button>
+          </Button>
         </div>
 
         {device.isNew && !device.trusted && (
@@ -343,6 +343,7 @@ export function DeviceDetailPanel({
                     ...device,
                     type: e.target.value as DeviceType,
                     manualEdit: true,
+                    identityManual: { ...device.identityManual, type: true },
                   })
                 }
                 className="min-w-0 flex-1 rounded-sm bg-popover text-sm text-popover-foreground outline-none"
@@ -356,13 +357,13 @@ export function DeviceDetailPanel({
             </span>
           </label>
           <label className="block">
-            <span className="text-xs text-muted-foreground">Fabricante / marca</span>
+            <span className="text-xs text-muted-foreground">Fabricante / marca guardado</span>
             <span className="mt-1 flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 focus-within:border-brand">
               <VendorIcon brand={device.brand} className="shrink-0 text-muted-foreground" />
               <input
                 value={device.vendor}
                 onChange={(e) =>
-                  onUpdate({ ...device, vendor: e.target.value, manualEdit: true })
+                  onUpdate({ ...device, vendor: e.target.value, manualEdit: true, identityManual: { ...device.identityManual, vendor: true } })
                 }
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none"
               />
@@ -818,7 +819,8 @@ export function DeviceDetailPanel({
             </button>
           )}
         </div>
-      </aside>
-    </div>
+      </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }
