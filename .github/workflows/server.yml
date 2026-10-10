@@ -1,0 +1,51 @@
+name: Validate NetHub Server
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feature/nas-server]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+      - run: bun install --frozen-lockfile
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      - run: bunx vitest run
+      - run: bun run build:server
+      - name: Build Linux container
+        run: docker build -f Dockerfile.server -t nethub-server:0.1.0 .
+      - name: Test authentication, monitoring and restart persistence inside container
+        run: |
+          mkdir -p data secrets
+          printf '%s' 'synthetic-container-password-2026' > secrets/test-password.txt
+          docker run -d --name nethub-test --network none --read-only --cap-drop ALL --cap-add NET_RAW --security-opt no-new-privileges:true --tmpfs /tmp -v "$PWD/data:/data" -v "$PWD/secrets/test-password.txt:/run/secrets/password:ro" -e NETHUB_PASSWORD_FILE=/run/secrets/password -e NETHUB_DEMO_MODE=true nethub-server:0.1.0
+          docker cp scripts/server-container-smoke.mjs nethub-test:/tmp/smoke.mjs
+          docker exec nethub-test node /tmp/smoke.mjs
+          docker restart nethub-test
+          docker cp scripts/server-container-smoke.mjs nethub-test:/tmp/smoke.mjs
+          docker exec -e EXPECT_RESTORED=true nethub-test node /tmp/smoke.mjs
+          docker exec nethub-test arp-scan --version
+          docker stop nethub-test
+      - name: Package server image and installation files
+        run: |
+          mkdir -p server-package
+          docker save nethub-server:0.1.0 | gzip > server-package/nethub-server-0.1.0-amd64.tar.gz
+          cp compose.server.image.yaml server-package/compose.server.yaml
+          cp docs/NAS.md server-package/INSTALL.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NetHub-Server-0.1.0-Linux-amd64
+          path: server-package/
+          retention-days: 30

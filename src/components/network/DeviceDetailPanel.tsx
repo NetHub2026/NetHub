@@ -21,6 +21,8 @@ import {
 import { openExternalUrl } from "@/lib/desktop";
 import { deviceTypeLabels, type Device } from "@/lib/devices";
 import { DeviceTypePicker } from "./DeviceTypePicker";
+import type { pingIp } from "@/lib/ping";
+import type { wakeDevice } from "@/lib/wol";
 import { PingCard } from "./PingCard";
 import { activityLabels, formatDateTime, relativeTime, type ActivityEvent } from "@/lib/activity";
 import { detectNetworkId, type NetworkDef } from "@/lib/networks";
@@ -37,7 +39,7 @@ import { IdentityDetails, InventoryIdentityIcon } from "./IdentityBadge";
 import { cn } from "@/lib/utils";
 import { CONNECTION_TAGS } from "@/lib/connections";
 
-const connectionTags = CONNECTION_TAGS.filter(t => t !== "Wi-Fi 6");
+const connectionTags = CONNECTION_TAGS.filter((t) => t !== "Wi-Fi 6");
 
 const quickTagGroups: Array<{ label: string; tags: string[] }> = [
   { label: "Ubicaciones", tags: ["Salón", "Dormitorio", "Cocina", "Despacho", "Entrada"] },
@@ -53,6 +55,12 @@ const quickTagGroups: Array<{ label: string; tags: string[] }> = [
 
 interface DeviceDetailPanelProps {
   device: Device | null;
+  storageLabel?: string;
+  pingSourceLabel?: string;
+  deviceTrafficAvailable?: boolean;
+  measurePing?: typeof pingIp;
+  sendWake?: typeof wakeDevice;
+  probeServices?: typeof detectServices;
   onClose: () => void;
   onUpdate: (device: Device) => void;
   onDelete: (device: Device) => void;
@@ -71,6 +79,12 @@ interface DeviceDetailPanelProps {
 
 export function DeviceDetailPanel({
   device,
+  storageLabel = "tu equipo",
+  pingSourceLabel,
+  deviceTrafficAvailable = true,
+  measurePing,
+  sendWake,
+  probeServices = detectServices,
   onClose,
   onUpdate,
   onDelete,
@@ -153,13 +167,18 @@ export function DeviceDetailPanel({
   const addTag = () => {
     const tag = tagDraft.trim();
     if (!tag || device.tags.includes(tag)) return;
-    onUpdate({ ...device, tags: [...device.tags, tag], ...(CONNECTION_TAGS.includes(tag) ? { connectionSource: "manual" as const } : {}) });
+    onUpdate({
+      ...device,
+      tags: [...device.tags, tag],
+      ...(CONNECTION_TAGS.includes(tag) ? { connectionSource: "manual" as const } : {}),
+    });
     setTagDraft("");
   };
 
   const toggleTag = (tag: string) => {
     const isConnection = connectionTags.includes(tag);
-    const active = device.tags.includes(tag) && (!isConnection || device.connectionSource === "manual");
+    const active =
+      device.tags.includes(tag) && (!isConnection || device.connectionSource === "manual");
     onUpdate({
       ...device,
       ...(isConnection ? { connectionSource: "manual" as const } : {}),
@@ -175,17 +194,22 @@ export function DeviceDetailPanel({
     setProbing(true);
     setProbeNote(null);
     setPortProgress({ done: 0, total: 1, found: 0 });
-    const { hits, native } = await detectServices(device.ip, setPortProgress);
-    onUpdate({ ...device, services: hits, servicesScannedAt: new Date().toISOString() });
-    setProbing(false);
-    setPortProgress(null);
-    setProbeNote(
-      hits.length > 0
-        ? `${hits.length} puertos abiertos (${native ? "escaneo TCP nativo" : "sondeo desde el navegador"}).`
-        : native
-          ? "Ningún puerto común está abierto en este equipo."
-          : "Ningún servicio ha respondido. El navegador solo puede sondear puertos web; usa la app portable para un escaneo completo.",
-    );
+    try {
+      const { hits, native } = await probeServices(device.ip, setPortProgress);
+      onUpdate({ ...device, services: hits, servicesScannedAt: new Date().toISOString() });
+      setProbeNote(
+        hits.length > 0
+          ? `${hits.length} puertos abiertos (${native ? "escaneo TCP nativo" : "sondeo desde el navegador"}).`
+          : native
+            ? "Ningún puerto común está abierto en este equipo."
+            : "Ningún servicio ha respondido. El navegador solo puede sondear puertos web; usa la app portable para un escaneo completo.",
+      );
+    } catch (error) {
+      setProbeNote((error as Error).message);
+    } finally {
+      setProbing(false);
+      setPortProgress(null);
+    }
   };
 
   const suggestion = suggestedName(device.mac, device.ip);
@@ -264,8 +288,12 @@ export function DeviceDetailPanel({
     ["Dirección IP", device.ip],
     ["Dirección MAC", device.mac + (privateMac ? " · privada" : "")],
     ["Última conexión", device.lastSeen],
-    ["Descarga actual", `${device.downstream.toFixed(1)} Mbps`],
-    ["Subida actual", `${device.upstream.toFixed(1)} Mbps`],
+    ...(deviceTrafficAvailable
+      ? ([
+          ["Descarga actual", `${device.downstream.toFixed(1)} Mbps`],
+          ["Subida actual", `${device.upstream.toFixed(1)} Mbps`],
+        ] as Array<[string, string]>)
+      : []),
   ];
 
   return (
@@ -361,7 +389,18 @@ export function DeviceDetailPanel({
             Editar dispositivo
           </h3>
           <div className="mt-3 space-y-3 rounded-xl border border-border p-4">
-            <p className="text-xs text-muted-foreground">Conexión: {device.connectionSource === "local" ? "detectada en este equipo" : device.connectionSource === "manual" ? "indicada manualmente" : device.connectionSource === "router" ? "informada por el router" : "sin confirmar"}. Elige cable o una banda Wi-Fi para confirmar la conexión. Wi-Fi 6 es una generación, no una banda de 6 GHz.</p>
+            <p className="text-xs text-muted-foreground">
+              Conexión:{" "}
+              {device.connectionSource === "local"
+                ? "detectada en este equipo"
+                : device.connectionSource === "manual"
+                  ? "indicada manualmente"
+                  : device.connectionSource === "router"
+                    ? "informada por el router"
+                    : "sin confirmar"}
+              . Elige cable o una banda Wi-Fi para confirmar la conexión. Wi-Fi 6 es una generación,
+              no una banda de 6 GHz.
+            </p>
             <label className="block">
               <span className="text-xs text-muted-foreground">Nombre</span>
               <input
@@ -373,9 +412,18 @@ export function DeviceDetailPanel({
             <IdentityDetails device={device} />
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Tipo de dispositivo</p>
-              <DeviceTypePicker value={[device.type]} onChange={([type]) => {
-                if (type) onUpdate({ ...device, type, manualEdit: true, identityManual: { ...device.identityManual, type: true } });
-              }} />
+              <DeviceTypePicker
+                value={[device.type]}
+                onChange={([type]) => {
+                  if (type)
+                    onUpdate({
+                      ...device,
+                      type,
+                      manualEdit: true,
+                      identityManual: { ...device.identityManual, type: true },
+                    });
+                }}
+              />
             </div>
             <label className="block">
               <span className="text-xs text-muted-foreground">Fabricante / marca guardado</span>
@@ -542,7 +590,8 @@ export function DeviceDetailPanel({
               resto de dispositivos.
             </p>
             <p className="text-xs text-muted-foreground">
-              Estos cambios se guardan en tu equipo y no se sobrescriben en escaneos posteriores.
+              Estos cambios se guardan en {storageLabel} y no se sobrescriben en escaneos
+              posteriores.
             </p>
           </div>
 
@@ -580,7 +629,7 @@ export function DeviceDetailPanel({
             </div>
           </div>
           {(() => {
-            const ids = new Set([device.id, ...(device.networkEntries?.map(d => d.id) ?? [])]);
+            const ids = new Set([device.id, ...(device.networkEntries?.map((d) => d.id) ?? [])]);
             const recent = events.filter((e) => ids.has(e.deviceId ?? "")).slice(0, 5);
             return (
               <ul className="mt-3 space-y-1.5">
@@ -596,7 +645,9 @@ export function DeviceDetailPanel({
                       {activityLabels[e.kind]}
                       {e.kind === "ip_changed" && e.previousIp
                         ? ` · ${e.previousIp} → ${e.ip}`
-                        : e.detail ? ` · ${e.detail}` : ""}
+                        : e.detail
+                          ? ` · ${e.detail}`
+                          : ""}
                     </span>
                     <span className="text-muted-foreground" title={formatDateTime(e.at)}>
                       {relativeTime(e.at)}
@@ -610,32 +661,102 @@ export function DeviceDetailPanel({
           <h3 className="mt-8 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Latencia y encendido remoto
           </h3>
-          <PingCard device={device} onUpdate={onUpdate} />
+          <PingCard
+            device={device}
+            onUpdate={onUpdate}
+            {...(measurePing ? { measurePing } : {})}
+            {...(sendWake ? { sendWake } : {})}
+            {...(pingSourceLabel ? { nativeSourceLabel: pingSourceLabel } : {})}
+          />
           <section className="mt-6 rounded-xl border border-border p-4">
             <h3 className="text-sm font-semibold">Unificar dispositivos</h3>
-            <p className="mt-2 text-xs text-muted-foreground">Elige otra entrada del mismo equipo. Compara y elige los datos que quieres conservar. Sus conexiones e historial se guardan y puedes deshacer la unión.</p>
-            <select aria-label="Dispositivo para unificar" value={mergeId} onChange={e => { setMergeId(e.target.value); setMergeChoices({}); }} className="mt-3 w-full rounded-md border border-border bg-background p-2 text-sm">
+            <p className="mt-2 text-xs text-muted-foreground">
+              Elige otra entrada del mismo equipo. Compara y elige los datos que quieres conservar.
+              Sus conexiones e historial se guardan y puedes deshacer la unión.
+            </p>
+            <select
+              aria-label="Dispositivo para unificar"
+              value={mergeId}
+              onChange={(e) => {
+                setMergeId(e.target.value);
+                setMergeChoices({});
+              }}
+              className="mt-3 w-full rounded-md border border-border bg-background p-2 text-sm"
+            >
               <option value="">Seleccionar dispositivo…</option>
-              {devices.filter(d => d.id !== device.id).map(d => <option key={d.id} value={d.id}>{d.name} · {d.ip} · {d.mac}</option>)}
+              {devices
+                .filter((d) => d.id !== device.id)
+                .map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name} · {d.ip} · {d.mac}
+                  </option>
+                ))}
             </select>
             {(() => {
-              const other = devices.find(d => d.id === mergeId);
+              const other = devices.find((d) => d.id === mergeId);
               if (!other) return null;
-              const fields: Array<[MergeField, string]> = [["name", "Nombre"], ["vendor", "Marca"], ["type", "Tipo"], ["person", "Persona"], ["location", "Ubicación"]];
-              const value = (d: Device, field: MergeField) => field === "type" ? deviceTypeLabels[d.type] : d[field] || "Sin asignar";
-              return <div className="mt-3 space-y-3">{fields.map(([field, label]) => <label key={field} className="block text-xs">
-                <span className="font-semibold">{label}</span>
-                <span className="mt-1 grid grid-cols-2 gap-2 text-muted-foreground"><span>Esta ficha: {value(device, field)}</span><span>Otra ficha: {value(other, field)}</span></span>
-                <select aria-label={`Conservar ${label.toLowerCase()}`} value={mergeChoices[field] ?? "primary"} onChange={e => setMergeChoices(prev => ({ ...prev, [field]: e.target.value as "primary" | "other" }))} className="mt-1 w-full rounded border border-border bg-background p-2">
-                  <option value="primary">Esta ficha: {value(device, field)}</option><option value="other">Otra ficha: {value(other, field)}</option>
-                </select>
-              </label>)}</div>;
+              const fields: Array<[MergeField, string]> = [
+                ["name", "Nombre"],
+                ["vendor", "Marca"],
+                ["type", "Tipo"],
+                ["person", "Persona"],
+                ["location", "Ubicación"],
+              ];
+              const value = (d: Device, field: MergeField) =>
+                field === "type" ? deviceTypeLabels[d.type] : d[field] || "Sin asignar";
+              return (
+                <div className="mt-3 space-y-3">
+                  {fields.map(([field, label]) => (
+                    <label key={field} className="block text-xs">
+                      <span className="font-semibold">{label}</span>
+                      <span className="mt-1 grid grid-cols-2 gap-2 text-muted-foreground">
+                        <span>Esta ficha: {value(device, field)}</span>
+                        <span>Otra ficha: {value(other, field)}</span>
+                      </span>
+                      <select
+                        aria-label={`Conservar ${label.toLowerCase()}`}
+                        value={mergeChoices[field] ?? "primary"}
+                        onChange={(e) =>
+                          setMergeChoices((prev) => ({
+                            ...prev,
+                            [field]: e.target.value as "primary" | "other",
+                          }))
+                        }
+                        className="mt-1 w-full rounded border border-border bg-background p-2"
+                      >
+                        <option value="primary">Esta ficha: {value(device, field)}</option>
+                        <option value="other">Otra ficha: {value(other, field)}</option>
+                      </select>
+                    </label>
+                  ))}
+                </div>
+              );
             })()}
-            <Button className="mt-2" disabled={!mergeId || !onUnify} onClick={() => { onUnify?.(mergeId, mergeChoices); setMergeId(""); }}>Unificar con esta ficha</Button>
-            {device.networkEntries?.length && <>
-              <ul className="mt-3 space-y-2 text-xs">{device.networkEntries.map(d => <li key={d.id}>{d.mac} · {d.ip} · {d.status === "online" ? "Activo" : "Inactivo"} · {formatDateTime(d.lastSeen)}</li>)}</ul>
-              <Button variant="outline" className="mt-3" onClick={onSeparate}>Deshacer unión</Button>
-            </>}
+            <Button
+              className="mt-2"
+              disabled={!mergeId || !onUnify}
+              onClick={() => {
+                onUnify?.(mergeId, mergeChoices);
+                setMergeId("");
+              }}
+            >
+              Unificar con esta ficha
+            </Button>
+            {device.networkEntries?.length && (
+              <>
+                <ul className="mt-3 space-y-2 text-xs">
+                  {device.networkEntries.map((d) => (
+                    <li key={d.id}>
+                      {d.mac} · {d.ip} · {d.status === "online" ? "Activo" : "Inactivo"} ·{" "}
+                      {formatDateTime(d.lastSeen)}
+                    </li>
+                  ))}
+                </ul>
+                <Button variant="outline" className="mt-3" onClick={onSeparate}>
+                  Deshacer unión
+                </Button>
+              </>
+            )}
           </section>
 
           {suggestion !== device.name && (
@@ -724,8 +845,7 @@ export function DeviceDetailPanel({
                   type="button"
                   title="Copiar IP:puerto"
                   onClick={() => {
-                    void navigator.clipboard?.writeText(`${device.ip}:${s.port}`);
-                    showFeedback(`Copiado ${device.ip}:${s.port}`);
+                    void copyValue("IP", `${device.ip}:${s.port}`);
                   }}
                   className="shrink-0 rounded-md border border-border p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
                 >
@@ -788,7 +908,15 @@ export function DeviceDetailPanel({
             {device.tags.map((tag) => (
               <button
                 key={tag}
-                onClick={() => onUpdate({ ...device, tags: device.tags.filter((t) => t !== tag), ...(CONNECTION_TAGS.includes(tag) ? { connectionSource: "manual" as const } : {}) })}
+                onClick={() =>
+                  onUpdate({
+                    ...device,
+                    tags: device.tags.filter((t) => t !== tag),
+                    ...(CONNECTION_TAGS.includes(tag)
+                      ? { connectionSource: "manual" as const }
+                      : {}),
+                  })
+                }
                 className="group inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs transition-colors hover:border-destructive hover:text-destructive"
                 title="Quitar etiqueta"
               >

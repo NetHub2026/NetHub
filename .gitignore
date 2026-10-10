@@ -39,3 +39,9 @@ devices-db*.json
 settings.json
 nethub-inventario-*
 dist-electron/
+
+# NAS runtime data and builds
+dist-server/
+data/
+secrets/
+*.tar

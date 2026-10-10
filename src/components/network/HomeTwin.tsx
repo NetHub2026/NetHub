@@ -50,8 +50,10 @@ export function HomeTwin({
   onUpdateDevice,
   onReviewAnomaly,
   onOpenPerformance,
+  monitoringHost = "este PC",
 }: {
   devices: Device[];
+  monitoringHost?: string;
   onUpdateDevice?: (device: Device) => void;
   patterns: PatternState;
   rxMbps: number;
@@ -127,7 +129,14 @@ export function HomeTwin({
               </div>
             </div>
             <div className="flex items-center gap-3 text-xs">
-              <Button variant="outline" size="sm" disabled={!onUpdateDevice} onClick={() => setPlacing(!placing)}>{placing ? "Terminar" : "Colocar dispositivos"}</Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!onUpdateDevice}
+                onClick={() => setPlacing(!placing)}
+              >
+                {placing ? "Terminar" : "Colocar dispositivos"}
+              </Button>
               <Clock className="size-3.5 text-muted-foreground" />
               <input
                 type="range"
@@ -188,7 +197,15 @@ export function HomeTwin({
                     </div>
                     {list.map((d) => {
                       const h = hash(d.id);
-                      const saved = d.roomPosition?.room === room && Number.isFinite(d.roomPosition.x) && Number.isFinite(d.roomPosition.y) ? { x: Math.max(12, Math.min(88, d.roomPosition.x)), y: Math.max(24, Math.min(86, d.roomPosition.y)) } : undefined;
+                      const saved =
+                        d.roomPosition?.room === room &&
+                        Number.isFinite(d.roomPosition.x) &&
+                        Number.isFinite(d.roomPosition.y)
+                          ? {
+                              x: Math.max(12, Math.min(88, d.roomPosition.x)),
+                              y: Math.max(24, Math.min(86, d.roomPosition.y)),
+                            }
+                          : undefined;
                       const position = positions[d.id] ?? saved;
                       const x = position?.x ?? 12 + (h % 76);
                       const y = position?.y ?? 24 + ((h >>> 8) % 62);
@@ -204,28 +221,82 @@ export function HomeTwin({
                           key={d.id}
                           type="button"
                           aria-label={placing ? `Colocar ${d.name}` : d.name}
-                          onClick={() => { if (!placing) onSelectDevice(d.id); }}
-                          onPointerDown={e => { if (!placing) return; e.preventDefault(); dragging.current = d.id; e.currentTarget.setPointerCapture(e.pointerId); }}
-                          onPointerMove={e => {
+                          onClick={() => {
+                            if (!placing) onSelectDevice(d.id);
+                          }}
+                          onPointerDown={(e) => {
+                            if (!placing) return;
+                            e.preventDefault();
+                            dragging.current = d.id;
+                            e.currentTarget.setPointerCapture(e.pointerId);
+                          }}
+                          onPointerMove={(e) => {
                             if (dragging.current !== d.id) return;
                             const rect = e.currentTarget.parentElement!.getBoundingClientRect();
-                            setPositions(prev => ({ ...prev, [d.id]: { x: Math.max(12, Math.min(88, (e.clientX - rect.left) / rect.width * 100)), y: Math.max(24, Math.min(86, (e.clientY - rect.top) / rect.height * 100)) } }));
+                            setPositions((prev) => ({
+                              ...prev,
+                              [d.id]: {
+                                x: Math.max(
+                                  12,
+                                  Math.min(88, ((e.clientX - rect.left) / rect.width) * 100),
+                                ),
+                                y: Math.max(
+                                  24,
+                                  Math.min(86, ((e.clientY - rect.top) / rect.height) * 100),
+                                ),
+                              },
+                            }));
                           }}
                           onPointerUp={() => {
                             if (dragging.current !== d.id) return;
                             dragging.current = null;
                             const position = positions[d.id];
-                            if (position) onUpdateDevice?.({ ...d, roomPosition: { room, ...position } });
-                            setPositions(prev => { const next = { ...prev }; delete next[d.id]; return next; });
+                            if (position)
+                              onUpdateDevice?.({ ...d, roomPosition: { room, ...position } });
+                            setPositions((prev) => {
+                              const next = { ...prev };
+                              delete next[d.id];
+                              return next;
+                            });
                           }}
-                          onPointerCancel={() => { dragging.current = null; setPositions({}); }}
-                          onKeyDown={e => {
-                            if (!placing || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+                          onPointerCancel={() => {
+                            dragging.current = null;
+                            setPositions({});
+                          }}
+                          onKeyDown={(e) => {
+                            if (
+                              !placing ||
+                              !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)
+                            )
+                              return;
                             e.preventDefault();
-                            onUpdateDevice?.({ ...d, roomPosition: { room, x: Math.max(12, Math.min(88, x + (e.key === "ArrowRight" ? 4 : e.key === "ArrowLeft" ? -4 : 0))), y: Math.max(24, Math.min(86, y + (e.key === "ArrowDown" ? 4 : e.key === "ArrowUp" ? -4 : 0))) } });
+                            onUpdateDevice?.({
+                              ...d,
+                              roomPosition: {
+                                room,
+                                x: Math.max(
+                                  12,
+                                  Math.min(
+                                    88,
+                                    x +
+                                      (e.key === "ArrowRight" ? 4 : e.key === "ArrowLeft" ? -4 : 0),
+                                  ),
+                                ),
+                                y: Math.max(
+                                  24,
+                                  Math.min(
+                                    86,
+                                    y + (e.key === "ArrowDown" ? 4 : e.key === "ArrowUp" ? -4 : 0),
+                                  ),
+                                ),
+                              },
+                            });
                           }}
                           title={`${d.name} · ${d.ip}${prob !== null ? ` · ${Math.round(prob * 100)} % a esa hora` : ""}`}
-                          className={cn("group absolute -translate-x-1/2 -translate-y-1/2", placing ? "touch-none cursor-move" : "transition-all duration-700")}
+                          className={cn(
+                            "group absolute -translate-x-1/2 -translate-y-1/2",
+                            placing ? "touch-none cursor-move" : "transition-all duration-700",
+                          )}
                           style={{
                             left: `${x}%`,
                             top: `${y}%`,
@@ -274,7 +345,11 @@ export function HomeTwin({
             <span className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-destructive" /> Intruso o comportamiento raro
             </span>
-            <span>{placing ? "Arrastra los dispositivos o usa las flechas del teclado. La posición se guarda automáticamente." : "Asigna habitaciones desde la ficha de cada equipo."}</span>
+            <span>
+              {placing
+                ? "Arrastra los dispositivos o usa las flechas del teclado. La posición se guarda automáticamente."
+                : "Asigna habitaciones desde la ficha de cada equipo."}
+            </span>
           </footer>
         </section>
         <aside className="rounded-xl border border-border bg-card">
@@ -428,7 +503,7 @@ export function HomeTwin({
                       </li>
                       <li>
                         Abre Rendimiento para consultar el tráfico actual. La medida corresponde al
-                        adaptador de este PC.
+                        adaptador de {monitoringHost}.
                       </li>
                     </>
                   )}

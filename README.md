@@ -22,3 +22,7 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+## NetHub Server para NAS
+
+Edición Docker con monitorización continua y una interfaz compartida para PC, móvil y tablet. Consulta [instalación, alcance y copias de seguridad](docs/NAS.md). El monitor del NAS funciona sin navegadores abiertos y guarda sus datos en un volumen persistente.

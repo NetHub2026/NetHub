@@ -16,7 +16,9 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "ensure:index": "node scripts/ensure-index-html.mjs",
-    "build:portable": "npm run build && npm run ensure:index && electron-builder --win portable"
+    "build:portable": "npm run build && npm run ensure:index && electron-builder --win portable",
+    "build:server": "node scripts/build-server.mjs",
+    "start:server": "node dist-server/server.mjs"
   },
   "build": {
     "appId": "dev.lovable.nethub",
