@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
-import { MapPin, Upload, Download, Move, Radio, Square, LoaderCircle } from "lucide-react";
+import {
+  MapPin,
+  Upload,
+  Download,
+  Move,
+  Radio,
+  Square,
+  LoaderCircle,
+  Plus,
+  Minus,
+} from "lucide-react";
 import { toast } from "sonner";
 import type { Device } from "@/lib/devices";
 import { DeviceTypeIcon } from "./DeviceTypeIcon";
@@ -45,6 +55,7 @@ const pointColor = (m: CoveragePoint) =>
 export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo = false }: Props) {
   const [draft, setDraft] = useState(plan);
   const [busy, setBusy] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const [mode, setMode] = useState<"devices" | "measure" | "rooms">("devices");
   const [deviceId, setDeviceId] = useState("");
   const [roomName, setRoomName] = useState("");
@@ -64,6 +75,7 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
     if (!busy) setDraft(plan);
   }, [plan?.updatedAt, busy]);
   useEffect(() => () => abort.current?.abort(), []);
+  useEffect(() => setZoom(1), [plan?.image]);
 
   async function save(next: FloorPlan | null) {
     if (busy) return false;
@@ -211,6 +223,37 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {draft && (
+            <div role="group" aria-label="Zoom del plano" className="flex items-center gap-1">
+              <button
+                className={control}
+                aria-label="Alejar plano"
+                title="Alejar plano"
+                disabled={busy || zoom <= 1}
+                onClick={() => setZoom((value) => Math.max(1, value - 0.25))}
+              >
+                <Minus className="size-4" />
+              </button>
+              <button
+                className={control}
+                aria-label="Restablecer zoom del plano"
+                title="Volver al tamaño inicial"
+                disabled={busy}
+                onClick={() => setZoom(1)}
+              >
+                {Math.round(zoom * 100)} %
+              </button>
+              <button
+                className={control}
+                aria-label="Ampliar plano"
+                title="Ampliar plano"
+                disabled={busy || zoom >= 4}
+                onClick={() => setZoom((value) => Math.min(4, value + 0.25))}
+              >
+                <Plus className="size-4" />
+              </button>
+            </div>
+          )}
           <button
             disabled={busy}
             className={control}
@@ -379,14 +422,19 @@ export function FloorPlanView({ devices, plan, onSave, canMeasure = false, demo 
             )}
           </div>
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="self-start overflow-hidden rounded-2xl border border-border bg-white">
+            <div
+              className="self-start overflow-auto rounded-2xl border border-border bg-white"
+              aria-label="Área desplazable del plano"
+              style={{ maxHeight: "max(240px, 100dvh - 350px)" }}
+            >
               <div
                 ref={surface}
                 className="relative w-full select-none"
                 style={{
                   aspectRatio: `${draft.width}/${draft.height}`,
-                  maxWidth: `calc(max(240px, 100dvh - 350px) * ${draft.width / draft.height})`,
-                  margin: "0 auto",
+                  width: `${zoom * 100}%`,
+                  maxWidth: `calc(max(240px, 100dvh - 350px) * ${(draft.width / draft.height) * zoom})`,
+                  margin: zoom === 1 ? "0 auto" : "0",
                   backgroundImage: `url(${draft.image})`,
                   backgroundSize: "100% 100%",
                   touchAction: mode === "devices" ? "pan-y" : "manipulation",
