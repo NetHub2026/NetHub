@@ -10,6 +10,9 @@ import { sanitizeSpeedHistory, speedHistoryLimit } from "../src/lib/speed-histor
 import type { Device } from "../src/lib/devices";
 import { activityLabels } from "../src/lib/activity";
 import { validateFloorPlan } from "../src/lib/floor-plan";
+import { sanitizeAlerts } from "../src/lib/sentinel";
+import { sanitizeAway } from "../src/lib/away";
+import { inventorySortLabels, inventoryGroupLabels } from "../src/lib/inventory-view";
 function storedDevices(value: unknown): Device[] {
   if (!Array.isArray(value)) throw new Error("Inventario no válido.");
   let count = 0;
@@ -158,6 +161,8 @@ export function normalizeState(parsed: Record<string, any>): ServerState {
   return {
     ...base,
     floorPlan: validateFloorPlan(parsed["floorPlan"]),
+    alerts: sanitizeAlerts(parsed["alerts"]),
+    away: sanitizeAway(parsed["away"]),
     revision:
       Number.isSafeInteger(parsed["revision"]) && parsed["revision"] >= 0 ? parsed["revision"] : 0,
     devices: storedDevices(parsed["devices"]),
@@ -185,6 +190,11 @@ export function normalizeState(parsed: Record<string, any>): ServerState {
           .slice(-2880)
       : [],
     settings: {
+      ispName: typeof settings.ispName === "string" ? settings.ispName.slice(0, 120) : "tu operador",
+      ispAuto: settings.ispAuto === true,
+      awayAutoArm: settings.awayAutoArm === true,
+      inventorySort: Object.hasOwn(inventorySortLabels, settings.inventorySort ?? "") ? settings.inventorySort : "ip",
+      inventoryGroup: Object.hasOwn(inventoryGroupLabels, settings.inventoryGroup ?? "") ? settings.inventoryGroup : "none",
       scanIntervalSeconds: interval(settings.scanIntervalSeconds, [0, 30, 60, 120, 300, 600], 30),
       healthIntervalSeconds: interval(settings.healthIntervalSeconds, [0, 15, 30, 60, 120], 30),
       speedIntervalMinutes: interval(settings.speedIntervalMinutes, [0, 120, 360, 720, 1440], 0),

@@ -12,6 +12,9 @@ import { StateStore, normalizeState } from "./storage";
 import { discoverInterfaces, scanNetwork, ping, TrafficSampler } from "./network";
 import type { ServerState, ServerSnapshot, NetworkInterface, ServerSettings } from "./types";
 import { measureSpeed } from "./speed";
+import { intruderAlerts, ipConflictAlerts, appendAlerts } from "../src/lib/sentinel";
+import { emptyAwayState, evaluateAway, addAwayActivity } from "../src/lib/away";
+import { inventorySortLabels, inventoryGroupLabels } from "../src/lib/inventory-view";
 export const EDITABLE_FIELDS = [
   "watch",
   "name",
@@ -198,6 +201,12 @@ export class Monitor {
         );
         const merged = watched.devices;
         const now = this.options.now?.() ?? new Date();
+        const fresh = merged.filter(d => d.status === "online" && !d.trusted && !draft.devices.some(previous => previous.id === d.id));
+        const conflicts = ipConflictAlerts(draft.devices, merged).filter(a => !(draft.alerts ?? []).some(existing => !existing.resolved && existing.kind === a.kind && existing.deviceId === a.deviceId && existing.detail === a.detail));
+        draft.alerts = appendAlerts(draft.alerts ?? [], [...intruderAlerts(fresh), ...conflicts]);
+        draft.away = evaluateAway(draft.away ?? emptyAwayState(), merged, draft.settings.awayAutoArm === true, now).state;
+        const awayArrivals = merged.filter(d => d.status === "online" && !d.trusted && !draft.devices.some(previous => previous.id === d.id && previous.status === "online"));
+        if (draft.away.armed) for (const device of awayArrivals) draft.away = addAwayActivity(draft.away, `Equipo no reconocido: ${device.name}`, now);
         draft.events = appendEvents(draft.events, [
           ...diffActivity(draft.devices, merged),
           ...watched.events,
@@ -322,6 +331,8 @@ export class Monitor {
         health: imported.health,
         speedHistory: imported.speedHistory,
         floorPlan: imported.floorPlan ?? null,
+        alerts: imported.alerts ?? [],
+        away: imported.away ?? emptyAwayState(),
         lastScanAt: null,
       });
       draft.settings = {
@@ -371,10 +382,15 @@ export class Monitor {
             "interfaceName",
             "contractedMbps",
             "speedHistoryLimit",
+            "ispName", "ispAuto", "awayAutoArm", "inventorySort", "inventoryGroup",
           ].includes(k),
       )
     )
       throw new Error("Preferencia no válida.");
+    if (changes.ispName !== undefined && (typeof changes.ispName !== "string" || changes.ispName.length > 120)) throw new Error("Proveedor no válido.");
+    for (const key of ["ispAuto", "awayAutoArm"] as const) if (key in changes && typeof changes[key] !== "boolean") throw new Error("Preferencia no válida.");
+    if (changes.inventorySort !== undefined && !Object.hasOwn(inventorySortLabels, changes.inventorySort)) throw new Error("Orden no válido.");
+    if (changes.inventoryGroup !== undefined && !Object.hasOwn(inventoryGroupLabels, changes.inventoryGroup)) throw new Error("Agrupación no válida.");
     for (const [key, allowed] of [
       ["scanIntervalSeconds", [0, 30, 60, 120, 300, 600]],
       ["healthIntervalSeconds", [0, 15, 30, 60, 120]],

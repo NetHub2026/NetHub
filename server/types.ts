@@ -5,8 +5,16 @@ import type { UsageState } from "../src/lib/usage";
 import type { HealthSample } from "../src/lib/health";
 import type { SpeedResult } from "../src/lib/speedtest";
 import type { FloorPlan } from "../src/lib/floor-plan";
+import type { SentinelAlert } from "../src/lib/sentinel";
+import type { AwayState } from "../src/lib/away";
+import type { InventorySort, InventoryGroup } from "../src/lib/inventory-view";
 
 export interface ServerSettings {
+  ispName?: string;
+  ispAuto?: boolean;
+  awayAutoArm?: boolean;
+  inventorySort?: InventorySort;
+  inventoryGroup?: InventoryGroup;
   speedHistoryLimit: number;
   scanIntervalSeconds: number;
   healthIntervalSeconds: number;
@@ -23,6 +31,8 @@ export interface NetworkInterface {
   gateway: string | null;
 }
 export interface ServerState {
+  alerts?: SentinelAlert[];
+  away?: AwayState;
   floorPlan?: FloorPlan | null;
   schema: 1;
   revision: number;

@@ -9,6 +9,9 @@ import { inSubnet, privateIp, ping } from "./network";
 import type { MergeChoices } from "../src/lib/device-unification";
 import { randomBytes } from "node:crypto";
 import { validateFloorPlan } from "../src/lib/floor-plan";
+import { Resolver } from "node:dns/promises";
+import { emptyAwayState, armAway, disarmAway } from "../src/lib/away";
+import type { DnsCheckResult } from "../src/lib/desktop";
 type Options = {
   password: string;
   staticDirectory: string;
@@ -41,6 +44,7 @@ export function createHttpServer(monitor: Monitor, options: Options) {
   const root = resolve(options.staticDirectory);
   const coveragePayload = randomBytes(4 * 1024 * 1024);
   const coverageLimits = new Map<string, { at: number; count: number }>();
+  let providerCache: { at: number; data: unknown } | null = null;
   const json = (res: ServerResponse, status: number, value: unknown) => {
     res.statusCode = status;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -54,7 +58,7 @@ export function createHttpServer(monitor: Monitor, options: Options) {
       res.setHeader("Cache-Control", "no-store");
       res.setHeader(
         "Content-Security-Policy",
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.vodafone.es https://www.movistar.es https://www.digimobil.es https://www.orange.es https://www.jazztel.com https://www.yoigo.com https://www.pepephone.com https://o2online.es https://www.euskaltel.com https://www.masmovil.es; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
       );
       try {
         const host = (req.headers.host ?? "").toLowerCase();
@@ -158,6 +162,34 @@ export function createHttpServer(monitor: Monitor, options: Options) {
               draft.floorPlan = plan;
             });
           } else if (url.pathname === "/api/scan") await monitor.scan();
+          else if (url.pathname === "/api/health") await monitor.health();
+          else if (url.pathname === "/api/provider") {
+            if (!monitor.state.settings.ispAuto || monitor.options.demo) return json(res, 400, { error: "Detección automática desactivada." });
+            if (!providerCache || Date.now() - providerCache.at > 600000) {
+              const response = await fetch("https://ipwho.is/", { signal: AbortSignal.timeout(5000) });
+              if (!response.ok) throw new Error("No se ha podido consultar el proveedor.");
+              providerCache = { at: Date.now(), data: await response.json() };
+            }
+            return json(res, 200, providerCache.data);
+          } else if (url.pathname === "/api/dns") {
+            return json(res, 200, await dnsCheck(monitor));
+          } else if (url.pathname === "/api/alerts") {
+            await monitor.mutate(draft => {
+              if (input["clear"] === true) draft.alerts = [];
+              else {
+                const id = string(input["id"]);
+                if (!(draft.alerts ?? []).some(a => a.id === id)) throw new Error("Alerta no encontrada.");
+                draft.alerts = (draft.alerts ?? []).map(a => a.id === id ? { ...a, resolved: true } : a);
+              }
+            });
+          } else if (url.pathname === "/api/away") {
+            await monitor.mutate(draft => {
+              const state = draft.away ?? emptyAwayState();
+              if (typeof input["armed"] === "boolean") draft.away = input["armed"] ? armAway(state) : disarmAway(state);
+              else if (Array.isArray(input["watchedIds"]) && input["watchedIds"].length <= 20 && input["watchedIds"].every(id => typeof id === "string" && draft.devices.some(d => d.id === id))) draft.away = { ...state, watchedIds: [...new Set(input["watchedIds"])] };
+              else throw new Error("Configuración del modo ausente no válida.");
+            });
+          }
           else if (url.pathname === "/api/device") {
             if (
               !input["changes"] ||
@@ -270,6 +302,24 @@ export function createHttpServer(monitor: Monitor, options: Options) {
       }
     },
   );
+}
+async function dnsCheck(monitor: Monitor): Promise<DnsCheckResult> {
+  const gateway = monitor.selectedNetwork()?.gateway ?? null;
+  const domain = "example.com";
+  const base = { available: true, ok: false, gateway, domain, gatewayIps: [], publicIps: [], hijacked: false, gatewayRtt: null };
+  if (monitor.options.demo || !gateway || !privateIp(gateway)) return { ...base, available: false, error: monitor.options.demo ? "Comprobación DNS desactivada en la demostración." : "No se ha detectado el router local." };
+  const resolve = async (server: string) => {
+    const resolver = new Resolver({ timeout: 1500, tries: 1 });
+    resolver.setServers([server]);
+    return (await resolver.resolve4(domain)).sort();
+  };
+  try {
+    const start = performance.now();
+    const [gatewayResult, publicIps] = await Promise.all([resolve(gateway).then(ips => ({ ips, rtt: Math.round(performance.now() - start) })), resolve("8.8.8.8")]);
+    const gatewayIps = gatewayResult.ips;
+    const ok = gatewayIps.length > 0 && JSON.stringify(gatewayIps) === JSON.stringify(publicIps);
+    return { ...base, gatewayIps, publicIps, gatewayRtt: gatewayResult.rtt, ok, error: ok ? undefined : "Los DNS devuelven respuestas distintas. Puede deberse a caché, CDN o filtrado; no demuestra una manipulación." };
+  } catch { return { ...base, error: "Alguno de los DNS no ha respondido. Puede estar bloqueado o no atender consultas." }; }
 }
 function knownIp(monitor: Monitor, value: unknown) {
   const ip = string(value),

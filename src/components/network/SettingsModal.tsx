@@ -35,6 +35,8 @@ interface Props {
   onChange: (patch: Partial<Settings>) => void;
   onReset: () => void;
   directoryManagers: { people: React.ReactNode; locations: React.ReactNode };
+  overrides?: Partial<Record<SectionId, React.ReactNode>>;
+  platform?: { label: string; version: string; description: string };
 }
 
 type SectionId = "system" | "appearance" | "network" | "alerts" | "data" | "people" | "locations";
@@ -50,7 +52,7 @@ const sections: Array<{ id: SectionId; label: string; icon: React.ReactNode }> =
 ];
 
 /** Panel de preferencias de NetHub, organizado por secciones. */
-export function SettingsModal({ open, settings, onClose, onChange, onReset, directoryManagers }: Props) {
+export function SettingsModal({ open, settings, onClose, onChange, onReset, directoryManagers, overrides, platform }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
@@ -148,7 +150,7 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset, dire
                 Configuración de NetHub
               </DialogPrimitive.Title>
               <DialogPrimitive.Description className="mt-1 text-xs text-muted-foreground">
-                {desktop
+                {platform ? platform.description : desktop
                   ? "Las opciones del sistema se aplican al instante en la app de escritorio."
                   : "Algunas opciones del sistema solo funcionan en la app de escritorio."}
               </DialogPrimitive.Description>
@@ -199,6 +201,7 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset, dire
               tabIndex={0}
               className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-none p-4 [scrollbar-gutter:stable] sm:p-6"
             >
+              {overrides?.[section] ?? <>
               {section === "system" && (
                 <div className="space-y-5">
                   <Toggle
@@ -509,6 +512,7 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset, dire
                   )}
                 </div>
               )}
+              </>}
             </div>
           </div>
         </DialogPrimitive.Content>
@@ -520,8 +524,8 @@ export function SettingsModal({ open, settings, onClose, onChange, onReset, dire
             <DialogPrimitive.Title className="text-lg font-semibold">Acerca de NetHub</DialogPrimitive.Title>
             <DialogPrimitive.Description className="mt-2 text-sm text-muted-foreground">Panel de red doméstica</DialogPrimitive.Description>
             <div className="mt-4 space-y-2 text-sm">
-              <p>Versión {APP_VERSION}</p>
-              <p className="text-muted-foreground">{runtimeLabels[getRuntime()]}</p>
+              <p>Versión {platform?.version ?? APP_VERSION}</p>
+              <p className="text-muted-foreground">{platform?.label ?? runtimeLabels[getRuntime()]}</p>
               <p className="text-muted-foreground">© 2026 oyogor</p>
               <a href="mailto:nethub2026@outlook.es" className="block text-brand hover:underline">nethub2026@outlook.es</a>
             </div>

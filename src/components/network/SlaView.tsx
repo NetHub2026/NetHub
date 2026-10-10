@@ -18,6 +18,7 @@ interface Props {
   intervalMinutes: number;
   onTestNow: () => void;
   onIntervalChange: (minutes: number) => void;
+  providerCard?: React.ReactNode;
 }
 
 const verdictClass = {
@@ -45,6 +46,7 @@ export function SlaView({
   intervalMinutes,
   onTestNow,
   onIntervalChange,
+  providerCard,
 }: Props) {
   const stats = useMemo(
     () => slaStats(samples, contracted, healthSamples),
@@ -65,7 +67,7 @@ export function SlaView({
 
   return (
     <section className="space-y-6">
-      <InternetProviderCard name={isp} automatic={ispAuto} onDetected={onProviderDetected} onEnable={onProviderEnable} />
+      {providerCard ?? <InternetProviderCard name={isp} automatic={ispAuto} onDetected={onProviderDetected} onEnable={onProviderEnable} />}
       <div className="rounded-2xl border border-border bg-card p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-base font-semibold">
@@ -106,7 +108,7 @@ export function SlaView({
           <p className="mt-6 text-sm text-muted-foreground">
             Aún no hay pruebas registradas. Haz una ahora o programa el test automático (por
             ejemplo, cada 2 horas) para llevar la cuenta de lo que {isp} te entrega de verdad
-            frente a los {contracted} Mbps contratados.
+            {contracted > 0 ? `frente a los ${contracted} Mbps contratados.` : "Indica la velocidad contratada en Configuración para comparar los resultados."}
           </p>
         ) : (
           <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

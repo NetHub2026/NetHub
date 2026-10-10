@@ -4,6 +4,12 @@ NetHub Server monitoriza desde un NAS Linux y ofrece una interfaz web para PC, m
 
 Esta edición es independiente de la aplicación portable para Windows. No instala Electron en el NAS. No incorpora apagado remoto. La primera versión requiere validar el escaneo en el NAS físico; las pruebas automatizadas utilizan datos sintéticos y no certifican la cobertura de una red real.
 
+## Interfaz compartida con Windows
+
+PC y NAS reutilizan la misma cabecera, navegación, filtros, tarjetas, configuración y vistas: Inventario, Plano y cobertura, Rendimiento, Topología de red, Actividad, Seguridad, Health Radar, Mi casa, Uso y Operador. Las diferencias responden al equipo que monitoriza: el NAS ejecuta y guarda las tareas en el servidor, mientras Windows ofrece las opciones propias de Electron. No se inventa tráfico por dispositivo cuando no está disponible.
+
+Los avisos de seguridad y el modo ausencia se conservan en el JSON del servidor. La detección del proveedor requiere activación expresa y consulta IPWhois desde el servidor; no transmite el inventario. La prueba de velocidad utiliza Cloudflare con consentimiento. Comparar respuestas DNS diferentes no basta para afirmar una manipulación.
+
 ## Requisitos
 
 - NAS Linux con Docker y Docker Compose. El UGREEN DXP4800 Pro es el destino previsto; el código no contiene reglas de una casa ni depende de una marca de router.

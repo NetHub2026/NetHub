@@ -56,6 +56,24 @@ describe("Network boundaries", () => {
   });
 });
 describe("Durable continuous monitor", () => {
+  it("persists shared view preferences, Sentinel and away monitoring without a browser", async () => {
+    const { monitor } = await fixture();
+    await monitor.settings({ inventorySort: "name", inventoryGroup: "location", ispName: "Example provider", awayAutoArm: true });
+    await monitor.scan();
+    const initial = monitor.state.alerts!;
+    expect(initial).toHaveLength(3);
+    await monitor.scan();
+    expect(monitor.state.alerts).toHaveLength(3);
+    await monitor.mutate(draft => { draft.alerts = (draft.alerts ?? []).map(a => ({ ...a, resolved: true })); draft.away = { armed: true, awaySince: "2026-10-10T10:00:00Z", watchedIds: [], history: [] }; });
+    const stored = await monitor.store.load();
+    expect(stored.settings.inventorySort).toBe("name");
+    expect(stored.settings.inventoryGroup).toBe("location");
+    expect(stored.settings.ispName).toBe("Example provider");
+    expect(stored.alerts?.every(a => a.resolved)).toBe(true);
+    expect(stored.away?.armed).toBe(true);
+    await expect(monitor.settings({ inventorySort: "unsafe" as never })).rejects.toThrow();
+    await expect(monitor.settings({ ispAuto: "true" as never })).rejects.toThrow();
+  });
   it("retains seven recoverable backup versions without archiving every state write", async () => {
     const { monitor, directory } = await fixture();
     await monitor.scan();
@@ -303,6 +321,16 @@ describe("Authenticated HTTP API", () => {
     const cookie = login.headers.get("set-cookie")!.split(";")[0]!;
     const { csrf } = await login.json();
     const headers = { cookie, "x-nethub-csrf": csrf };
+    expect((await request("/api/away", { armed: true }, { cookie })).status).toBe(403);
+    expect((await request("/api/away", { armed: true }, headers)).status).toBe(200);
+    expect(monitor.state.away?.armed).toBe(true);
+    expect((await request("/api/away", { watchedIds: ["unknown"] }, headers)).status).toBe(400);
+    const alert = monitor.state.alerts![0]!;
+    expect((await request("/api/alerts", { id: alert.id }, headers)).status).toBe(200);
+    expect(monitor.state.alerts?.find(a => a.id === alert.id)?.resolved).toBe(true);
+    expect((await request("/api/provider", {}, headers)).status).toBe(400);
+    expect((await (await request("/api/dns", {}, headers)).json()).available).toBe(false);
+    expect((await request("/api/health", {}, headers)).status).toBe(200);
     const plan = { version: 1, updatedAt: "2026-10-10T12:00:00.000Z", name: "Generic test", image: "data:image/png;base64,aGVsbG8=", width: 800, height: 600, positions: {}, rooms: [], measurements: [] };
     expect((await request("/api/floor-plan", { plan, expected: null }, { cookie })).status).toBe(403);
     expect((await request("/api/floor-plan", { plan, expected: null }, headers)).status).toBe(200);

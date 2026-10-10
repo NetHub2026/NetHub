@@ -1,32 +1,14 @@
+import { InventoryToolbar } from "@/components/network/InventoryToolbar";
+import { DashboardHeader } from "@/components/network/DashboardHeader";
+import { DashboardNavigation } from "@/components/network/DashboardNavigation";
+import { InventoryDeviceCard } from "@/components/network/InventoryDeviceCard";
 import { FloorPlanView } from "@/components/network/FloorPlanView";
 import { evaluateWatches } from "@/lib/device-watch";
 import { SPEED_HISTORY_CHANGED } from "@/lib/speed-history";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import {
-  Activity,
-  ShieldAlert,
-  ShieldCheck,
-  Sparkles,
-  Loader2,
-  LayoutGrid,
-  Moon,
-  Radar,
-  RefreshCw,
-  MapPin,
-  Cable,
-  Search,
-  Settings as SettingsIcon,
-  Sun,
-  Users,
-  Wifi,
-  Waypoints,
-  BarChart3,
-  Gauge,
-  Siren,
-  Home as HomeIcon,
-} from "lucide-react";
+import { ShieldAlert, ShieldCheck, Sparkles, Loader2, Radar, Siren } from "lucide-react";
 import { type Device, type DeviceType } from "@/lib/devices";
 import {
   changeDirectoryEntry,
@@ -119,7 +101,6 @@ import { NetworkTabs } from "@/components/network/NetworkTabs";
 import { NetworkTopology } from "@/components/network/NetworkTopology";
 import { ActivityTimeline } from "@/components/network/ActivityTimeline";
 import { appendEvents, diffActivity, type ActivityEvent } from "@/lib/activity";
-import { History as HistoryIcon, ShieldCheck as ShieldIcon, HeartPulse } from "lucide-react";
 import { SecurityView } from "@/components/network/SecurityView";
 import { HealthRadar } from "@/components/network/HealthRadar";
 import {
@@ -139,14 +120,9 @@ import {
 
 import { UpdateModal } from "@/components/network/UpdateModal";
 import { DirectoryManager } from "@/components/network/DirectoryManager";
-import { DeviceTypeFilter } from "@/components/network/DeviceTypeFilter";
-import { InventoryIdentityIcon, InventoryDeviceBrand } from "@/components/network/IdentityBadge";
 
 import { arrangeInventory } from "@/lib/inventory-view";
-import { InventoryViewControls } from "@/components/network/InventoryViewControls";
 import { InventorySummary } from "@/components/network/InventorySummary";
-import { CONNECTION_TAGS, connectionOf } from "@/lib/connections";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({
@@ -170,15 +146,6 @@ export const Route = createFileRoute("/")({
   }),
   component: Dashboard,
 });
-
-/** Etiquetas de conexión: se muestran como icono, no como etiqueta de texto. */
-const WIFI_TAGS = CONNECTION_TAGS.filter(t => t !== "Cableado / Ethernet");
-const WIRED_TAG = "Cableado / Ethernet";
-
-/** Etiquetas visibles: sin las de conexión (ya representadas con su icono). */
-function visibleTags(device: Device): string[] {
-  return device.tags.filter((t) => !WIFI_TAGS.includes(t) && t !== WIRED_TAG);
-}
 
 function Dashboard() {
   const [items, setItems] = useState<Device[]>([]);
@@ -769,61 +736,7 @@ function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-[1720px] flex-wrap items-center gap-2 sm:gap-4 px-5 py-4 xl:px-8">
-          <img
-            src="/app-icon.png"
-            alt="NetHub"
-            width={36}
-            height={36}
-            className="size-9 rounded-lg"
-          />
-          <div className="min-w-0 flex-1 basis-1/2 sm:basis-auto">
-            <h1 className="text-lg font-semibold leading-none">NetHub</h1>
-            <p className="mt-1 text-xs text-muted-foreground">
-              v{APP_VERSION}
-            </p>
-          </div>
-          <StatusPill status={status} />
-          <button
-            onClick={() => setUpdateOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <RefreshCw className="size-4" />
-            Actualizaciones
-          </button>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={scan}
-            disabled={scanning || autoScanning}
-            className="inline-flex items-center gap-2 rounded-md h-9 min-w-36 bg-brand px-3.5 py-2 text-sm font-medium text-brand-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
-          >
-            {scanning || autoScanning ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Radar className="size-4" />
-            )}
-            {scanning || autoScanning ? "Escaneando…" : "Escanear red"}
-          </Button>
-          <button
-            onClick={() => setSettingsOpen(true)}
-            className="rounded-md border border-border p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            aria-label="Abrir configuración"
-            title="Configuración"
-          >
-            <SettingsIcon className="size-4" />
-          </button>
-          <button
-            onClick={() => updateSettings({ theme: dark ? "light" : "dark" })}
-            className="rounded-md border border-border p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
-          >
-            {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
-          </button>
-        </div>
-      </header>
+      <DashboardHeader version={APP_VERSION} status={status} scanning={scanning || autoScanning} dark={dark} onUpdates={() => setUpdateOpen(true)} onScan={scan} onSettings={() => setSettingsOpen(true)} onTheme={() => updateSettings({ theme: dark ? "light" : "dark" })} />
 
       <main className="mx-auto max-w-[1720px] px-5 py-8 xl:px-8">
         <section className="mb-6 flex flex-wrap items-center gap-x-5 gap-y-3 rounded-2xl border border-border bg-card px-5 py-4 text-xs">
@@ -838,129 +751,7 @@ function Dashboard() {
             Datos en <span className="font-mono text-foreground">{dbPath}</span>
           </span>
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <div
-              className="flex max-w-full flex-wrap items-center rounded-md border border-border bg-muted/40 p-0.5"
-              aria-label="Vista del panel"
-            >
-              <button
-                type="button"
-                onClick={() => setViewMode("inventory")}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
-                  viewMode === "inventory"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <LayoutGrid className="size-3.5" />
-                Inventario
-              </button>
-              <button type="button" onClick={() => setViewMode("floorplan")} className={cn("inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors", viewMode === "floorplan" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}><MapPin className="size-3.5" />Plano y cobertura</button>
-              <button
-                type="button"
-                onClick={() => setViewMode("performance")}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
-                  viewMode === "performance"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <Gauge className="size-3.5" />
-                Rendimiento
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("topology")}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
-                  viewMode === "topology"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <Waypoints className="size-3.5" />
-                Topología de red
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("activity")}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
-                  viewMode === "activity"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <HistoryIcon className="size-3.5" />
-                Actividad
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("security")}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
-                  viewMode === "security"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <ShieldIcon className="size-3.5" />
-                Seguridad
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("health")}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
-                  viewMode === "health"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <HeartPulse className="size-3.5" />
-                Health Radar
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("home")}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
-                  viewMode === "home"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <HomeIcon className="size-3.5" />
-                Mi casa
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("usage")}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
-                  viewMode === "usage"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <BarChart3 className="size-3.5" />
-                Uso
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("sla")}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
-                  viewMode === "sla"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <Gauge className="size-3.5" />
-                Operador
-              </button>
-            </div>
+            <DashboardNavigation value={viewMode} onChange={setViewMode} />
             {awayState.armed && (
               <span className="inline-flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-2.5 py-1.5 text-xs font-medium text-destructive">
                 <Siren className="size-3.5" />
@@ -1070,91 +861,7 @@ function Dashboard() {
             </section>
 
             <section className="mt-8">
-              <div className="flex flex-wrap items-center gap-3">
-                <h2 className="mr-auto text-base font-semibold">
-                  Dispositivos <span className="text-muted-foreground">({visible.length})</span>
-                </h2>
-                <label className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Buscar nombre, IP, MAC…"
-                    className="w-56 rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm outline-none focus:border-brand"
-                  />
-                </label>
-                <DeviceTypeFilter value={filter} onChange={setFilter} />
-                <InventoryViewControls
-                  order={settings.inventorySort}
-                  grouping={settings.inventoryGroup}
-                  onChange={updateSettings}
-                />
-
-                <span className="flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm focus-within:border-brand">
-                  <Users className="size-4 shrink-0 text-muted-foreground" />
-                  <select
-                    value={personFilter}
-                    onChange={(e) => setPersonFilter(e.target.value)}
-                    aria-label="Filtrar por persona"
-                    className="bg-popover text-sm text-popover-foreground outline-none"
-                  >
-                    <option value="all" className="bg-popover text-popover-foreground">
-                      Todas las personas
-                    </option>
-                    {options.people.map((name) => (
-                      <option
-                        key={name}
-                        value={name}
-                        className="bg-popover text-popover-foreground"
-                      >
-                        {name}
-                      </option>
-                    ))}
-                    <option value="" className="bg-popover text-popover-foreground">
-                      Sin persona
-                    </option>
-                  </select>
-                </span>
-                <span className="flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm focus-within:border-brand">
-                  <MapPin className="size-4 shrink-0 text-muted-foreground" />
-                  <select
-                    value={locationFilter}
-                    onChange={(e) => setLocationFilter(e.target.value)}
-                    aria-label="Filtrar por ubicación"
-                    className="bg-popover text-sm text-popover-foreground outline-none"
-                  >
-                    <option value="all" className="bg-popover text-popover-foreground">
-                      Todas las ubicaciones
-                    </option>
-                    {options.locations.map((name) => (
-                      <option
-                        key={name}
-                        value={name}
-                        className="bg-popover text-popover-foreground"
-                      >
-                        {name}
-                      </option>
-                    ))}
-                    <option value="" className="bg-popover text-popover-foreground">
-                      Sin ubicación
-                    </option>
-                  </select>
-                </span>
-                <label className="flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm">
-                  <span className="text-muted-foreground">Estado</span>
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-                    aria-label="Filtrar por estado"
-                    className="bg-popover text-popover-foreground outline-none"
-                  >
-                    <option value="all">Todos</option>
-                    <option value="online">Activos</option>
-                    <option value="offline">Inactivos</option>
-                  </select>
-                </label>
-              </div>
-
+              <InventoryToolbar count={visible.length} query={query} onQuery={setQuery} types={filter} onTypes={setFilter} order={settings.inventorySort} grouping={settings.inventoryGroup} onViewChange={updateSettings} person={personFilter} onPerson={setPersonFilter} location={locationFilter} onLocation={setLocationFilter} status={statusFilter} onStatus={setStatusFilter} people={options.people} locations={options.locations} />
               {inventoryGroups.map((group) => (
                 <div key={group.key} className="mt-5">
                   {group.label && (
@@ -1165,81 +872,7 @@ function Dashboard() {
                   )}
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                     {group.devices.map((d) => (
-                      <button
-                        key={d.id}
-                        onClick={() => setSelectedId(d.id)}
-                        className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-brand"
-                      >
-                        <span
-                          className={cn(
-                            "flex size-10 shrink-0 items-center justify-center rounded-lg",
-                            d.status === "online"
-                              ? "bg-brand/15 text-brand"
-                              : "bg-muted text-muted-foreground",
-                          )}
-                        >
-                          <InventoryIdentityIcon device={d} />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-center gap-2">
-                            <span className="truncate font-medium">{d.name}</span>
-                            <span
-                              className={cn(
-                                "size-1.5 shrink-0 rounded-full",
-                                d.status === "online" ? "bg-success" : "bg-muted-foreground",
-                              )}
-                            />
-                          </span>
-                          <span className="mt-0.5 block truncate font-mono text-xs text-muted-foreground">
-                            {d.ip} · <InventoryDeviceBrand device={d} />
-                          </span>
-                          {(d.person || d.location) && (
-                            <span className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-                              {d.location && (
-                                <span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-muted-foreground">
-                                  <MapPin className="size-3 shrink-0" />
-                                  <span className="truncate">{d.location}</span>
-                                </span>
-                              )}
-                              {d.person && (
-                                <span className="inline-flex min-w-0 items-center gap-1 text-muted-foreground">
-                                  <Users className="size-3 shrink-0" />
-                                  <span className="truncate">{d.person}</span>
-                                </span>
-                              )}
-                            </span>
-                          )}
-                          <span className="mt-1.5 flex flex-wrap gap-1.5">
-                            {d.isNew && !d.trusted && (
-                              <Badge className="bg-warning/15 text-warning">Nuevo</Badge>
-                            )}
-                            {d.blocked && (
-                              <Badge className="bg-destructive/15 text-destructive">
-                                Bloqueado
-                              </Badge>
-                            )}
-                            {d.prioritized && (
-                              <Badge className="bg-warning/15 text-warning">QoS</Badge>
-                            )}
-                            {visibleTags(d)
-                              .slice(0, 2)
-                              .map((t) => (
-                                <Badge key={t} className="bg-muted text-muted-foreground">
-                                  {t}
-                                </Badge>
-                              ))}
-                          </span>
-                        </span>
-                        <span className="flex shrink-0 flex-col items-end gap-1.5 self-stretch">
-                          <ConnectionIcon device={d} />
-                          <span className="mt-auto text-right">
-                            <span className="block font-mono text-sm">
-                              {d.downstream.toFixed(1)}
-                            </span>
-                            <span className="block text-[11px] text-muted-foreground">Mbps</span>
-                          </span>
-                        </span>
-                      </button>
+                      <InventoryDeviceCard key={d.id} device={d} onSelect={setSelectedId} />
                     ))}
                   </div>
                 </div>
@@ -1436,66 +1069,5 @@ function Dashboard() {
         }}
       />
     </div>
-  );
-}
-
-function StatusPill({ status }: { status: ScannerStatus }) {
-  const map: Record<ScannerStatus, { label: string; className: string; dot: string }> = {
-    unknown: {
-      label: "Escáner sin comprobar",
-      className: "bg-muted text-muted-foreground",
-      dot: "bg-muted-foreground",
-    },
-    checking: {
-      label: "Comprobando…",
-      className: "bg-warning/15 text-warning",
-      dot: "bg-warning animate-pulse",
-    },
-    connected: {
-      label: "Conectado",
-      className: "bg-success/15 text-success",
-      dot: "bg-success",
-    },
-    disconnected: {
-      label: "Desconectado",
-      className: "bg-destructive/15 text-destructive",
-      dot: "bg-destructive",
-    },
-  };
-  const s = map[status];
-  return (
-    <span
-      className={cn(
-        "hidden items-center gap-2 rounded-full px-3 py-1 text-xs font-medium md:inline-flex",
-        s.className,
-      )}
-    >
-      <span className={cn("size-1.5 rounded-full", s.dot)} />
-      {s.label}
-    </span>
-  );
-}
-
-function Badge({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <span
-      className={cn(
-        "rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide",
-        className,
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
-/** Icono del tipo de conexión (Wi-Fi o cable) en la esquina de cada tarjeta. */
-function ConnectionIcon({ device }: { device: Device }) {
-  const kind = connectionOf(device);
-  if (kind === null) return null;
-  return kind === "wifi" ? (
-    <Wifi className="size-4 text-muted-foreground" aria-label="Wi-Fi" />
-  ) : (
-    <Cable className="size-4 text-muted-foreground" aria-label="Cableado / Ethernet" />
   );
 }

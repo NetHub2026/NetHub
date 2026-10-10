@@ -1,27 +1,30 @@
+import { InventoryToolbar } from "../src/components/network/InventoryToolbar";
+import { PerformanceView } from "../src/components/network/PerformanceView";
+import { SpeedTestPanel } from "../src/components/network/SpeedTestPanel";
+import { InternetProviderCard } from "../src/components/network/InternetProviderCard";
+import { SlaView } from "../src/components/network/SlaView";
+import { SecurityView } from "../src/components/network/SecurityView";
+import { AwayMode } from "../src/components/network/AwayMode";
+import { emptyAwayState } from "../src/lib/away";
+import { SettingsModal } from "../src/components/network/SettingsModal";
+import { defaultSettings, type Settings as AppSettings } from "../src/lib/settings";
+import { NetworkTabs } from "../src/components/network/NetworkTabs";
+import { ALL_NETWORKS, UNKNOWN_NETWORK, networkOf } from "../src/lib/networks";
+import { DashboardHeader } from "../src/components/network/DashboardHeader";
+import {
+  DashboardNavigation,
+  type DashboardView,
+} from "../src/components/network/DashboardNavigation";
+import { InventoryDeviceCard } from "../src/components/network/InventoryDeviceCard";
+import { NetworkTopology } from "../src/components/network/NetworkTopology";
+import { HealthRadar } from "../src/components/network/HealthRadar";
 import { FloorPlanView } from "../src/components/network/FloorPlanView";
 import { BackupManager } from "../src/components/network/BackupManager";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Toaster, toast } from "sonner";
-import {
-  Search,
-  Radar,
-  Server,
-  LogOut,
-  Settings,
-  Activity,
-  House,
-  Gauge,
-  Network,
-  LockKeyhole,
-  LoaderCircle,
-  Download,
-  ShieldCheck,
-  Users,
-  MapPin,
-} from "lucide-react";
+import { LogOut, LockKeyhole, LoaderCircle, Download } from "lucide-react";
 import type { Device, DeviceType } from "../src/lib/devices";
-import { deviceTypeLabels } from "../src/lib/devices";
 import { detectNetworks } from "../src/lib/networks";
 import {
   arrangeInventory,
@@ -29,20 +32,13 @@ import {
   type InventoryGroup,
 } from "../src/lib/inventory-view";
 import { InventorySummary } from "../src/components/network/InventorySummary";
-import { DeviceTypeFilter } from "../src/components/network/DeviceTypeFilter";
-import { DeviceTypeIcon } from "../src/components/network/DeviceTypeIcon";
-import { InventoryViewControls } from "../src/components/network/InventoryViewControls";
 import { DeviceDetailPanel } from "../src/components/network/DeviceDetailPanel";
 import { DirectoryManager } from "../src/components/network/DirectoryManager";
 import { ActivityTimeline } from "../src/components/network/ActivityTimeline";
 import { HomeTwin } from "../src/components/network/HomeTwin";
 import { UsageView } from "../src/components/network/UsageView";
-import { BandwidthChart } from "../src/components/network/BandwidthChart";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "../src/components/ui/dialog";
-import { healthStats } from "../src/lib/health";
-import { slaCsv } from "../src/lib/sla";
-import { connectionOf, wifiBand } from "../src/lib/connections";
-import type { ServerSnapshot, ServerSettings } from "../server/types";
+import type { ServerSnapshot } from "../server/types";
 import "./style.css";
 import { InventoryExport } from "../src/components/network/InventoryExport";
 import { commonServices, serviceUrl } from "../src/lib/services";
@@ -117,22 +113,38 @@ const editable = [
   "services",
   "servicesScannedAt",
 ] as const;
-type View = "floorplan" | "inventory" | "home" | "activity" | "status" | "performance" | "usage" | "settings";
-const views: Array<[View, string, typeof Server]> = [
-  ["inventory", "Inventario", Network],
-  ["home", "Casa", House],
-  ["floorplan", "Plano y cobertura", MapPin],
-  ["activity", "Actividad", Activity],
-  ["status", "Estado", ShieldCheck],
-  ["performance", "Rendimiento", Gauge],
-  ["usage", "Uso", Users],
-  ["settings", "Configuración", Settings],
-];
+type View = DashboardView | "settings";
 const date = (iso: string | null) =>
   iso
     ? new Date(iso).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })
     : "Pendiente";
 function App() {
+  const [theme, setTheme] = useState<"dark" | "light" | "auto">(() => {
+    const saved = window.localStorage.getItem("nethub.server.theme");
+    return saved === "light" || saved === "auto" ? saved : "dark";
+  });
+  const [systemDark, setSystemDark] = useState(
+    () => window.matchMedia("(prefers-color-scheme: dark)").matches,
+  );
+  const dark = theme === "auto" ? systemDark : theme === "dark";
+  const setDark = (value: boolean) => setTheme(value ? "dark" : "light");
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const change = () => setSystemDark(media.matches);
+    media.addEventListener("change", change);
+    return () => media.removeEventListener("change", change);
+  }, []);
+  const [updatesOpen, setUpdatesOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [networkFilter, setNetworkFilter] = useState(ALL_NETWORKS);
+  const [consent, setConsent] = useState<"provider" | "speed" | null>(null);
+  const [intervalConsent, setIntervalConsent] = useState<number | null>(null);
+  const [importData, setImportData] = useState<unknown>(null);
+  const [healthBusy, setHealthBusy] = useState(false);
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+    window.localStorage.setItem("nethub.server.theme", theme);
+  }, [dark, theme]);
   const [session, setSession] = useState<"checking" | "login" | "ready">("checking");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -144,10 +156,10 @@ function App() {
   const [selected, setSelected] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [types, setTypes] = useState<DeviceType[]>([]);
-  const [order, setOrder] = useState<InventorySort>("ip");
-  const [group, setGroup] = useState<InventoryGroup>("none");
-  const [person, setPerson] = useState("");
-  const [location, setLocation] = useState("");
+  const order: InventorySort = "ip";
+  const group: InventoryGroup = "none";
+  const [person, setPerson] = useState("all");
+  const [location, setLocation] = useState("all");
   const [status, setStatus] = useState("all");
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const pending = useRef(0);
@@ -167,7 +179,9 @@ function App() {
   const refresh = async () => {
     try {
       const version = latest?.floorPlan?.updatedAt;
-      const value = await api<ServerSnapshot>("state" + (version ? `?planVersion=${encodeURIComponent(version)}` : ""));
+      const value = await api<ServerSnapshot>(
+        "state" + (version ? `?planVersion=${encodeURIComponent(version)}` : ""),
+      );
       if (!pending.current && mounted.current) apply(value);
     } catch (error) {
       if (mounted.current) setConnected(false);
@@ -236,18 +250,66 @@ function App() {
   };
   const networks = useMemo(() => detectNetworks(state?.devices ?? []), [state?.devices]);
   const devices = state?.devices ?? [];
+  const isp = state?.settings.ispName ?? "tu operador";
+  const providerCard = (
+    <InternetProviderCard
+      name={isp}
+      automatic={state?.settings.ispAuto === true}
+      onDetected={(name) => {
+        if (name !== isp) void mutate("settings", { ispName: name });
+      }}
+      onEnable={() =>
+        state?.server.demo
+          ? toast.message("Detección real desactivada en la demostración.")
+          : setConsent("provider")
+      }
+      readProvider={() => api("provider", {})}
+      compact={view === "performance"}
+    />
+  );
+  const startTest = () =>
+    state?.server.demo
+      ? toast.message("Pruebas reales desactivadas en la demostración.")
+      : setConsent("speed");
+  const scheduleTest = (minutes: number) => {
+    if (!minutes) void mutate("settings", { speedIntervalMinutes: 0 });
+    else if (state?.server.demo) toast.message("Pruebas reales desactivadas en la demostración.");
+    else setIntervalConsent(minutes);
+  };
+  const changeSettings = (patch: Partial<AppSettings>) => {
+    if (patch.theme) setTheme(patch.theme);
+    const changes: Record<string, unknown> = {};
+    for (const key of [
+      "scanIntervalSeconds",
+      "healthIntervalSeconds",
+      "ispName",
+      "ispAuto",
+      "awayAutoArm",
+      "inventorySort",
+      "inventoryGroup",
+    ] as const)
+      if (patch[key] !== undefined) changes[key] = patch[key];
+    if (patch.linkSpeedMbps !== undefined) changes["contractedMbps"] = patch.linkSpeedMbps;
+    if (patch.slaIntervalMinutes !== undefined) scheduleTest(patch.slaIntervalMinutes);
+    if (Object.keys(changes).length) void mutate("settings", changes);
+  };
   const filtered = devices.filter(
     (d) =>
+      (networkFilter === ALL_NETWORKS || networkOf(d) === networkFilter) &&
       (!query ||
         `${d.name} ${d.ip} ${d.mac} ${d.vendor}`
           .toLocaleLowerCase()
           .includes(query.toLocaleLowerCase())) &&
       (!types.length || types.includes(d.type)) &&
-      (!person || d.person === person) &&
-      (!location || d.location === location) &&
+      (person === "all" || (person === "" ? !d.person : d.person === person)) &&
+      (location === "all" || (location === "" ? !d.location : d.location === location)) &&
       (status === "all" || d.status === status),
   );
-  const groups = arrangeInventory(filtered, order, group);
+  const groups = arrangeInventory(
+    filtered,
+    state?.settings.inventorySort ?? order,
+    state?.settings.inventoryGroup ?? group,
+  );
   const chosen = devices.find((d) => d.id === selected) ?? null;
   const download = async () => {
     const data = await api<unknown>("export");
@@ -317,30 +379,17 @@ function App() {
     );
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <Toaster richColors theme="dark" />
-      <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
-          <img src="/app-icon.png" alt="" className="size-9" />
-          <div className="mr-auto">
-            <h1 className="font-semibold">
-              NetHub{" "}
-              <span className="text-xs font-normal text-muted-foreground">
-                v{state?.server.version ?? ""}
-              </span>
-            </h1>
-          </div>
-          <span className={`text-xs ${connected ? "text-success" : "text-warning"}`}>
-            <span className="hidden sm:inline">{connected ? "Conectado" : "Sin conexión"}</span>
-            <span aria-label={connected ? "Conectado" : "Sin conexión"} className="inline-block size-2 rounded-full bg-current sm:hidden" />
-          </span>
-          <button
-            onClick={() => void mutate("scan", {})}
-            disabled={!connected || state?.server.scanning}
-            className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-          >
-            <Radar className="size-4" />
-            {state?.server.scanning ? "Escaneando…" : "Escanear"}
-          </button>
+      <Toaster richColors theme={dark ? "dark" : "light"} />
+      <DashboardHeader
+        version={state?.server.version ?? ""}
+        status={connected ? "connected" : "disconnected"}
+        scanning={state?.server.scanning ?? false}
+        dark={dark}
+        onUpdates={() => setUpdatesOpen(true)}
+        onScan={() => void mutate("scan", {})}
+        onSettings={() => setSettingsOpen(true)}
+        onTheme={() => setDark(!dark)}
+        extra={
           <button
             aria-label="Cerrar sesión"
             onClick={async () => {
@@ -350,29 +399,29 @@ function App() {
               csrf = "";
               setSession("login");
             }}
-            className="rounded-md p-2 text-muted-foreground hover:bg-muted"
+            className="rounded-md border border-border p-2 text-muted-foreground hover:bg-accent"
           >
             <LogOut className="size-4" />
           </button>
-        </div>
-        <nav
-          aria-label="Secciones de NetHub"
-          className="server-tabs mx-auto flex max-w-[1600px] gap-1 overflow-x-auto px-4 pb-2 sm:px-6"
-        >
-          {views.map(([id, label, Icon]) => (
-            <button
-              key={id}
-              onClick={() => setView(id)}
-              aria-current={view === id ? "page" : undefined}
-              className={`flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-xs ${view === id ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-muted"}`}
-            >
-              <Icon className="size-4" />
-              {label}
-            </button>
-          ))}
-        </nav>
-      </header>
-      <main className="mx-auto max-w-[1600px] space-y-5 px-4 py-5 sm:px-6">
+        }
+      />
+      <Dialog open={updatesOpen} onOpenChange={setUpdatesOpen}>
+        <DialogContent>
+          <DialogTitle>Actualizaciones de NetHub</DialogTitle>
+          <DialogDescription>
+            Versión del servidor: {state?.server.version}. Para actualizar el NAS, descarga el nuevo
+            paquete e importa su imagen Docker conservando el volumen de datos y la contraseña.
+          </DialogDescription>
+        </DialogContent>
+      </Dialog>
+      <main className="mx-auto max-w-[1720px] space-y-5 px-5 py-8 xl:px-8">
+        <section className="flex flex-wrap items-center justify-end gap-2">
+          <DashboardNavigation
+            value={view === "settings" ? "inventory" : view}
+            onChange={setView}
+          />
+          <InventoryExport devices={filtered} />
+        </section>
         {state?.server.demo && (
           <p className="rounded-lg border border-warning/50 bg-warning/10 px-4 py-3 text-sm text-warning">
             Demostración con datos de ejemplo. No se escanea tu red ni se realizan pruebas de
@@ -400,52 +449,44 @@ function App() {
             {view === "inventory" && (
               <>
                 <InventorySummary devices={devices} networks={networks.length} />
-                <div className="flex flex-wrap items-center gap-2">
-                  <label className="relative min-w-[180px] flex-1">
-                    <Search className="absolute left-3 top-3 size-4 text-muted-foreground" />
-                    <input
-                      aria-label="Buscar dispositivos"
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      placeholder="Buscar nombre, IP, MAC…"
-                      className="w-full rounded-lg border border-border bg-card py-2.5 pl-9 pr-3 text-sm"
-                    />
-                  </label>
-                  <DeviceTypeFilter value={types} onChange={setTypes} />
-                  <InventoryViewControls
-                    order={order}
-                    grouping={group}
-                    onChange={(patch) => {
-                      if (patch.inventorySort) setOrder(patch.inventorySort);
-                      if (patch.inventoryGroup) setGroup(patch.inventoryGroup);
-                    }}
+                <section className="mt-8 space-y-3">
+                  <h2 className="text-base font-semibold">Redes detectadas</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Las subredes se detectan solas a partir de las IP encontradas; puedes cambiar la
+                    red de un equipo en su ficha de detalle.
+                  </p>
+                  <NetworkTabs
+                    value={networkFilter}
+                    networks={networks}
+                    counts={Object.fromEntries([
+                      [ALL_NETWORKS, devices.length],
+                      [UNKNOWN_NETWORK, devices.filter(d => networkOf(d) === UNKNOWN_NETWORK).length],
+                      ...networks.map((n) => [
+                        n.id,
+                        devices.filter((d) => networkOf(d) === n.id).length,
+                      ]),
+                    ])}
+                    onChange={setNetworkFilter}
                   />
-                  <Filter
-                    label="Personas"
-                    value={person}
-                    onChange={setPerson}
-                    all="Todas las personas"
-                    options={state.settings.people}
-                  />
-                  <Filter
-                    label="Ubicaciones"
-                    value={location}
-                    onChange={setLocation}
-                    all="Todas las ubicaciones"
-                    options={state.settings.locations}
-                  />
-                  <select
-                    aria-label="Estado del dispositivo"
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    className="rounded-lg border border-border bg-card p-2.5 text-sm"
-                  >
-                    <option value="all">Todos los estados</option>
-                    <option value="online">Activos</option>
-                    <option value="offline">Inactivos</option>
-                  </select>
-                  <InventoryExport devices={filtered} />
-                </div>
+                </section>
+                <InventoryToolbar
+                  count={filtered.length}
+                  query={query}
+                  onQuery={setQuery}
+                  types={types}
+                  onTypes={setTypes}
+                  order={state.settings.inventorySort ?? order}
+                  grouping={state.settings.inventoryGroup ?? group}
+                  onViewChange={changeSettings}
+                  person={person}
+                  onPerson={setPerson}
+                  location={location}
+                  onLocation={setLocation}
+                  status={status as "all" | "online" | "offline"}
+                  onStatus={setStatus}
+                  people={state.settings.people}
+                  locations={state.settings.locations}
+                />
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>
                     {filtered.length} de {devices.length} dispositivos
@@ -459,46 +500,14 @@ function App() {
                         {g.label} · {g.devices.length}
                       </h2>
                     )}
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                       {g.devices.map((d) => (
-                        <button
+                        <InventoryDeviceCard
                           key={d.id}
-                          onClick={() => setSelected(d.id)}
-                          className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-card p-4 text-left hover:border-primary/60"
-                        >
-                          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
-                            <DeviceTypeIcon type={d.type} className="size-5" />
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="flex items-center gap-2">
-                              <span className="truncate text-sm font-semibold">{d.name}</span>
-                              <span
-                                className={`size-1.5 shrink-0 rounded-full ${d.status === "online" ? "bg-success" : "bg-muted-foreground"}`}
-                              />
-                              {d.isNew && !d.trusted && (
-                                <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[10px] text-warning">
-                                  Nuevo
-                                </span>
-                              )}
-                            </span>
-                            <span className="mt-1 block truncate font-mono text-xs text-muted-foreground">
-                              {d.ip} · {deviceTypeLabels[d.type]}
-                            </span>
-                            <span className="mt-1 block truncate text-xs text-muted-foreground">
-                              {[
-                                d.person,
-                                d.location,
-                                connectionOf(d) === "wired"
-                                  ? "Cable"
-                                  : connectionOf(d) === "wifi"
-                                    ? `Wi-Fi${wifiBand(d) ? " " + wifiBand(d) + " GHz" : ""}`
-                                    : null,
-                              ]
-                                .filter(Boolean)
-                                .join(" · ") || "Sin persona ni ubicación"}
-                            </span>
-                          </span>
-                        </button>
+                          device={d}
+                          onSelect={setSelected}
+                          trafficAvailable={false}
+                        />
                       ))}
                     </div>
                   </section>
@@ -535,180 +544,444 @@ function App() {
             {view === "usage" && (
               <UsageView devices={devices} usage={state.usage} onSelectDevice={setSelected} />
             )}
-            {view === "status" && <Status state={state} />}
-            {view === "performance" && (
-              <Performance
-                state={state}
-                onTest={() => void mutate("speed", {})}
-                onSettings={(patch) => void mutate("settings", patch)}
+            {view === "topology" && (
+              <NetworkTopology devices={devices} networks={networks} onSelectDevice={setSelected} />
+            )}
+            {view === "health" && (
+              <HealthRadar
+                samples={state.health}
+                isp={isp}
+                probing={healthBusy}
+                intervalSeconds={state.settings.healthIntervalSeconds}
+                onProbeNow={() => {
+                  setHealthBusy(true);
+                  void mutate("health", {}).finally(() => setHealthBusy(false));
+                }}
+                monitoringHost="Este NAS"
+                targets={[
+                  {
+                    id: "gateway",
+                    label: "Router local",
+                    ip:
+                      state.server.interfaces.find((n) => n.name === state.settings.interfaceName)
+                        ?.gateway ?? "Sin detectar",
+                  },
+                  { id: "secondary", label: "Referencia DNS", ip: "8.8.8.8" },
+                  { id: "internet", label: "Internet", ip: "1.1.1.1" },
+                ]}
               />
             )}
-            {view === "floorplan" && <FloorPlanView devices={devices} plan={state.floorPlan ?? null} canMeasure demo={state.server.demo} onSave={(plan, expected) => mutate("floor-plan", { plan, expected })} />}
-            {view === "settings" && (
-              <section className="space-y-5">
-                <div className="rounded-xl border border-border bg-card p-5">
-                  <h2 className="mb-4 text-lg font-semibold">Monitor del NAS</h2>
-                  <p className="mb-5 text-sm text-muted-foreground">
-                    El servicio realiza estas tareas aunque no haya ningún navegador abierto.
-                  </p>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="grid gap-2 text-sm">
-                      Interfaz de red
-                      <select
-                        aria-label="Interfaz de red"
-                        value={state.settings.interfaceName}
-                        onChange={(e) => void mutate("settings", { interfaceName: e.target.value })}
-                        className="rounded-lg border border-border bg-background p-2"
-                      >
-                        <option value="">Seleccionar interfaz…</option>
-                        {state.server.interfaces.map((n) => (
-                          <option key={n.name + "-" + n.address} value={n.name}>
-                            {n.name} · {n.cidr}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <Interval
-                      label="Escaneo de dispositivos"
-                      value={state.settings.scanIntervalSeconds}
-                      options={[
-                        [0, "Desactivado"],
-                        [30, "Cada 30 segundos"],
-                        [60, "Cada minuto"],
-                        [120, "Cada 2 minutos"],
-                        [300, "Cada 5 minutos"],
-                        [600, "Cada 10 minutos"],
-                      ]}
-                      onChange={(value) => void mutate("settings", { scanIntervalSeconds: value })}
-                    />
-                    <Interval
-                      label="Comprobación de conectividad"
-                      value={state.settings.healthIntervalSeconds}
-                      options={[
-                        [0, "Desactivado"],
-                        [15, "Cada 15 segundos"],
-                        [30, "Cada 30 segundos"],
-                        [60, "Cada minuto"],
-                        [120, "Cada 2 minutos"],
-                      ]}
-                      onChange={(value) =>
-                        void mutate("settings", { healthIntervalSeconds: value })
-                      }
-                    />
-                    <label className="grid gap-2 text-sm">
-                      Velocidad contratada (Mbps)
-                      <input
-                        aria-label="Velocidad contratada"
-                        type="number"
-                        min="0"
-                        max="100000"
-                        defaultValue={state.settings.contractedMbps}
-                        key={state.settings.contractedMbps}
-                        onBlur={(e) =>
-                          void mutate("settings", { contractedMbps: Number(e.target.value) })
-                        }
-                        className="rounded-lg border border-border bg-background p-2"
-                      />
-                    </label>
-                  </div>
-                  <p className="mt-4 text-xs text-muted-foreground">
-                    La detección cubre la red local de la interfaz seleccionada. Redes aisladas,
-                    VLAN y equipos dormidos pueden requerir otra fuente de información.
-                  </p>
-                </div>
-                <div className="grid gap-5 lg:grid-cols-2">
-                  {(["people", "locations"] as const).map((kind) => (
-                    <div key={kind} className="rounded-xl border border-border bg-card p-5">
-                      <DirectoryManager
-                        kind={kind}
-                        names={state.settings[kind]}
-                        devices={devices}
-                        onCreate={(replacement) =>
-                          void mutate("directory", { kind, previous: null, replacement })
-                        }
-                        onChange={(previous, replacement) =>
-                          void mutate("directory", { kind, previous, replacement })
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div className="rounded-xl border border-border bg-card p-5">
-                  <button
-                    className="mb-4 rounded-lg border border-border px-3 py-2 text-sm"
-                    onClick={() => setAboutOpen(true)}
-                  >
-                    Acerca de NetHub
-                  </button>
-                  <h2 className="text-lg font-semibold">Datos y copias</h2>
-                  <BackupManager
-                    adapter={{
-                      list: () => api("backups"),
-                      create: async () => {
-                        await api("backup", {});
+            {view === "performance" && (
+              <PerformanceView
+                traffic={{
+                  ...state.server.traffic,
+                  totalMbps: state.server.traffic.rxMbps + state.server.traffic.txMbps,
+                }}
+                linkSpeedMbps={state.settings.contractedMbps}
+                isp={isp}
+                ispAuto={state.settings.ispAuto === true}
+                onProviderDetected={() => {}}
+                onProviderEnable={() => setConsent("provider")}
+                providerCard={providerCard}
+                monitoringHost="este NAS"
+                speedPanel={
+                  <SpeedTestPanel
+                    controller={{
+                      durationSeconds: 32,
+                      phaseText: state.server.speedRunning
+                        ? state.server.speedProgress?.phase === "latency"
+                          ? "Midiendo latencia…"
+                          : state.server.speedProgress?.phase === "upload"
+                            ? "Midiendo subida…"
+                            : "Midiendo descarga…"
+                        : undefined,
+                      running: state.server.speedRunning,
+                      phase: state.server.speedRunning
+                        ? state.server.speedProgress?.phase === "latency"
+                          ? "ping"
+                          : state.server.speedProgress?.phase === "upload"
+                            ? "upload"
+                            : "download"
+                        : state.speedHistory.length
+                          ? "done"
+                          : "idle",
+                      live: state.server.speedProgress?.value ?? 0,
+                      peak: 0,
+                      progress: {
+                        total: state.server.speedProgress?.progress ?? 0,
+                        secondsLeft: 0,
                       },
-                      read: (id) => api("backup-read", { id }),
-                      restore: async (id) => {
-                        await api("restore", { id });
-                        await refresh();
-                      },
+                      result: state.server.speedRunning ? null : (state.speedHistory[0] ?? null),
+                      history: state.speedHistory,
+                      historyLimit: state.settings.speedHistoryLimit,
+                      error: state.lastSpeedError,
+                      disabled: state.server.demo,
+                      onStart: startTest,
+                      onLimit: (limit) => void mutate("settings", { speedHistoryLimit: limit }),
                     }}
                   />
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Inventario, posiciones, actividad, rutinas y hasta 100 pruebas de velocidad se
-                    guardan en el NAS. Se crea una copia cada 24 horas y se conservan las siete
-                    últimas versiones.
-                  </p>
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <label className="cursor-pointer rounded-lg border border-border px-3 py-2 text-sm">
-                      Importar JSON
-                      <input
-                        aria-label="Importar JSON de NetHub"
-                        type="file"
-                        accept=".json,application/json"
-                        className="sr-only"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          e.target.value = "";
-                          if (!file) return;
-                          if (file.size > 10 * 1024 * 1024) {
-                            toast.error("El archivo supera los 10 MB.");
-                            return;
-                          }
-                          try {
-                            const data = JSON.parse(await file.text());
-                            if (
-                              !window.confirm(
-                                "¿Sustituir los datos del NAS por este JSON? Se guardará una copia previa en el NAS. Las tareas y la contraseña del servidor se conservarán.",
-                              )
-                            )
-                              return;
-                            void mutate("import", { data });
-                          } catch {
-                            toast.error("No se pudo leer el JSON.");
-                          }
-                        }}
-                      />
-                    </label>
-                    <button
-                      onClick={() => void download().catch((error) => toast.error(error.message))}
-                      className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
-                    >
-                      <Download className="size-4" />
-                      Descargar estado actual
-                    </button>
-                  </div>
-                  <p className="mt-4 text-xs text-muted-foreground">
-                    Para cambiar la contraseña, actualiza el archivo configurado en Docker y
-                    reinicia el contenedor. Para acceso desde fuera de casa, utiliza una VPN o un
-                    proxy HTTPS autenticado.
-                  </p>
-                </div>
-              </section>
+                }
+              />
+            )}
+            {view === "sla" && (
+              <SlaView
+                samples={[...state.speedHistory].reverse()}
+                healthSamples={state.health}
+                contracted={state.settings.contractedMbps}
+                isp={isp}
+                ispAuto={state.settings.ispAuto === true}
+                onProviderDetected={() => {}}
+                onProviderEnable={() => setConsent("provider")}
+                providerCard={providerCard}
+                running={state.server.speedRunning}
+                intervalMinutes={state.settings.speedIntervalMinutes}
+                onTestNow={startTest}
+                onIntervalChange={scheduleTest}
+              />
+            )}
+            {view === "security" && (
+              <div className="space-y-8">
+                <AwayMode
+                  state={state.away ?? emptyAwayState()}
+                  devices={devices}
+                  autoArm={state.settings.awayAutoArm === true}
+                  onToggleAutoArm={(value) => void mutate("settings", { awayAutoArm: value })}
+                  onArm={() => void mutate("away", { armed: true })}
+                  onDisarm={() => void mutate("away", { armed: false })}
+                  onToggleWatched={(id) => {
+                    const ids = state.away?.watchedIds ?? [];
+                    void mutate("away", {
+                      watchedIds: ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id],
+                    });
+                  }}
+                  onSelectDevice={setSelected}
+                />
+                <SecurityView
+                  devices={devices}
+                  alerts={state.alerts ?? []}
+                  gatewayIp={
+                    state.server.interfaces.find((n) => n.name === state.settings.interfaceName)
+                      ?.gateway ?? ""
+                  }
+                  onSelectDevice={setSelected}
+                  onTrust={(id) => {
+                    const d = devices.find((d) => d.id === id);
+                    if (d) update({ ...d, trusted: true, isNew: false });
+                  }}
+                  onResolveAlert={(id) => void mutate("alerts", { id })}
+                  onClearAlerts={() => void mutate("alerts", { clear: true })}
+                  measureDns={async () => {
+                    try {
+                      return await api("dns", {});
+                    } catch {
+                      return {
+                        available: false,
+                        ok: false,
+                        gateway: null,
+                        domain: "example.com",
+                        gatewayIps: [],
+                        publicIps: [],
+                        hijacked: false,
+                        gatewayRtt: null,
+                        error: "No se ha podido contactar con el NAS.",
+                      };
+                    }
+                  }}
+                />
+              </div>
+            )}
+            {view === "floorplan" && (
+              <FloorPlanView
+                devices={devices}
+                plan={state.floorPlan ?? null}
+                canMeasure
+                demo={state.server.demo}
+                onSave={(plan, expected) => mutate("floor-plan", { plan, expected })}
+              />
             )}
           </>
         )}
       </main>
+      {state && (
+        <SettingsModal
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          settings={{
+            ...defaultSettings,
+            theme,
+            scanIntervalSeconds: state.settings.scanIntervalSeconds,
+            healthIntervalSeconds: state.settings.healthIntervalSeconds,
+            linkSpeedMbps: state.settings.contractedMbps,
+            ispName: isp,
+            ispAuto: state.settings.ispAuto === true,
+            awayAutoArm: state.settings.awayAutoArm === true,
+            slaIntervalMinutes: state.settings.speedIntervalMinutes,
+          }}
+          onChange={changeSettings}
+          onReset={() => {}}
+          platform={{
+            label: "Servidor NAS",
+            version: state.server.version,
+            description:
+              "Las opciones de monitorización se guardan en el NAS y se comparten con todos los navegadores.",
+          }}
+          directoryManagers={{
+            people: (
+              <DirectoryManager
+                kind="people"
+                names={state.settings.people}
+                devices={devices}
+                onCreate={(replacement) =>
+                  void mutate("directory", { kind: "people", previous: null, replacement })
+                }
+                onChange={(previous, replacement) =>
+                  void mutate("directory", { kind: "people", previous, replacement })
+                }
+              />
+            ),
+            locations: (
+              <DirectoryManager
+                kind="locations"
+                names={state.settings.locations}
+                devices={devices}
+                onCreate={(replacement) =>
+                  void mutate("directory", { kind: "locations", previous: null, replacement })
+                }
+                onChange={(previous, replacement) =>
+                  void mutate("directory", { kind: "locations", previous, replacement })
+                }
+              />
+            ),
+          }}
+          overrides={{
+            system: (
+              <div className="space-y-4">
+                <h3 className="font-semibold">Servicio continuo del NAS</h3>
+                <p className="text-sm text-muted-foreground">
+                  Docker mantiene NetHub activo aunque cierres el navegador. Reinicio automático
+                  configurado en el contenedor.
+                </p>
+                <p className="text-sm">Iniciado: {date(state.server.startedAt)}</p>
+                <p className="text-xs text-muted-foreground">
+                  Para cambiar la contraseña, modifica el archivo privado configurado en Docker y
+                  reinicia el contenedor.
+                </p>
+              </div>
+            ),
+            network: (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {" "}
+                <label className="grid gap-2 text-sm">
+                  Interfaz de red
+                  <select
+                    aria-label="Interfaz de red"
+                    value={state.settings.interfaceName}
+                    onChange={(e) => void mutate("settings", { interfaceName: e.target.value })}
+                    className="rounded-lg border border-border bg-background p-2"
+                  >
+                    <option value="">Seleccionar interfaz…</option>
+                    {state.server.interfaces.map((n) => (
+                      <option key={n.name + "-" + n.address} value={n.name}>
+                        {n.name} · {n.cidr}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <Interval
+                  label="Escaneo de dispositivos"
+                  value={state.settings.scanIntervalSeconds}
+                  options={[
+                    [0, "Desactivado"],
+                    [30, "Cada 30 segundos"],
+                    [60, "Cada minuto"],
+                    [120, "Cada 2 minutos"],
+                    [300, "Cada 5 minutos"],
+                    [600, "Cada 10 minutos"],
+                  ]}
+                  onChange={(value) => void mutate("settings", { scanIntervalSeconds: value })}
+                />
+                <Interval
+                  label="Comprobación de conectividad"
+                  value={state.settings.healthIntervalSeconds}
+                  options={[
+                    [0, "Desactivado"],
+                    [15, "Cada 15 segundos"],
+                    [30, "Cada 30 segundos"],
+                    [60, "Cada minuto"],
+                    [120, "Cada 2 minutos"],
+                  ]}
+                  onChange={(value) => void mutate("settings", { healthIntervalSeconds: value })}
+                />
+                <label className="grid gap-2 text-sm">
+                  Velocidad contratada (Mbps)
+                  <input
+                    aria-label="Velocidad contratada"
+                    type="number"
+                    min="0"
+                    max="100000"
+                    defaultValue={state.settings.contractedMbps}
+                    key={state.settings.contractedMbps}
+                    onBlur={(e) =>
+                      void mutate("settings", { contractedMbps: Number(e.target.value) })
+                    }
+                    className="rounded-lg border border-border bg-background p-2"
+                  />
+                </label>
+                <label className="grid gap-2 text-sm">
+                  Proveedor de Internet
+                  <input
+                    aria-label="Proveedor de Internet"
+                    className="rounded-lg border border-border bg-background p-2"
+                    defaultValue={isp}
+                    key={isp}
+                    maxLength={120}
+                    onBlur={(e) =>
+                      void mutate("settings", { ispName: e.target.value, ispAuto: false })
+                    }
+                  />
+                </label>
+              </div>
+            ),
+            alerts: (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Las alertas Sentinel y el modo ausente se consultan en Seguridad. Configura la
+                  vigilancia individual en la ficha de cada equipo. Se registran en el NAS incluso
+                  con el navegador cerrado.
+                </p>
+                <label className="flex gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={state.settings.awayAutoArm === true}
+                    onChange={(e) => void mutate("settings", { awayAutoArm: e.target.checked })}
+                  />
+                  Activar automáticamente el modo ausente
+                </label>
+              </div>
+            ),
+            data: (
+              <div className="space-y-4">
+                {" "}
+                <h2 className="text-lg font-semibold">Datos y copias</h2>
+                <BackupManager
+                  adapter={{
+                    list: () => api("backups"),
+                    create: async () => {
+                      await api("backup", {});
+                    },
+                    read: (id) => api("backup-read", { id }),
+                    restore: async (id) => {
+                      await api("restore", { id });
+                      await refresh();
+                    },
+                  }}
+                />
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Inventario, posiciones, actividad, rutinas y hasta 100 pruebas de velocidad se
+                  guardan en el NAS. Se crea una copia cada 24 horas y se conservan las siete
+                  últimas versiones.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <label className="cursor-pointer rounded-lg border border-border px-3 py-2 text-sm">
+                    Importar JSON
+                    <input
+                      aria-label="Importar JSON de NetHub"
+                      type="file"
+                      accept=".json,application/json"
+                      className="sr-only"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (!file) return;
+                        if (file.size > 10 * 1024 * 1024) {
+                          toast.error("El archivo supera los 10 MB.");
+                          return;
+                        }
+                        try {
+                          const data = JSON.parse(await file.text());
+                          setImportData(data);
+                        } catch {
+                          toast.error("No se pudo leer el JSON.");
+                        }
+                      }}
+                    />
+                  </label>
+                  <button
+                    onClick={() => void download().catch((error) => toast.error(error.message))}
+                    className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                  >
+                    <Download className="size-4" />
+                    Descargar estado actual
+                  </button>
+                </div>
+                <p className="mt-4 text-xs text-muted-foreground">
+                  Para cambiar la contraseña, actualiza el archivo configurado en Docker y reinicia
+                  el contenedor. Para acceso desde fuera de casa, utiliza una VPN o un proxy HTTPS
+                  autenticado.
+                </p>
+              </div>
+            ),
+          }}
+        />
+      )}
+      <Dialog
+        open={consent !== null || intervalConsent !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConsent(null);
+            setIntervalConsent(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogTitle>
+            {consent === "provider"
+              ? "¿Detectar el proveedor de Internet?"
+              : "¿Medir la conexión del NAS?"}
+          </DialogTitle>
+          <DialogDescription>
+            {consent === "provider"
+              ? "Se consultará IPWhois desde el NAS. Ese servicio verá tu IP pública y devolverá proveedor y ubicación aproximada; no se enviará el inventario."
+              : "Se intercambiará tráfico con Cloudflare desde el NAS. Puede consumir varios GB y afectar temporalmente a otras conexiones; el inventario no se envía."}
+          </DialogDescription>
+          <button
+            className="rounded-md bg-brand px-4 py-2 text-brand-foreground"
+            onClick={() => {
+              if (consent === "provider") void mutate("settings", { ispAuto: true });
+              else if (intervalConsent)
+                void mutate("settings", { speedIntervalMinutes: intervalConsent });
+              else void mutate("speed", {});
+              setConsent(null);
+              setIntervalConsent(null);
+            }}
+          >
+            Continuar
+          </button>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={importData !== null}
+        onOpenChange={(open) => {
+          if (!open) setImportData(null);
+        }}
+      >
+        <DialogContent>
+          <DialogTitle>¿Restaurar estos datos en el NAS?</DialogTitle>
+          <DialogDescription>
+            Se sustituirán inventario e historiales. Se guardará una copia previa y se conservarán
+            la contraseña y las tareas del servidor.
+          </DialogDescription>
+          <button
+            className="rounded-md bg-brand px-4 py-2 text-brand-foreground"
+            onClick={() => {
+              void mutate("import", { data: importData });
+              setImportData(null);
+            }}
+          >
+            Restaurar
+          </button>
+        </DialogContent>
+      </Dialog>
       <Dialog open={aboutOpen} onOpenChange={setAboutOpen}>
         <DialogContent>
           <DialogTitle>Acerca de NetHub</DialogTitle>
@@ -757,35 +1030,6 @@ function App() {
     </div>
   );
 }
-function Filter({
-  label,
-  value,
-  onChange,
-  all,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  all: string;
-  options: string[];
-}) {
-  return (
-    <select
-      aria-label={label}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="rounded-lg border border-border bg-card p-2.5 text-sm"
-    >
-      <option value="">{all}</option>
-      {options.map((name) => (
-        <option key={name} value={name}>
-          {name}
-        </option>
-      ))}
-    </select>
-  );
-}
 function Interval({
   label,
   value,
@@ -815,275 +1059,12 @@ function Interval({
     </label>
   );
 }
-function Status({ state }: { state: ServerSnapshot }) {
-  const latest = state.health.at(-1),
-    stats = healthStats(state.health);
-  return (
-    <section className="space-y-5">
-      <div className="rounded-xl border border-border bg-card p-5">
-        <h2 className="text-lg font-semibold">Conectividad desde el NAS</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Se comprueba si los destinos responden a ping. Una falta de respuesta también puede
-          deberse a un filtro de ICMP.
-        </p>
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          {(
-            [
-              ["Router", latest?.gateway],
-              ["Referencia 8.8.8.8", latest?.secondary],
-              ["Internet 1.1.1.1", latest?.internet],
-            ] as const
-          ).map(([label, value]) => (
-            <div key={label} className="rounded-lg border border-border p-4">
-              <p className="text-xs text-muted-foreground">{label}</p>
-              <p className="mt-2 text-xl font-semibold">
-                {value === undefined
-                  ? "Pendiente"
-                  : value === null
-                    ? "Sin respuesta"
-                    : `${value} ms`}
-              </p>
-            </div>
-          ))}
-        </div>
-        <p className="mt-4 text-xs text-muted-foreground">
-          Última comprobación: {date(latest?.at ?? null)} · {state.health.length} muestras guardadas
-        </p>
-        {state.lastHealthError && (
-          <p className="mt-3 text-sm text-warning">{state.lastHealthError}</p>
-        )}
-      </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Metric
-          label="Muestras con respuesta de Internet"
-          value={state.health.length ? `${stats.uptime}%` : "—"}
-        />
-        <Metric
-          label="Latencia media"
-          value={stats.avgInternet === null ? "—" : `${stats.avgInternet} ms`}
-        />
-        <Metric label="Microcortes observados" value={String(stats.microcuts)} />
-      </div>
-      <div className="rounded-xl border border-border bg-card p-5">
-        <h2 className="text-sm font-semibold">Servicio continuo</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Iniciado: {date(state.server.startedAt)}. El NAS sigue monitorizando cuando cierras esta
-          página.
-        </p>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Último escaneo: {date(state.lastScanAt)}. El resumen se sincroniza cada 2 segundos
-          mientras la página está abierta.
-        </p>
-      </div>
-    </section>
-  );
-}
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-2 text-2xl font-semibold">{value}</p>
-    </div>
-  );
-}
-function Performance({
-  state,
-  onTest,
-  onSettings,
-}: {
-  state: ServerSnapshot;
-  onTest: () => void;
-  onSettings: (patch: Partial<ServerSettings>) => void;
-}) {
-  const limit = state.settings.speedHistoryLimit;
-  const [confirm, setConfirm] = useState(false);
-  const history = state.speedHistory,
-    latest = history[0],
-    progress = state.server.speedProgress;
-  const average = history.length
-    ? history.reduce((n, r) => n + r.download, 0) / history.length
-    : null;
-  return (
-    <section className="space-y-5">
-      <div className="rounded-xl border border-border bg-card p-5">
-        <h2 className="mb-4 text-lg font-semibold">Tráfico del NAS</h2>
-        <BandwidthChart
-          sample={{
-            ...state.server.traffic,
-            totalMbps: state.server.traffic.rxMbps + state.server.traffic.txMbps,
-          }}
-        />
-        <p className="mt-3 text-xs text-muted-foreground">
-          Incluye el tráfico local y de Internet de la interfaz seleccionada. No representa el
-          tráfico de todos los dispositivos.
-        </p>
-      </div>
-      <div className="rounded-xl border border-border bg-card p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">Prueba de velocidad desde el NAS</h2>
-          <button
-            disabled={state.server.speedRunning || state.server.demo}
-            onClick={() => setConfirm(true)}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-          >
-            {state.server.speedRunning ? "Midiendo…" : "Iniciar prueba"}
-          </button>
-        </div>
-        <p className="mt-2 text-sm text-muted-foreground">
-          La prueba se ejecuta en el NAS y su resultado se comparte con todos tus dispositivos.
-        </p>
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          <Metric label="Última descarga" value={latest ? `${latest.download} Mbps` : "—"} />
-          <Metric label="Última subida" value={latest ? `${latest.upload} Mbps` : "—"} />
-          <Metric
-            label="Latencia HTTP / jitter"
-            value={latest ? `${latest.ping} / ${latest.migratedSla ? "—" : latest.jitter} ms` : "—"}
-          />
-        </div>
-        {progress && (
-          <div className="mt-4">
-            <p className="text-sm">
-              {progress.phase === "latency"
-                ? "Latencia"
-                : progress.phase === "download"
-                  ? "Descarga"
-                  : "Subida"}{" "}
-              · {progress.value.toFixed(1)} {progress.phase === "latency" ? "ms" : "Mbps"}
-            </p>
-            <progress
-              aria-label="Progreso del test"
-              max="1"
-              value={progress.progress}
-              className="mt-2 w-full"
-            />
-          </div>
-        )}
-        {state.lastSpeedError && (
-          <p className="mt-4 text-sm text-warning">{state.lastSpeedError}</p>
-        )}
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <Interval
-            label="Pruebas automáticas"
-            value={state.settings.speedIntervalMinutes}
-            options={[
-              [0, "Desactivadas"],
-              [120, "Cada 2 horas"],
-              [360, "Cada 6 horas"],
-              [720, "Cada 12 horas"],
-              [1440, "Una vez al día"],
-            ]}
-            onChange={(value) => {
-              if (value && state.server.demo) {
-                toast.message("Pruebas reales desactivadas en la demostración.");
-                return;
-              }
-              if (
-                value &&
-                !window.confirm(
-                  "Las pruebas programadas consumen ancho de banda y envían tráfico a Cloudflare desde el NAS. ¿Activarlas?",
-                )
-              )
-                return;
-              onSettings({ speedIntervalMinutes: value });
-            }}
-          />
-          <div className="self-end text-sm text-muted-foreground">
-            Media guardada: {average === null ? "—" : average.toFixed(1) + " Mbps"}
-            {state.settings.contractedMbps > 0 && average !== null
-              ? ` · ${Math.round((average / state.settings.contractedMbps) * 100)}% de ${state.settings.contractedMbps} Mbps contratados`
-              : ""}
-          </div>
-        </div>
-        <p className="mt-4 text-xs text-muted-foreground">
-          Las pruebas automáticas están desactivadas inicialmente. Utilizan Cloudflare y pueden
-          consumir varios GB por prueba en conexiones rápidas.
-        </p>
-      </div>
-      <div className="rounded-xl border border-border bg-card p-5">
-        <div className="mb-4 flex flex-wrap items-center gap-3">
-          <h2 className="mr-auto text-sm font-semibold">
-            Historial compartido · {history.length} de 100 resultados
-          </h2>
-          <select
-            aria-label="Resultados del historial"
-            value={limit}
-            onChange={(e) => onSettings({ speedHistoryLimit: Number(e.target.value) })}
-            className="rounded border border-border bg-background p-2 text-xs"
-          >
-            {[10, 25, 50, 100].map((n) => (
-              <option key={n} value={n}>
-                Últimos {n}
-              </option>
-            ))}
-          </select>
-          <button
-            className="rounded border border-border px-3 py-2 text-xs"
-            disabled={!history.length}
-            onClick={() =>
-              saveDownload(
-                slaCsv([...history].reverse(), state.settings.contractedMbps),
-                "nethub-server-tests.csv",
-                "text/csv;charset=utf-8",
-              )
-            }
-          >
-            Informe CSV
-          </button>
-        </div>
-        <div className="space-y-2">
-          {history.slice(0, limit).map((r) => (
-            <div
-              key={r.at}
-              className="flex flex-wrap justify-between gap-2 rounded-lg border border-border p-3 text-xs"
-            >
-              <span>{date(r.at)}</span>
-              <span className="font-mono">
-                ↓ {r.download} Mbps · ↑ {r.upload} Mbps · {r.ping} ms
-              </span>
-            </div>
-          ))}
-          {!history.length && (
-            <p className="py-5 text-center text-sm text-muted-foreground">
-              Todavía no hay pruebas guardadas.
-            </p>
-          )}
-        </div>
-      </div>
-      <Dialog open={confirm} onOpenChange={setConfirm}>
-        <DialogContent>
-          <DialogTitle>¿Medir la conexión del NAS?</DialogTitle>
-          <DialogDescription>
-            NetHub enviará y recibirá tráfico de prueba con Cloudflare. Puede consumir varios GB y
-            afectar temporalmente a otras conexiones. El inventario no se envía.
-          </DialogDescription>
-          <div className="flex justify-end gap-3">
-            <button
-              className="rounded border border-border px-3 py-2 text-sm"
-              onClick={() => setConfirm(false)}
-            >
-              Cancelar
-            </button>
-            <button
-              className="rounded bg-primary px-3 py-2 text-sm text-primary-foreground"
-              onClick={() => {
-                setConfirm(false);
-                onTest();
-              }}
-            >
-              Iniciar prueba
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </section>
-  );
-}
 function saveDownload(content: string, name: string, type: string) {
   const url = URL.createObjectURL(new Blob([content], { type }));
   const link = document.createElement("a");
   link.href = url;
   link.download = name;
   link.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 createRoot(document.getElementById("root")!).render(<App />);
