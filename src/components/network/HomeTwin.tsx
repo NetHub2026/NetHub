@@ -111,6 +111,124 @@ export function HomeTwin({
   }, [devices]);
   const online = devices.filter((d) => d.status === "online").length;
   const pulse = Math.min(1, rxMbps / 200);
+  const homeSidebar = <div className="space-y-4 self-start">
+    {planView && homeView === "plan" && <section className="rounded-xl border border-border bg-card p-4" aria-label="Resumen de la casa">
+      <h3 className="mb-3 text-sm font-semibold">Tu casa ahora</h3>
+      <div className="grid grid-cols-2 gap-3 text-xs">
+        {[
+          ["Encendidos", online, "text-sky-500"],
+          ["Apagados", devices.length - online, "text-muted-foreground"],
+          ["Intrusos", devices.filter(d => !d.trusted && d.isNew).length, "text-red-500"],
+          ["Anomalías", pendingCount, "text-amber-500"],
+        ].map(([label, count, color]) => <div key={label} className="rounded-lg bg-background p-3"><span className="text-muted-foreground">{label}</span><strong className={`mt-1 block text-xl ${color}`}>{count}</strong></div>)}
+      </div>
+    </section>}
+        <aside className="rounded-xl border border-border bg-card">
+          <header className="flex items-center gap-3 border-b border-border px-5 py-4">
+            <span className="flex size-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
+              <Brain className="size-4" />
+            </span>
+            <div>
+              <h2 className="text-sm font-semibold">Anomalías aprendidas</h2>
+              <p className="text-xs text-muted-foreground">
+                Solo te avisa de lo que se sale de tu rutina
+              </p>
+            </div>
+          </header>
+          {!ready && (
+            <div className="border-b border-border px-5 py-4">
+              <div className="mb-2 flex justify-between text-xs">
+                <span className="flex items-center gap-1.5">
+                  <Radio className="size-3.5 text-primary" /> Aprendiendo tu rutina…
+                </span>
+                <span className="font-mono">
+                  {learned}/{MIN_LEARNING_DAYS} días
+                </span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full bg-primary transition-all"
+                  style={{ width: `${(learned / MIN_LEARNING_DAYS) * 100}%` }}
+                />
+              </div>
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                {monitoringHost === "este PC"
+                  ? "Deja NetHub abierto (o en la bandeja) con el escaneo automático activo. Cada hora vigilada cuenta."
+                  : "El monitor del NAS aprende con el escaneo automático activo, aunque cierres los navegadores."}
+              </p>
+            </div>
+          )}
+          <div className="flex items-center gap-2 border-b border-border px-5 py-3 text-xs">
+            <label htmlFor="anomaly-filter">Mostrar</label>
+            <select
+              id="anomaly-filter"
+              value={anomalyFilter}
+              onChange={(e) => setAnomalyFilter(e.target.value as typeof anomalyFilter)}
+              className="min-w-0 flex-1 rounded border border-input bg-background px-2 py-1.5"
+            >
+              <option value="pending">Pendientes ({pendingCount})</option>
+              <option value="reviewed">
+                Revisadas ({patterns.anomalies.length - pendingCount})
+              </option>
+              <option value="all">Todas ({patterns.anomalies.length})</option>
+            </select>
+          </div>
+          <ul className="max-h-[620px] divide-y divide-border overflow-y-auto">
+            {listedAnomalies.length === 0 && (
+              <li className="px-5 py-10 text-center text-xs text-muted-foreground">
+                <ShieldAlert className="mx-auto mb-2 size-5" />
+                {anomalyFilter === "reviewed"
+                  ? "No hay anomalías revisadas."
+                  : "No hay anomalías pendientes."}
+              </li>
+            )}
+            {listedAnomalies.map((a) => {
+              const k = kindLabel[a.kind];
+              const Icon = k.icon;
+              return (
+                <li key={a.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAnomalyId(a.id)}
+                    className="flex w-full gap-3 px-5 py-3 text-left hover:bg-muted/50"
+                  >
+                    <Icon
+                      className={cn(
+                        "mt-0.5 size-4 shrink-0",
+                        a.score >= 85 ? "text-destructive" : "text-primary",
+                      )}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-xs font-semibold">{a.deviceName}</span>
+                        <span className="shrink-0 text-[10px] text-muted-foreground">
+                          {timeAgo(a.at)}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        {k.label} · rareza {a.score}/100
+                      </p>
+                      <p className="mt-0.5 text-xs">{a.detail}</p>
+                      <span className="mt-1 inline-block text-[11px] text-primary">
+                        Investigar · {a.reviewedAt ? "Revisada" : "Pendiente"}
+                      </span>
+                    </div>
+                  </button>
+                  <div className="px-5 pb-3">
+                    <button
+                      type="button"
+                      onClick={() => onReviewAnomaly(a.id, !a.reviewedAt)}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      {a.reviewedAt ? "Volver a pendiente" : "Marcar como revisada"}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </aside>
+  </div>;
   const homeHeader = <div className="flex items-center gap-4">
     <h2 className="flex items-center gap-2 text-base font-semibold"><Home className="size-4 text-primary" />Mi casa</h2>
     {planView && <div className="flex gap-1 rounded-lg border border-border bg-muted/40 p-1" role="group" aria-label="Representación de Mi casa">
@@ -123,7 +241,7 @@ export function HomeTwin({
       {!planView && onSetupPlan && <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-base font-semibold">Mi casa</h2><Button variant="outline" onClick={onSetupPlan}>Añadir plano real</Button></div>}
       <div className={cn("grid gap-6", !(planView && homeView === "plan") && "xl:grid-cols-[1fr_380px]")}>
         <div className="min-w-0">
-        {planView && homeView === "plan" ? (isValidElement(planView) ? cloneElement(planView as ReactElement<{homeHeader?: ReactNode}>, {homeHeader}) : planView) : <section className="overflow-hidden rounded-xl border border-border bg-card">
+        {planView && homeView === "plan" ? (isValidElement(planView) ? cloneElement(planView as ReactElement<{homeHeader?: ReactNode; homeSidebar?: ReactNode}>, {homeHeader, homeSidebar}) : planView) : <section className="overflow-hidden rounded-xl border border-border bg-card">
           <header className={`flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 ${planView ? "py-2" : "py-4"}`}>
             {planView ? homeHeader : <div className="flex items-center gap-3">
               <span className="relative flex size-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
@@ -385,111 +503,7 @@ export function HomeTwin({
           </footer>
         </section>}
         </div>
-        <aside className="rounded-xl border border-border bg-card">
-          <header className="flex items-center gap-3 border-b border-border px-5 py-4">
-            <span className="flex size-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
-              <Brain className="size-4" />
-            </span>
-            <div>
-              <h2 className="text-sm font-semibold">Anomalías aprendidas</h2>
-              <p className="text-xs text-muted-foreground">
-                Solo te avisa de lo que se sale de tu rutina
-              </p>
-            </div>
-          </header>
-          {!ready && (
-            <div className="border-b border-border px-5 py-4">
-              <div className="mb-2 flex justify-between text-xs">
-                <span className="flex items-center gap-1.5">
-                  <Radio className="size-3.5 text-primary" /> Aprendiendo tu rutina…
-                </span>
-                <span className="font-mono">
-                  {learned}/{MIN_LEARNING_DAYS} días
-                </span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full bg-primary transition-all"
-                  style={{ width: `${(learned / MIN_LEARNING_DAYS) * 100}%` }}
-                />
-              </div>
-              <p className="mt-2 text-[11px] text-muted-foreground">
-                {monitoringHost === "este PC"
-                  ? "Deja NetHub abierto (o en la bandeja) con el escaneo automático activo. Cada hora vigilada cuenta."
-                  : "El monitor del NAS aprende con el escaneo automático activo, aunque cierres los navegadores."}
-              </p>
-            </div>
-          )}
-          <div className="flex items-center gap-2 border-b border-border px-5 py-3 text-xs">
-            <label htmlFor="anomaly-filter">Mostrar</label>
-            <select
-              id="anomaly-filter"
-              value={anomalyFilter}
-              onChange={(e) => setAnomalyFilter(e.target.value as typeof anomalyFilter)}
-              className="min-w-0 flex-1 rounded border border-input bg-background px-2 py-1.5"
-            >
-              <option value="pending">Pendientes ({pendingCount})</option>
-              <option value="reviewed">
-                Revisadas ({patterns.anomalies.length - pendingCount})
-              </option>
-              <option value="all">Todas ({patterns.anomalies.length})</option>
-            </select>
-          </div>
-          <ul className="max-h-[620px] divide-y divide-border overflow-y-auto">
-            {listedAnomalies.length === 0 && (
-              <li className="px-5 py-10 text-center text-xs text-muted-foreground">
-                <ShieldAlert className="mx-auto mb-2 size-5" />
-                {anomalyFilter === "reviewed"
-                  ? "No hay anomalías revisadas."
-                  : "No hay anomalías pendientes."}
-              </li>
-            )}
-            {listedAnomalies.map((a) => {
-              const k = kindLabel[a.kind];
-              const Icon = k.icon;
-              return (
-                <li key={a.id}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedAnomalyId(a.id)}
-                    className="flex w-full gap-3 px-5 py-3 text-left hover:bg-muted/50"
-                  >
-                    <Icon
-                      className={cn(
-                        "mt-0.5 size-4 shrink-0",
-                        a.score >= 85 ? "text-destructive" : "text-primary",
-                      )}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-xs font-semibold">{a.deviceName}</span>
-                        <span className="shrink-0 text-[10px] text-muted-foreground">
-                          {timeAgo(a.at)}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        {k.label} · rareza {a.score}/100
-                      </p>
-                      <p className="mt-0.5 text-xs">{a.detail}</p>
-                      <span className="mt-1 inline-block text-[11px] text-primary">
-                        Investigar · {a.reviewedAt ? "Revisada" : "Pendiente"}
-                      </span>
-                    </div>
-                  </button>
-                  <div className="px-5 pb-3">
-                    <button
-                      type="button"
-                      onClick={() => onReviewAnomaly(a.id, !a.reviewedAt)}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      {a.reviewedAt ? "Volver a pendiente" : "Marcar como revisada"}
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </aside>
+        {!(planView && homeView === "plan") && homeSidebar}
       </div>
       <Dialog
         open={Boolean(selectedAnomaly)}

@@ -50,6 +50,7 @@ type Props = {
   embedded?: boolean;
   onSelectDevice?: (id: string) => void;
   homeHeader?: ReactNode;
+  homeSidebar?: ReactNode;
 };
 const control =
   "rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-50";
@@ -70,6 +71,7 @@ export function FloorPlanView({
   embedded = false,
   onSelectDevice,
   homeHeader,
+  homeSidebar,
 }: Props) {
   const anomalous = new Set(
     (patterns?.anomalies ?? [])
@@ -88,6 +90,7 @@ export function FloorPlanView({
   }, [plan?.image]);
   const [busy, setBusy] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [showHomeSidebar, setShowHomeSidebar] = useState(true);
   const [planHeight, setPlanHeight] = useState(400);
   const viewport = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<"devices" | "measure" | "rooms">("devices");
@@ -268,6 +271,7 @@ export function FloorPlanView({
           </p>
         </div>}
         <div className="flex flex-wrap gap-2">
+          {homeSidebar && <button className={control} onClick={() => setShowHomeSidebar(!showHomeSidebar)} aria-pressed={showHomeSidebar}>{showHomeSidebar ? "Ocultar resumen" : "Mostrar resumen"}</button>}
           {draft && (
             <button
               className={control}
@@ -487,7 +491,7 @@ export function FloorPlanView({
               </span>
             )}
           </div>
-          <div className={`grid gap-4 ${embedded ? "" : "xl:grid-cols-[minmax(0,1fr)_320px]"}`}>
+          <div className={`grid gap-4 ${homeSidebar && showHomeSidebar ? "lg:grid-cols-[minmax(0,1fr)_300px]" : embedded ? "" : "xl:grid-cols-[minmax(0,1fr)_320px]"}`}>
             <div
               ref={viewport}
               className="self-start overflow-auto rounded-2xl border border-border bg-background"
@@ -710,6 +714,7 @@ export function FloorPlanView({
                 )}
               </div>
             </div>
+            {homeSidebar && showHomeSidebar && homeSidebar}
             {(!embedded || mode === "measure") && <aside className="space-y-4 rounded-2xl border border-border bg-card p-4">
               <div
                 className="flex flex-wrap gap-3 text-xs text-muted-foreground"
