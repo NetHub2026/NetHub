@@ -51,8 +51,8 @@ export function ConfidencePill({
         className,
       )}
     >
-      {label}
-      {source && <span className="ml-1 opacity-70">· {source}</span>}
+      {fact.source === "legacy" ? "Legado / no verificado" : label}
+      {source && fact.source !== "legacy" && <span className="ml-1 opacity-70">· {source}</span>}
     </span>
   );
 }
@@ -106,12 +106,12 @@ export function IdentityDetails({ device }: { device: Device }) {
       <p className="text-xs font-medium text-muted-foreground">Identificación automática</p>
       <dl className="mt-2 space-y-1.5 text-xs">
         {rows.map(([k, v, fact]) => (
-          <div key={k} className="flex items-center gap-2">
-            <dt className="w-28 shrink-0 text-muted-foreground">{k}</dt>
-            <dd className="min-w-0 flex-1 truncate" title={v}>
+          <div key={k} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1">
+            <dt className="min-w-0 text-muted-foreground">{k}</dt>
+            <ConfidencePill fact={fact} />
+            <dd className="col-span-2 min-w-0 break-words" title={v}>
               {v}
             </dd>
-            <ConfidencePill fact={fact} />
           </div>
         ))}
       </dl>
