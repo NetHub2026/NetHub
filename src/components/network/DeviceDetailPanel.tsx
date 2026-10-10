@@ -32,7 +32,7 @@ import {
   type ServiceHit,
 } from "@/lib/services";
 import { VendorIcon } from "./VendorIcon";
-import { IdentityDetails, useIdentity } from "./IdentityBadge";
+import { IdentityDetails, InventoryIdentityIcon } from "./IdentityBadge";
 import { cn } from "@/lib/utils";
 
 const connectionTags = ["Cableado / Ethernet", "Wi-Fi", "Wi-Fi 2.4GHz", "Wi-Fi 5GHz", "Wi-Fi 6"];
@@ -313,7 +313,7 @@ export function DeviceDetailPanel({
                 )}
               </div>
               <DialogPrimitive.Title className="mt-3 flex items-center gap-2 text-2xl font-semibold">
-                <DeviceTypeIcon type={device.type} className="size-6 text-brand" />
+              <InventoryIdentityIcon device={device} />
                 {device.name}
               </DialogPrimitive.Title>
               <p className="font-mono text-sm text-muted-foreground">{device.ip}</p>

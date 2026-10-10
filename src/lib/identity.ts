@@ -301,6 +301,7 @@ export function deriveIdentity(device: IdentityInput, adapterName?: string | nul
 
 /** Tipo sugerido para un dispositivo recién detectado, o null si no hay pistas. */
 export function inferType(device: IdentityInput, adapterName?: string | null): DeviceType | null {
-  return deriveIdentity({ ...device, manualEdit: false, identityManual: undefined }, adapterName)
-    .type.value;
+  const automatic = { ...device, manualEdit: false };
+  delete automatic.identityManual;
+  return deriveIdentity(automatic, adapterName).type.value;
 }
