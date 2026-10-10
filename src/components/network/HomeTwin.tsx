@@ -68,6 +68,7 @@ export function HomeTwin({
   onOpenPerformance: () => void;
 }) {
   const [placing, setPlacing] = useState(false);
+  const [homeView, setHomeView] = useState<"plan" | "rooms">("plan");
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
   const dragging = useRef<string | null>(null);
   const [selectedAnomalyId, setSelectedAnomalyId] = useState<string | null>(null);
@@ -114,7 +115,14 @@ export function HomeTwin({
     <>
       {!planView && onSetupPlan && <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-base font-semibold">Mi casa</h2><Button variant="outline" onClick={onSetupPlan}>Añadir plano real</Button></div>}
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
-        {planView ?? <section className="overflow-hidden rounded-xl border border-border bg-card">
+        <div className="min-w-0">
+          {planView && <div className="mb-3 flex justify-end" role="group" aria-label="Representación de Mi casa">
+            <div className="flex gap-1 rounded-lg border border-border bg-muted/40 p-1">
+              <Button size="sm" variant={homeView === "plan" ? "secondary" : "ghost"} aria-pressed={homeView === "plan"} onClick={() => setHomeView("plan")}>Plano</Button>
+              <Button size="sm" variant={homeView === "rooms" ? "secondary" : "ghost"} aria-pressed={homeView === "rooms"} onClick={() => setHomeView("rooms")}>Habitaciones</Button>
+            </div>
+          </div>}
+        {planView && homeView === "plan" ? planView : <section className="overflow-hidden rounded-xl border border-border bg-card">
           <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
             <div className="flex items-center gap-3">
               <span className="relative flex size-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
@@ -375,6 +383,7 @@ export function HomeTwin({
             </span>
           </footer>
         </section>}
+        </div>
         <aside className="rounded-xl border border-border bg-card">
           <header className="flex items-center gap-3 border-b border-border px-5 py-4">
             <span className="flex size-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
