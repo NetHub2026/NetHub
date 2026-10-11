@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import {
   MapPin,
   Upload,
@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import type { Device } from "@/lib/devices";
 import type { PatternState } from "@/lib/patterns";
+import { transparentPlanImage } from "@/lib/plan-background";
 import { DeviceTypeIcon } from "./DeviceTypeIcon";
 import {
   planId,
@@ -48,6 +49,8 @@ type Props = {
   patterns?: PatternState;
   embedded?: boolean;
   onSelectDevice?: (id: string) => void;
+  homeHeader?: ReactNode;
+  homeSidebar?: ReactNode;
 };
 const control =
   "rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-50";
@@ -67,6 +70,8 @@ export function FloorPlanView({
   patterns,
   embedded = false,
   onSelectDevice,
+  homeHeader,
+  homeSidebar,
 }: Props) {
   const anomalous = new Set(
     (patterns?.anomalies ?? [])
@@ -74,8 +79,18 @@ export function FloorPlanView({
       .map((a) => a.deviceId),
   );
   const [draft, setDraft] = useState(plan);
+  const [displayImage, setDisplayImage] = useState(plan?.image);
+  useEffect(() => {
+    let cancelled = false;
+    setDisplayImage(plan?.image);
+    if (plan?.image) void transparentPlanImage(plan.image).then(image => {
+      if (!cancelled) setDisplayImage(image);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [plan?.image]);
   const [busy, setBusy] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [showHomeSidebar, setShowHomeSidebar] = useState(true);
   const [planHeight, setPlanHeight] = useState(400);
   const viewport = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<"devices" | "measure" | "rooms">("devices");
@@ -245,8 +260,8 @@ export function FloorPlanView({
   const sessions = [...new Set(draft?.measurements.map((m) => m.session) ?? [])];
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+      <div className={`flex flex-wrap items-center justify-between gap-3 ${homeHeader ? "border border-transparent px-5 py-2" : ""}`}>
+        {homeHeader ?? <div>
           <h2 className="flex items-center gap-2 text-lg font-semibold">
             <MapPin className="size-5 text-primary" />
             {embedded ? "Mi casa" : "Plano y cobertura"}
@@ -254,8 +269,9 @@ export function FloorPlanView({
           <p className="text-sm text-muted-foreground">
             Tu plano real, tus equipos y mediciones donde tú estás.
           </p>
-        </div>
+        </div>}
         <div className="flex flex-wrap gap-2">
+          {homeSidebar && <button className={control} onClick={() => setShowHomeSidebar(!showHomeSidebar)} aria-pressed={showHomeSidebar}>{showHomeSidebar ? "Ocultar resumen" : "Mostrar resumen"}</button>}
           {draft && (
             <button
               className={control}
@@ -475,7 +491,7 @@ export function FloorPlanView({
               </span>
             )}
           </div>
-          <div className={`grid gap-4 ${embedded ? "" : "xl:grid-cols-[minmax(0,1fr)_320px]"}`}>
+          <div className={`grid gap-4 ${homeSidebar && showHomeSidebar ? "lg:grid-cols-[minmax(0,1fr)_300px]" : embedded ? "" : "xl:grid-cols-[minmax(0,1fr)_320px]"}`}>
             <div
               ref={viewport}
               className="self-start overflow-auto rounded-2xl border border-border bg-background"
@@ -490,7 +506,7 @@ export function FloorPlanView({
                   width: `${zoom * 100}%`,
                   maxWidth: `${(planHeight - 4) * (draft.width / draft.height) * zoom}px`,
                   margin: zoom === 1 ? "0 auto" : "0",
-                  backgroundImage: `url(${draft.image})`,
+                  backgroundImage: `url(${displayImage ?? draft.image})`,
                   backgroundSize: "100% 100%",
                   touchAction: mode === "devices" ? "pan-y" : "manipulation",
                 }}
@@ -501,7 +517,7 @@ export function FloorPlanView({
                   preserveAspectRatio="none"
                   className="pointer-events-none absolute inset-0 h-full w-full"
                 >
-                  {draft.rooms.map((room) => (
+                  {mode === "rooms" && !draft.locked && draft.rooms.map((room) => (
                     <polygon
                       key={room.id}
                       points={roomPoints(room)
@@ -698,6 +714,7 @@ export function FloorPlanView({
                 )}
               </div>
             </div>
+            {homeSidebar && showHomeSidebar && homeSidebar}
             {(!embedded || mode === "measure") && <aside className="space-y-4 rounded-2xl border border-border bg-card p-4">
               <div
                 className="flex flex-wrap gap-3 text-xs text-muted-foreground"
